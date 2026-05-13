@@ -1298,7 +1298,7 @@ public class IngestionService
         await _dbContext.SaveChangesAsync(ct);
 
         if (_notificationService is not null)
-            await SendLateDiscoveryNotificationsAsync(tenantId, criticalVulnIds, ct);
+            await SendLateDiscoveryNotificationsAsync(tenantId, [.. assessedVulnIds], ct);
     }
 
     private async Task SendLateDiscoveryNotificationsAsync(
@@ -1331,7 +1331,8 @@ public class IngestionService
         var emergencyVulnIds = emergencyAssessments.Select(e => e.VulnerabilityId).ToList();
 
         var alreadyNotifiedPairs = await _dbContext.Notifications
-            .Where(n => n.Type == NotificationType.NewCriticalVuln
+            .Where(n => n.TenantId == tenantId
+                     && n.Type == NotificationType.NewCriticalVuln
                      && n.RelatedEntityId != null
                      && emergencyVulnIds.Contains(n.RelatedEntityId.Value)
                      && managerUserIds.Contains(n.UserId))
@@ -1349,17 +1350,26 @@ public class IngestionService
                 if (notifiedSet.Contains((userId, assessment.VulnerabilityId)))
                     continue;
 
-                await _notificationService!.SendAsync(
-                    userId,
-                    tenantId,
-                    NotificationType.NewCriticalVuln,
-                    $"Emergency patch required: {assessment.ExternalId}",
-                    $"{assessment.ExternalId} requires emergency patching. " +
-                    $"Confidence: {assessment.Confidence}. " +
-                    $"Target SLA: {assessment.UrgencyTargetSla}.",
-                    "Vulnerability",
-                    assessment.VulnerabilityId,
-                    ct);
+                try
+                {
+                    await _notificationService!.SendAsync(
+                        userId,
+                        tenantId,
+                        NotificationType.NewCriticalVuln,
+                        $"Emergency patch required: {assessment.ExternalId}",
+                        $"{assessment.ExternalId} requires emergency patching. " +
+                        $"Confidence: {assessment.Confidence}. " +
+                        $"Target SLA: {assessment.UrgencyTargetSla}.",
+                        "Vulnerability",
+                        assessment.VulnerabilityId,
+                        ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Failed to send late-discovery notification to user {UserId} for vulnerability {VulnerabilityId}",
+                        userId, assessment.VulnerabilityId);
+                }
             }
         }
     }
