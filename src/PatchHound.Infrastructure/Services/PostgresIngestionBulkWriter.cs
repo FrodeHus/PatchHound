@@ -203,6 +203,23 @@ internal sealed class PostgresIngestionBulkWriter(PatchHoundDbContext db) : IIng
             );
     }
 
+    public async Task<int> RefreshDeviceActivityAsync(Guid tenantId, TimeSpan inactiveThreshold, CancellationToken ct)
+    {
+        var cutoff = DateTimeOffset.UtcNow.Subtract(inactiveThreshold);
+
+        var deactivatedCount = await db.Devices
+            .IgnoreQueryFilters()
+            .Where(d => d.TenantId == tenantId && d.ActiveInTenant && (d.LastSeenAt == null || d.LastSeenAt < cutoff))
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.ActiveInTenant, false), ct);
+
+        await db.Devices
+            .IgnoreQueryFilters()
+            .Where(d => d.TenantId == tenantId && !d.ActiveInTenant && d.LastSeenAt != null && d.LastSeenAt >= cutoff)
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.ActiveInTenant, true), ct);
+
+        return deactivatedCount;
+    }
+
     public async Task FinalizeAbortedRunAsync(
         Guid runId,
         Guid tenantId,

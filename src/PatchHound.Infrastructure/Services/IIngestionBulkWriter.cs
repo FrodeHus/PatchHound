@@ -69,6 +69,14 @@ internal interface IIngestionBulkWriter
         CancellationToken ct
     );
 
+    // ── Device activity ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Deactivates devices not seen since <paramref name="inactiveThreshold"/> and reactivates
+    /// those that have re-appeared. Returns the count of deactivated devices.
+    /// </summary>
+    Task<int> RefreshDeviceActivityAsync(Guid tenantId, TimeSpan inactiveThreshold, CancellationToken ct);
+
     // ── Compound operations ──────────────────────────────────────────────────
 
     /// <summary>

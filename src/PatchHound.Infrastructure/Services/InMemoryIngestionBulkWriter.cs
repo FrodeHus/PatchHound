@@ -222,6 +222,29 @@ internal sealed class InMemoryIngestionBulkWriter(PatchHoundDbContext db) : IIng
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task<int> RefreshDeviceActivityAsync(Guid tenantId, TimeSpan inactiveThreshold, CancellationToken ct)
+    {
+        var cutoff = DateTimeOffset.UtcNow.Subtract(inactiveThreshold);
+        var devices = await db.Devices
+            .IgnoreQueryFilters()
+            .Where(d => d.TenantId == tenantId)
+            .ToListAsync(ct);
+
+        var deactivatedCount = 0;
+        foreach (var device in devices)
+        {
+            var isActive = device.LastSeenAt.HasValue && device.LastSeenAt.Value >= cutoff;
+            device.SetActiveInTenant(isActive);
+            if (!isActive)
+            {
+                deactivatedCount++;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        return deactivatedCount;
+    }
+
     public async Task FinalizeAbortedRunAsync(
         Guid runId,
         Guid tenantId,

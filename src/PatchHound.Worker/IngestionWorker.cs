@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
@@ -171,7 +172,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
                     setters
                         .SetProperty(item => item.ManualRequestedAt, (DateTimeOffset?)null)
                         .SetProperty(item => item.LastCompletedAt, DateTimeOffset.UtcNow)
-                        .SetProperty(item => item.LastStatus, "Failed")
+                        .SetProperty(item => item.LastStatus, IngestionRunStatuses.FailedRecoverable)
                         .SetProperty(
                             item => item.LastError,
                             "Manual sync skipped because the source is disabled or credentials are incomplete."

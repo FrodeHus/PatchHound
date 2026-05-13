@@ -819,28 +819,8 @@ public class IngestionService
         return startedAny;
     }
 
-    private async Task<int> RefreshDeviceActivityForTenantAsync(Guid tenantId, CancellationToken ct)
-    {
-        var cutoff = DateTimeOffset.UtcNow.Subtract(DeviceInactiveThreshold);
-        var devices = await _dbContext.Devices
-            .IgnoreQueryFilters()
-            .Where(d => d.TenantId == tenantId)
-            .ToListAsync(ct);
-        var deactivatedCount = 0;
-
-        foreach (var device in devices)
-        {
-            var isActive = device.LastSeenAt.HasValue && device.LastSeenAt.Value >= cutoff;
-            device.SetActiveInTenant(isActive);
-            if (!isActive)
-            {
-                deactivatedCount++;
-            }
-        }
-
-        await _dbContext.SaveChangesAsync(ct);
-        return deactivatedCount;
-    }
+    private Task<int> RefreshDeviceActivityForTenantAsync(Guid tenantId, CancellationToken ct) =>
+        _bulkWriter.RefreshDeviceActivityAsync(tenantId, DeviceInactiveThreshold, ct);
 
     private async Task<T> ExecuteWithConcurrencyRetryAsync<T>(
         Func<Task<T>> operation,
