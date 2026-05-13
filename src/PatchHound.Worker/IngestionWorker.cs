@@ -77,7 +77,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
                 runnableSources++;
             }
 
-            if (!isManualSync && !isDue)
+            if (!isManualSync && (!isDue || !HasConfiguredCredentials(source)))
             {
                 continue;
             }

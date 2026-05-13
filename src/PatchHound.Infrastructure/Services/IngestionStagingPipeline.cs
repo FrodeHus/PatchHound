@@ -226,12 +226,13 @@ public class IngestionStagingPipeline(
         CancellationToken ct
     )
     {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
         var checkpoint = await dbContext
             .IngestionCheckpoints.IgnoreQueryFilters()
             .FirstOrDefaultAsync(item =>
                 item.IngestionRunId == ingestionRunId
                 && item.TenantId == tenantId
-                && item.SourceKey == sourceKey
+                && item.SourceKey == normalizedSourceKey
                 && item.Phase == CheckpointPhases.AssetStaging,
                 ct
             );
@@ -271,7 +272,7 @@ public class IngestionStagingPipeline(
                 await StageAssetInventorySnapshotAsync(
                     ingestionRunId,
                     tenantId,
-                    sourceKey,
+                    normalizedSourceKey,
                     normalizedBatch,
                     batchNumber,
                     ct
@@ -279,7 +280,7 @@ public class IngestionStagingPipeline(
                 await checkpointWriter.CommitCheckpointAsync(
                     ingestionRunId,
                     tenantId,
-                    sourceKey,
+                    normalizedSourceKey,
                     CheckpointPhases.AssetStaging,
                     batchNumber,
                     batch.NextCursorJson,
@@ -293,7 +294,7 @@ public class IngestionStagingPipeline(
                 await checkpointWriter.CommitCheckpointAsync(
                     ingestionRunId,
                     tenantId,
-                    sourceKey,
+                    normalizedSourceKey,
                     CheckpointPhases.AssetStaging,
                     batchNumber,
                     batch.NextCursorJson,

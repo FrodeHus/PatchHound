@@ -61,7 +61,7 @@ public static class IngestionScheduleEvaluator
         DateTimeOffset? lastCompletedAt,
         DateTimeOffset nowUtc)
     {
-        if (!enabled || string.IsNullOrWhiteSpace(syncSchedule))
+        if (!enabled || !TenantSourceCatalog.SupportsScheduling(sourceKey) || string.IsNullOrWhiteSpace(syncSchedule))
         {
             return false;
         }

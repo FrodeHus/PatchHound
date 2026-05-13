@@ -91,7 +91,7 @@ public class StagedDeviceMergeService(
 
         // ── Pass 1: Upsert devices ──────────────────────────────────────────────────────────
         // Collect Device entities by their ExternalId for the software-link pass below.
-        var deviceByExternalId = new Dictionary<string, Device>(StringComparer.OrdinalIgnoreCase);
+        var deviceByExternalId = new Dictionary<(string SourceKey, string ExternalId), Device>();
 
         foreach (var stagedDevice in stagedDevices)
         {
@@ -191,7 +191,7 @@ public class StagedDeviceMergeService(
             );
             device.SetActiveInTenant(true);
 
-            deviceByExternalId[stagedDevice.ExternalId] = device;
+            deviceByExternalId[(stagedDevice.SourceKey, stagedDevice.ExternalId)] = device;
         }
 
         // Persist device upserts so all device IDs are stable before the software-link pass.
@@ -212,7 +212,7 @@ public class StagedDeviceMergeService(
 
         foreach (var stagedDevice in stagedDevices)
         {
-            if (!deviceByExternalId.TryGetValue(stagedDevice.ExternalId, out var device))
+            if (!deviceByExternalId.TryGetValue((stagedDevice.SourceKey, stagedDevice.ExternalId), out var device))
             {
                 // Device was skipped or deactivated in Pass 1 — no software links to process.
                 continue;
