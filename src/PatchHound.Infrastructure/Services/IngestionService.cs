@@ -35,6 +35,7 @@ public class IngestionService
     private readonly IngestionCheckpointWriter _checkpointWriter;
     private readonly IngestionStagingPipeline _stagingPipeline;
     private readonly IngestionSnapshotLifecycle _snapshotLifecycle;
+    private readonly IIngestionBulkWriter _bulkWriter;
     private readonly ILogger<IngestionService> _logger;
 
     public IngestionService(
@@ -68,6 +69,7 @@ public class IngestionService
             new IngestionCheckpointWriter(dbContext),
             new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
             new IngestionSnapshotLifecycle(dbContext),
+            CreateBulkWriter(dbContext),
             logger
         ) { }
 
@@ -103,6 +105,7 @@ public class IngestionService
             new IngestionCheckpointWriter(dbContext),
             new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
             new IngestionSnapshotLifecycle(dbContext),
+            CreateBulkWriter(dbContext),
             logger
         ) { }
 
@@ -138,10 +141,16 @@ public class IngestionService
             new IngestionCheckpointWriter(dbContext),
             new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
             new IngestionSnapshotLifecycle(dbContext),
+            CreateBulkWriter(dbContext),
             logger
         ) { }
 
-    public IngestionService(
+    private static IIngestionBulkWriter CreateBulkWriter(PatchHoundDbContext db) =>
+        db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory"
+            ? new InMemoryIngestionBulkWriter(db)
+            : new PostgresIngestionBulkWriter(db);
+
+    internal IngestionService(
         PatchHoundDbContext dbContext,
         IEnumerable<IIngestionSource> sources,
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
@@ -159,6 +168,7 @@ public class IngestionService
         IngestionCheckpointWriter checkpointWriter,
         IngestionStagingPipeline stagingPipeline,
         IngestionSnapshotLifecycle snapshotLifecycle,
+        IIngestionBulkWriter bulkWriter,
         ILogger<IngestionService> logger
     )
     {
@@ -179,6 +189,7 @@ public class IngestionService
         _checkpointWriter = checkpointWriter;
         _stagingPipeline = stagingPipeline;
         _snapshotLifecycle = snapshotLifecycle;
+        _bulkWriter = bulkWriter;
         _logger = logger;
     }
 
@@ -1229,40 +1240,12 @@ public class IngestionService
             CancellationToken callbackCt
         )
         {
-            if (_dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
-            {
-                var run = await _dbContext
-                    .IngestionRuns.IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(item => item.Id == ingestionRunId, callbackCt);
-                if (run is null)
-                {
-                    return;
-                }
-
-                run.UpdateVulnerabilityMergeProgress(
-                    stagedVulnerabilityCount,
-                    persistedVulnerabilityCount
-                );
-                await _dbContext.SaveChangesAsync(callbackCt);
-                return;
-            }
-
-            await _dbContext
-                .IngestionRuns.IgnoreQueryFilters()
-                .Where(item => item.Id == ingestionRunId && !item.CompletedAt.HasValue)
-                .ExecuteUpdateAsync(
-                    setters =>
-                        setters
-                            .SetProperty(
-                                item => item.StagedVulnerabilityCount,
-                                stagedVulnerabilityCount
-                            )
-                            .SetProperty(
-                                item => item.PersistedVulnerabilityCount,
-                                persistedVulnerabilityCount
-                            ),
-                    callbackCt
-                );
+            await _bulkWriter.UpdateVulnerabilityMergeProgressAsync(
+                ingestionRunId,
+                stagedVulnerabilityCount,
+                persistedVulnerabilityCount,
+                callbackCt
+            );
         }
     }
 
@@ -1362,67 +1345,17 @@ public class IngestionService
             CancellationToken callbackCt
         )
         {
-            if (_dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
-            {
-                var run = await _dbContext
-                    .IngestionRuns.IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(item => item.Id == ingestionRunId, callbackCt);
-                if (run is null)
-                {
-                    return;
-                }
-
-                run.UpdateAssetMergeProgress(
-                    stagedMachineCount,
-                    stagedSoftwareCount,
-                    persistedMachineCount,
-                    0,
-                    persistedSoftwareCount
-                );
-                await _dbContext.SaveChangesAsync(callbackCt);
-                return;
-            }
-
-            await _dbContext
-                .IngestionRuns.IgnoreQueryFilters()
-                .Where(item => item.Id == ingestionRunId && !item.CompletedAt.HasValue)
-                .ExecuteUpdateAsync(
-                    setters =>
-                        setters
-                            .SetProperty(
-                                item => item.StagedMachineCount,
-                                stagedMachineCount
-                            )
-                            .SetProperty(
-                                item => item.StagedSoftwareCount,
-                                stagedSoftwareCount
-                            )
-                            .SetProperty(
-                                item => item.PersistedMachineCount,
-                                persistedMachineCount
-                            )
-                            .SetProperty(
-                                item => item.DeactivatedMachineCount,
-                                0
-                            )
-                            .SetProperty(
-                                item => item.PersistedSoftwareCount,
-                                persistedSoftwareCount
-                            ),
-                    callbackCt
-                );
+            await _bulkWriter.UpdateAssetMergeProgressAsync(
+                ingestionRunId,
+                stagedMachineCount,
+                stagedSoftwareCount,
+                persistedMachineCount,
+                persistedSoftwareCount,
+                callbackCt
+            );
         }
     }
 
-
-    private bool IsInMemoryProvider()
-    {
-        return string.Equals(
-            _dbContext.Database.ProviderName,
-            "Microsoft.EntityFrameworkCore.InMemory",
-            StringComparison.Ordinal
-        );
-    }
 
     private static string DescribeConcurrencyEntries(DbUpdateConcurrencyException ex)
     {

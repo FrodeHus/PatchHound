@@ -5,8 +5,25 @@ using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Infrastructure.Services;
 
-public class IngestionSnapshotLifecycle(PatchHoundDbContext dbContext)
+public class IngestionSnapshotLifecycle
 {
+    private readonly PatchHoundDbContext dbContext;
+    private readonly IIngestionBulkWriter _bulkWriter;
+
+    public IngestionSnapshotLifecycle(PatchHoundDbContext dbContext)
+        : this(dbContext, CreateBulkWriter(dbContext)) { }
+
+    internal IngestionSnapshotLifecycle(PatchHoundDbContext dbContext, IIngestionBulkWriter bulkWriter)
+    {
+        this.dbContext = dbContext;
+        _bulkWriter = bulkWriter;
+    }
+
+    private static IIngestionBulkWriter CreateBulkWriter(PatchHoundDbContext db) =>
+        db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory"
+            ? new InMemoryIngestionBulkWriter(db)
+            : new PostgresIngestionBulkWriter(db);
+
     internal static bool SupportsSoftwareSnapshots(string sourceKey)
     {
         return sourceKey.Trim().ToLowerInvariant() == TenantSourceCatalog.DefenderSourceKey;
@@ -137,30 +154,6 @@ public class IngestionSnapshotLifecycle(PatchHoundDbContext dbContext)
 
     internal async Task CleanupSnapshotDataAsync(Guid snapshotId, CancellationToken ct)
     {
-        if (dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
-        {
-            var tenantSoftware = await dbContext
-                .SoftwareTenantRecords.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
-            var installations = await dbContext
-                .SoftwareProductInstallations.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
-
-            dbContext.SoftwareTenantRecords.RemoveRange(tenantSoftware);
-            dbContext.SoftwareProductInstallations.RemoveRange(installations);
-            await dbContext.SaveChangesAsync(ct);
-            return;
-        }
-
-        await dbContext
-            .SoftwareProductInstallations.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
-        await dbContext
-            .SoftwareTenantRecords.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
+        await _bulkWriter.CleanupSnapshotDataAsync(snapshotId, ct);
     }
 }

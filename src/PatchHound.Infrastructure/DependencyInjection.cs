@@ -205,6 +205,13 @@ public static class DependencyInjection
         services.AddScoped<IStagedCloudApplicationMergeService, StagedCloudApplicationMergeService>();
 
         // Ingestion
+        services.AddScoped<IIngestionBulkWriter>(sp =>
+        {
+            var db = sp.GetRequiredService<PatchHoundDbContext>();
+            return db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory"
+                ? new InMemoryIngestionBulkWriter(db)
+                : (IIngestionBulkWriter)new PostgresIngestionBulkWriter(db);
+        });
         services.AddScoped<IngestionLeaseManager>();
         services.AddScoped<IngestionCheckpointWriter>();
         services.AddScoped<IngestionStagingPipeline>();
