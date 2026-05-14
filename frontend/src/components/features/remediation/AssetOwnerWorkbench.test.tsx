@@ -124,6 +124,7 @@ const dataFixture: DecisionContext = {
     jobError: null,
     jobStatus: 'None',
   },
+  patchAssessments: [],
   threatIntel: {
     summary: null,
     generatedAt: null,

@@ -24,6 +24,7 @@ public record DecisionContextDto(
     DecisionRiskDto? RiskScore,
     DecisionSlaDto? Sla,
     PatchAssessmentDto PatchAssessment,
+    List<PatchAssessmentDto> PatchAssessments,
     ThreatIntelDto ThreatIntel
 );
 

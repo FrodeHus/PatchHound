@@ -860,7 +860,10 @@ public class RemediationDecisionQueryService(
 
         var aiProfileAvailable = (await aiConfigurationResolver.ResolveDefaultAsync(tenantId, ct)).IsSuccess;
 
-        var patchAssessment = await ResolvePatchAssessmentAsync(tenantId, remediationCaseId, ct);
+        var patchAssessments = await ResolvePatchAssessmentsAsync(tenantId, remediationCaseId, ct);
+        var patchAssessment = patchAssessments.FirstOrDefault(assessment => assessment.Recommendation is not null)
+            ?? patchAssessments.FirstOrDefault()
+            ?? PatchAssessmentDtoMapper.Empty(null);
 
         var threatIntel = new ThreatIntelDto(
             caseMeta.ThreatIntelSummary,
@@ -909,6 +912,7 @@ public class RemediationDecisionQueryService(
             riskDto,
             slaDto,
             patchAssessment,
+            patchAssessments,
             threatIntel
         );
     }
@@ -1317,7 +1321,7 @@ public class RemediationDecisionQueryService(
         return new DateTimeOffset(utc.Year, utc.Month, utc.Day, 0, 0, 0, TimeSpan.Zero);
     }
 
-    private async Task<PatchAssessmentDto> ResolvePatchAssessmentAsync(
+    private async Task<List<PatchAssessmentDto>> ResolvePatchAssessmentsAsync(
         Guid tenantId,
         Guid caseId,
         CancellationToken ct)
@@ -1335,74 +1339,39 @@ public class RemediationDecisionQueryService(
                 (_, v) => new { v.Id, v.VendorSeverity })
             .ToListAsync(ct);
 
-        // Prefer an already-assessed candidate; fall back to highest severity (materialise first —
-        // enum stored as string, alphabetical SQL order ≠ severity order)
-        var candidateIds = candidates.Select(c => c.Id).ToList();
-        var assessedVulnIds = await dbContext.VulnerabilityPatchAssessments.AsNoTracking()
+        var uniqueCandidates = candidates
+            .GroupBy(c => c.Id)
+            .Select(group => group.First())
+            .ToList();
+        var candidateIds = uniqueCandidates.Select(c => c.Id).ToList();
+        if (candidateIds.Count == 0)
+            return [];
+
+        var assessments = await dbContext.VulnerabilityPatchAssessments.AsNoTracking()
             .Where(a => candidateIds.Contains(a.VulnerabilityId))
-            .Select(a => a.VulnerabilityId)
-            .ToHashSetAsync(ct);
+            .ToListAsync(ct);
+        var assessmentsByVulnerabilityId = assessments.ToDictionary(a => a.VulnerabilityId);
 
-        var vulnerabilityId = candidates
-            .OrderByDescending(x => assessedVulnIds.Contains(x.Id) ? 1 : 0)
-            .ThenByDescending(x => x.VendorSeverity)
+        var jobs = await dbContext.VulnerabilityAssessmentJobs.AsNoTracking()
+            .Where(j => candidateIds.Contains(j.VulnerabilityId))
+            .ToListAsync(ct);
+        var latestJobs = jobs
+            .GroupBy(j => j.VulnerabilityId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(j => j.UpdatedAt)
+                    .ThenByDescending(j => j.RequestedAt)
+                    .First());
+
+        return uniqueCandidates
+            .OrderByDescending(x => x.VendorSeverity)
             .ThenBy(x => x.Id)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefault();
-
-        if (vulnerabilityId is null)
-            return new PatchAssessmentDto(null, null, null, null, null, null, null, null, null, null, null, null, null, "None");
-
-        var assessment = await dbContext.VulnerabilityPatchAssessments.AsNoTracking()
-            .FirstOrDefaultAsync(a => a.VulnerabilityId == vulnerabilityId, ct);
-
-        var job = await dbContext.VulnerabilityAssessmentJobs.AsNoTracking()
-            .Where(j => j.VulnerabilityId == vulnerabilityId)
-            .OrderByDescending(j => j.UpdatedAt)
-            .ThenByDescending(j => j.RequestedAt)
-            .FirstOrDefaultAsync(ct);
-
-        // Assessment existence takes precedence over transient job state
-        var jobStatus = assessment is not null ? "Succeeded" : job?.Status.ToString() ?? "None";
-        var jobError = assessment is null && job?.Status == VulnerabilityAssessmentJobStatus.Failed
-            ? NullIfWhiteSpace(job.Error)
-            : null;
-
-        if (assessment is null)
-            return new PatchAssessmentDto(vulnerabilityId, null, null, null, null, null, null, null, null, null, null, null, jobError, jobStatus);
-
-        return new PatchAssessmentDto(
-            vulnerabilityId,
-            assessment.Recommendation,
-            assessment.Confidence,
-            assessment.Summary,
-            assessment.UrgencyTier,
-            assessment.UrgencyTargetSla,
-            assessment.UrgencyReason,
-            ParseJsonStringArray(assessment.SimilarVulnerabilities),
-            ParseJsonStringArray(assessment.CompensatingControlsUntilPatched),
-            ParseJsonStringArray(assessment.References),
-            assessment.AiProfileName,
-            assessment.AssessedAt,
-            null,
-            jobStatus);
+            .Select(candidate => assessmentsByVulnerabilityId.TryGetValue(candidate.Id, out var assessment)
+                ? PatchAssessmentDtoMapper.FromAssessment(assessment)
+                : PatchAssessmentDtoMapper.FromJob(
+                    candidate.Id,
+                    latestJobs.GetValueOrDefault(candidate.Id)))
+            .ToList();
     }
-
-    private static IReadOnlyList<string>? ParseJsonStringArray(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json) || json == "[]")
-            return null;
-        try
-        {
-            var parsed = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json);
-            return parsed is { Count: > 0 } ? parsed : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static string? NullIfWhiteSpace(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

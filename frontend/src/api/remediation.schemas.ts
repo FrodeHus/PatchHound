@@ -185,6 +185,7 @@ export const decisionContextSchema = z.object({
   riskScore: decisionRiskSchema.nullable(),
   sla: decisionSlaSchema.nullable(),
   patchAssessment: patchAssessmentSchema,
+  patchAssessments: z.array(patchAssessmentSchema),
   threatIntel: threatIntelSchema,
 })
 

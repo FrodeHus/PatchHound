@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { isoDateTimeSchema } from './common.schemas'
 import { pagedResponseMetaSchema } from './pagination.schemas'
+import { patchAssessmentSchema } from './remediation.schemas'
 
 export const vulnerabilitySchema = z.object({
   id: z.string().uuid(),
@@ -120,6 +121,7 @@ export const vulnerabilityDetailSchema = z.object({
     activeEpisodes: z.array(exposureEpisodeSchema),
     resolvedEpisodes: z.array(exposureEpisodeSchema),
   }),
+  patchAssessment: patchAssessmentSchema,
 })
 
 export const aiReportSchema = z.object({

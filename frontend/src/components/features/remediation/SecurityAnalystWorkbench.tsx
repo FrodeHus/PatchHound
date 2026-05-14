@@ -65,6 +65,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
   const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? '')
   const [isSaving, setIsSaving] = useState(false)
   const [requestingAssessment, setRequestingAssessment] = useState(false)
+  const [requestingAssessmentIds, setRequestingAssessmentIds] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const vulnerabilities = data.openVulnerabilities.length > 0 ? data.openVulnerabilities : data.topVulnerabilities
@@ -124,14 +125,19 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
     }
   }
 
-  async function handleRequestAssessment() {
-    const vulnerabilityId = data.patchAssessment.vulnerabilityId ?? vulnerabilities[0]?.vulnerabilityId
-    if (!vulnerabilityId) return
+  async function handleRequestAssessment(vulnerabilityIds?: string[]) {
+    const ids = vulnerabilityIds?.length
+      ? vulnerabilityIds
+      : [data.patchAssessment.vulnerabilityId ?? vulnerabilities[0]?.vulnerabilityId].filter((id): id is string => !!id)
+    if (ids.length === 0) return
 
     setRequestingAssessment(true)
+    setRequestingAssessmentIds(ids)
     setError(null)
     try {
-      await requestVulnerabilityAssessment({ data: { vulnerabilityId } })
+      await Promise.all(ids.map((vulnerabilityId) =>
+        requestVulnerabilityAssessment({ data: { vulnerabilityId } })
+      ))
       await queryClient.invalidateQueries({
         predicate: ({ queryKey: candidateKey }) =>
           isDecisionContextQueryForCase(candidateKey, caseId),
@@ -140,6 +146,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
       setError(getApiErrorMessage(err, 'Unable to request patch assessment.'))
     } finally {
       setRequestingAssessment(false)
+      setRequestingAssessmentIds([])
     }
   }
 
@@ -318,9 +325,17 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
 
         <PatchAssessmentPanel
           assessment={data.patchAssessment}
+          assessments={data.patchAssessments}
+          vulnerabilities={vulnerabilities.map((vulnerability) => ({
+            vulnerabilityId: vulnerability.vulnerabilityId,
+            externalId: vulnerability.externalId,
+            title: vulnerability.title,
+            severity: vulnerability.effectiveSeverity ?? vulnerability.vendorSeverity,
+          }))}
           canRequest={true}
-          onRequest={() => void handleRequestAssessment()}
+          onRequest={(ids) => void handleRequestAssessment(ids)}
           requesting={requestingAssessment}
+          requestingVulnerabilityIds={requestingAssessmentIds}
         />
       </div>
 

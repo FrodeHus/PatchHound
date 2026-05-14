@@ -249,6 +249,63 @@ public class RemediationDecisionListTests : IDisposable
     }
 
     [Fact]
+    public async Task BuildByCaseIdAsync_ReturnsPatchAssessmentStateForEveryOpenVulnerability()
+    {
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var device = CanonicalTestData.MakeDevice(_tenantId);
+        var installedSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, device.Id, product.Id);
+        var critical = Vulnerability.Create("nvd", "CVE-2026-5001", "Critical vuln", "desc", Severity.Critical, 9.8m, null, DateTimeOffset.UtcNow);
+        var high = Vulnerability.Create("nvd", "CVE-2026-5002", "High vuln", "desc", Severity.High, 8.2m, null, DateTimeOffset.UtcNow);
+        var highAssessment = VulnerabilityPatchAssessment.Create(
+            high.Id,
+            "Patch in normal window.",
+            "Medium",
+            "No active exploit.",
+            "normal_patch_window",
+            "14 days",
+            "High severity without exploitation.",
+            "[]",
+            "[]",
+            "[]",
+            "Default AI",
+            null,
+            DateTimeOffset.UtcNow);
+        var criticalJob = VulnerabilityAssessmentJob.Create(critical.Id, _tenantId, DateTimeOffset.UtcNow);
+        criticalJob.Start(DateTimeOffset.UtcNow);
+
+        await _dbContext.AddRangeAsync(
+            product,
+            remediationCase,
+            device,
+            installedSoftware,
+            critical,
+            high,
+            DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, critical.Id, product.Id, installedSoftware.Id, installedSoftware.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow),
+            DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, high.Id, product.Id, installedSoftware.Id, installedSoftware.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow),
+            highAssessment,
+            criticalJob);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.BuildByCaseIdAsync(
+            _tenantId,
+            remediationCase.Id,
+            CancellationToken.None
+        );
+
+        result.Should().NotBeNull();
+        result!.PatchAssessments.Should().HaveCount(2);
+        result.PatchAssessments.Should().Contain(a =>
+            a.VulnerabilityId == critical.Id &&
+            a.JobStatus == nameof(VulnerabilityAssessmentJobStatus.Running));
+        result.PatchAssessments.Should().Contain(a =>
+            a.VulnerabilityId == high.Id &&
+            a.JobStatus == "Succeeded" &&
+            a.Recommendation == "Patch in normal window.");
+        result.PatchAssessment.VulnerabilityId.Should().Be(high.Id);
+    }
+
+    [Fact]
     public async Task ListAsync_ReturnsSoftwareOwnerRoutingFields()
     {
         var ownerTeam = Team.Create(_tenantId, "Platform Engineering");

@@ -120,6 +120,27 @@ const dataFixture: DecisionContext = {
       episodeRiskScore: null,
       overrideOutcome: null,
     },
+    {
+      vulnerabilityId: '99999999-9999-9999-9999-999999999999',
+      vulnerabilityDefinitionId: '99999999-9999-9999-9999-999999999999',
+      externalId: 'CVE-2026-5151',
+      title: 'Important elevation of privilege',
+      description: 'A high severity vulnerability.',
+      vendorSeverity: 'High',
+      vendorScore: 8.1,
+      effectiveSeverity: 'High',
+      effectiveScore: 8.1,
+      cvssVector: null,
+      firstSeenAt: '2026-05-01T00:00:00Z',
+      affectedDeviceCount: 2,
+      affectedVersionCount: 1,
+      knownExploited: false,
+      publicExploit: false,
+      activeAlert: false,
+      epssScore: 0.11,
+      episodeRiskScore: null,
+      overrideOutcome: null,
+    },
   ],
   riskScore: null,
   sla: {
@@ -131,21 +152,55 @@ const dataFixture: DecisionContext = {
     dueDate: '2026-05-09T00:00:00Z',
   },
   patchAssessment: {
-    vulnerabilityId: null,
-    recommendation: null,
-    confidence: null,
-    summary: null,
-    urgencyTier: null,
-    urgencyTargetSla: null,
-    urgencyReason: null,
+    vulnerabilityId: '99999999-9999-9999-9999-999999999999',
+    recommendation: 'Patch in the next normal change window.',
+    confidence: 'Medium',
+    summary: 'The high severity vulnerability has an assessment.',
+    urgencyTier: 'normal_patch_window',
+    urgencyTargetSla: '14 days',
+    urgencyReason: 'No active exploitation.',
     similarVulnerabilities: null,
     compensatingControlsUntilPatched: null,
     references: null,
-    aiProfileName: null,
-    assessedAt: null,
+    aiProfileName: 'Default AI',
+    assessedAt: '2026-05-02T00:00:00Z',
     jobError: null,
-    jobStatus: 'None',
+    jobStatus: 'Succeeded',
   },
+  patchAssessments: [
+    {
+      vulnerabilityId: '66666666-6666-6666-6666-666666666666',
+      recommendation: null,
+      confidence: null,
+      summary: null,
+      urgencyTier: null,
+      urgencyTargetSla: null,
+      urgencyReason: null,
+      similarVulnerabilities: null,
+      compensatingControlsUntilPatched: null,
+      references: null,
+      aiProfileName: null,
+      assessedAt: null,
+      jobError: null,
+      jobStatus: 'None',
+    },
+    {
+      vulnerabilityId: '99999999-9999-9999-9999-999999999999',
+      recommendation: 'Patch in the next normal change window.',
+      confidence: 'Medium',
+      summary: 'The high severity vulnerability has an assessment.',
+      urgencyTier: 'normal_patch_window',
+      urgencyTargetSla: '14 days',
+      urgencyReason: 'No active exploitation.',
+      similarVulnerabilities: null,
+      compensatingControlsUntilPatched: null,
+      references: null,
+      aiProfileName: 'Default AI',
+      assessedAt: '2026-05-02T00:00:00Z',
+      jobError: null,
+      jobStatus: 'Succeeded',
+    },
+  ],
   threatIntel: {
     summary: null,
     generatedAt: null,
@@ -200,7 +255,7 @@ describe('SecurityAnalystWorkbench', () => {
   it('opens vulnerability essentials from the compact list', () => {
     renderWorkbench()
 
-    fireEvent.click(screen.getByRole('button', { name: /Details/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Open details for CVE-2026-4242/i }))
 
     expect(screen.getByRole('heading', { name: 'CVE-2026-4242' })).toBeInTheDocument()
     expect(screen.getByText('A remotely exploitable vulnerability.')).toBeInTheDocument()
@@ -237,11 +292,24 @@ describe('SecurityAnalystWorkbench', () => {
   it('requests a patch assessment from the side card', () => {
     renderWorkbench()
 
-    fireEvent.click(screen.getByRole('button', { name: /Request assessment/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Re-assess/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Request 1 assessment/i }))
 
     expect(requestVulnerabilityAssessment).toHaveBeenCalledWith({
       data: { vulnerabilityId: '66666666-6666-6666-6666-666666666666' },
     })
+  })
+
+  it('shows assessment coverage and lets analysts choose CVEs to assess', () => {
+    renderWorkbench()
+
+    expect(screen.getByText('1 of 2 assessed')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Re-assess/i }))
+
+    const checkboxes = screen.getAllByRole('checkbox')
+    expect(checkboxes[0]).toBeChecked()
+    expect(checkboxes[1]).not.toBeChecked()
   })
 
   it('shows the exact failed patch assessment error with readable context', () => {
@@ -249,12 +317,20 @@ describe('SecurityAnalystWorkbench', () => {
 
     renderWorkbench({
       ...dataFixture,
+      openVulnerabilities: [dataFixture.openVulnerabilities[0]],
       patchAssessment: {
         ...dataFixture.patchAssessment,
         vulnerabilityId: '66666666-6666-6666-6666-666666666666',
         jobStatus: 'Failed',
         jobError: error,
+        recommendation: null,
       },
+      patchAssessments: [{
+        ...dataFixture.patchAssessments[0],
+        vulnerabilityId: '66666666-6666-6666-6666-666666666666',
+        jobStatus: 'Failed',
+        jobError: error,
+      }],
     })
 
     expect(screen.getByText('Assessment failed')).toBeInTheDocument()
