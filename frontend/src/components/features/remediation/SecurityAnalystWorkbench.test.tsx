@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnchorHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { DecisionContext } from '@/api/remediation.schemas'
-import { generateThreatIntel } from '@/api/remediation.functions'
+import { requestVulnerabilityAssessment } from '@/api/vulnerabilities.functions'
 import { SecurityAnalystWorkbench } from './SecurityAnalystWorkbench'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -12,7 +12,10 @@ vi.mock('@tanstack/react-router', () => ({
 
 vi.mock('@/api/remediation.functions', () => ({
   addRecommendation: vi.fn(),
-  generateThreatIntel: vi.fn(),
+}))
+
+vi.mock('@/api/vulnerabilities.functions', () => ({
+  requestVulnerabilityAssessment: vi.fn(),
 }))
 
 vi.mock('@/api/work-notes.functions', () => ({
@@ -223,43 +226,20 @@ describe('SecurityAnalystWorkbench', () => {
     expect(screen.getByLabelText(/Recommendation rationale/i)).toHaveValue('Existing analyst text.')
   })
 
-  it('opens long threat intelligence summaries in a fullscreen dialog', () => {
-    const longSummary = Array.from(
-      { length: 18 },
-      (_, index) => `Paragraph ${index + 1}: active exploitation details and mitigation notes for analyst review.`,
-    ).join('\n\n')
-
-    renderWorkbench({
-      ...dataFixture,
-      threatIntel: {
-        summary: longSummary,
-        generatedAt: '2026-05-03T00:00:00Z',
-        profileName: 'Threat profile',
-        canGenerate: true,
-        unavailableMessage: null,
-      },
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /View threat intelligence in fullscreen/i }))
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /Threat intelligence/i })).toBeInTheDocument()
-    expect(screen.getAllByText(/Paragraph 18:/i).length).toBeGreaterThan(0)
-  })
-
-  it('shows generated threat intelligence from the mutation response', async () => {
-    vi.mocked(generateThreatIntel).mockResolvedValueOnce({
-      summary: 'Generated threat intelligence summary.',
-      generatedAt: '2026-05-03T00:00:00Z',
-      profileName: 'Threat profile',
-      canGenerate: true,
-      unavailableMessage: null,
-    })
-
+  it('shows patch assessment in place of threat intelligence', () => {
     renderWorkbench()
 
-    fireEvent.click(screen.getByRole('button', { name: /Retrieve threat intel/i }))
+    expect(screen.getByText('Patch Priority Assessment')).toBeInTheDocument()
+    expect(screen.queryByText('Threat intelligence')).not.toBeInTheDocument()
+  })
 
-    expect(await screen.findByText('Generated threat intelligence summary.')).toBeInTheDocument()
+  it('requests a patch assessment from the side card', () => {
+    renderWorkbench()
+
+    fireEvent.click(screen.getByRole('button', { name: /Request assessment/i }))
+
+    expect(requestVulnerabilityAssessment).toHaveBeenCalledWith({
+      data: { vulnerabilityId: '66666666-6666-6666-6666-666666666666' },
+    })
   })
 })

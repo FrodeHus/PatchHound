@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Bot, ExternalLink, LoaderCircle, Maximize2, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Trash2 } from 'lucide-react'
 import type { DecisionContext, DecisionVuln, ThreatIntel } from '@/api/remediation.schemas'
-import { addRecommendation, generateThreatIntel } from '@/api/remediation.functions'
+import { addRecommendation } from '@/api/remediation.functions'
+import { requestVulnerabilityAssessment } from '@/api/vulnerabilities.functions'
 import { createWorkNote, deleteWorkNote, fetchWorkNotes, updateWorkNote } from '@/api/work-notes.functions'
 import type { WorkNote } from '@/api/work-notes.schemas'
 import { Button } from '@/components/ui/button'
@@ -37,6 +38,7 @@ import {
   severityTone,
 } from './remediation-utils'
 import { MetricRail, type MetricRailItem, type MetricRailTone } from './MetricRail'
+import { PatchAssessmentPanel } from './PatchAssessmentPanel'
 
 type SecurityAnalystWorkbenchProps = {
   data: DecisionContext
@@ -62,8 +64,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
   const [rationale, setRationale] = useState(currentRecommendation?.rationale ?? '')
   const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? '')
   const [isSaving, setIsSaving] = useState(false)
-  const [isGeneratingThreatIntel, setIsGeneratingThreatIntel] = useState(false)
-  const [generatedThreatIntel, setGeneratedThreatIntel] = useState<ThreatIntel | null>(null)
+  const [requestingAssessment, setRequestingAssessment] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const vulnerabilities = data.openVulnerabilities.length > 0 ? data.openVulnerabilities : data.topVulnerabilities
@@ -123,31 +124,22 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
     }
   }
 
-  async function handleGenerateThreatIntel() {
-    setIsGeneratingThreatIntel(true)
+  async function handleRequestAssessment() {
+    const vulnerabilityId = data.patchAssessment.vulnerabilityId ?? vulnerabilities[0]?.vulnerabilityId
+    if (!vulnerabilityId) return
+
+    setRequestingAssessment(true)
     setError(null)
     try {
-      const threatIntel = await generateThreatIntel({ data: { caseId } })
-      setGeneratedThreatIntel(threatIntel)
-      queryClient.setQueryData<DecisionContext>(
-        queryKey,
-        (current) => current ? { ...current, threatIntel } : current,
-      )
-      queryClient.setQueriesData<DecisionContext>(
-        {
-          predicate: ({ queryKey: candidateKey }) =>
-            isDecisionContextQueryForCase(candidateKey, caseId),
-        },
-        (current) => current ? { ...current, threatIntel } : current,
-      )
+      await requestVulnerabilityAssessment({ data: { vulnerabilityId } })
       await queryClient.invalidateQueries({
         predicate: ({ queryKey: candidateKey }) =>
           isDecisionContextQueryForCase(candidateKey, caseId),
       })
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Unable to generate threat intel.'))
+      setError(getApiErrorMessage(err, 'Unable to request patch assessment.'))
     } finally {
-      setIsGeneratingThreatIntel(false)
+      setRequestingAssessment(false)
     }
   }
 
@@ -324,10 +316,11 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
           </CardContent>
         </Card>
 
-        <ThreatIntelBrief
-          threatIntel={generatedThreatIntel ?? data.threatIntel}
-          isGenerating={isGeneratingThreatIntel}
-          onGenerate={() => void handleGenerateThreatIntel()}
+        <PatchAssessmentPanel
+          assessment={data.patchAssessment}
+          canRequest={true}
+          onRequest={() => void handleRequestAssessment()}
+          requesting={requestingAssessment}
         />
       </div>
 

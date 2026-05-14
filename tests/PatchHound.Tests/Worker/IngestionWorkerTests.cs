@@ -28,4 +28,14 @@ public class IngestionWorkerTests
 
         IngestionWorker.HasConfiguredCredentials(source).Should().BeTrue();
     }
+
+    [Fact]
+    public void BuildAssessmentRequest_UsesProviderNativeWebResearch()
+    {
+        var request = VulnerabilityAssessmentWorker.BuildAssessmentRequest("CVE-2026-4242");
+
+        request.UseProviderNativeWebResearch.Should().BeTrue();
+        request.MaxResearchSources.Should().Be(10);
+        request.UserPrompt.Should().Contain("CVE-2026-4242");
+    }
 }
