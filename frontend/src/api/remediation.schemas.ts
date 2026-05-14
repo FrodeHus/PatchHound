@@ -157,6 +157,7 @@ export const patchAssessmentSchema = z.object({
   references: z.array(z.string()).nullable(),
   aiProfileName: z.string().nullable(),
   assessedAt: z.string().nullable(),
+  jobError: z.string().nullable(),
   jobStatus: z.string(),
 })
 

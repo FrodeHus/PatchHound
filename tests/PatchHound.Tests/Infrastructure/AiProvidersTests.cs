@@ -184,7 +184,8 @@ public class AiProvidersTests
             new AiTextGenerationRequest(
                 "System",
                 "User",
-                UseProviderNativeWebResearch: true
+                UseProviderNativeWebResearch: true,
+                MaxOutputTokens: 4000
             ),
             new TenantAiProfileResolved(profile, "api-key"),
             CancellationToken.None
@@ -193,6 +194,7 @@ public class AiProvidersTests
         content.Should().Be("Generated summary with research");
         handler.Requests.Should().HaveCount(1);
         handler.Requests[0].RequestUri!.ToString().Should().Be("https://api.openai.com/v1/responses");
+        handler.RequestBodies[0].Should().Contain("\"max_output_tokens\":4000");
     }
 
     [Fact]
@@ -256,12 +258,18 @@ public class AiProvidersTests
         private readonly Func<HttpRequestMessage, HttpResponseMessage> _responder = responder;
 
         public List<HttpRequestMessage> Requests { get; } = [];
+        public List<string> RequestBodies { get; } = [];
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken
         )
         {
+            if (request.Content is not null)
+            {
+                RequestBodies.Add(request.Content.ReadAsStringAsync(cancellationToken).GetAwaiter().GetResult());
+            }
+
             Requests.Add(request);
             return Task.FromResult(_responder(request));
         }

@@ -13,5 +13,6 @@ public record PatchAssessmentDto(
     IReadOnlyList<string>? References,
     string? AiProfileName,
     DateTimeOffset? AssessedAt,
+    string? JobError,
     string JobStatus
 );

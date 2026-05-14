@@ -40,6 +40,21 @@ function urgencyLabel(tier: string | null): string {
   }
 }
 
+function failureMessage(error: string | null): string {
+  if (!error) return 'The assessment worker did not return an error message.'
+
+  const normalized = error.toLowerCase()
+  if (normalized.includes('malformed ai response') || normalized.includes('json payload')) {
+    return 'The AI response was not valid JSON. This usually means the answer was cut off or the provider returned text outside the expected schema.'
+  }
+
+  if (normalized.includes('timeout') || normalized.includes('timed out') || normalized.includes('taskcanceled')) {
+    return 'The AI provider timed out before the assessment completed.'
+  }
+
+  return 'The assessment worker reported an error.'
+}
+
 export function PatchAssessmentPanel({ assessment, canRequest, onRequest, requesting }: Props) {
   const isLoading = assessment.jobStatus === 'Pending' || assessment.jobStatus === 'Running'
   const hasAssessment = assessment.recommendation !== null
@@ -73,7 +88,13 @@ export function PatchAssessmentPanel({ assessment, canRequest, onRequest, reques
           )}
 
           {!isLoading && !hasAssessment && assessment.jobStatus === 'Failed' && (
-            <p className="text-sm text-destructive">Assessment failed. Request a new one above.</p>
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+              <div className="font-medium text-destructive">Assessment failed</div>
+              <p className="mt-1 text-muted-foreground">{failureMessage(assessment.jobError)}</p>
+              {assessment.jobError && (
+                <p className="mt-2 break-words font-mono text-xs text-destructive">{assessment.jobError}</p>
+              )}
+            </div>
           )}
 
           {!isLoading && !hasAssessment && assessment.jobStatus === 'None' && (

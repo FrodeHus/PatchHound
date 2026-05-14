@@ -143,6 +143,7 @@ const dataFixture: DecisionContext = {
     references: null,
     aiProfileName: null,
     assessedAt: null,
+    jobError: null,
     jobStatus: 'None',
   },
   threatIntel: {
@@ -241,5 +242,23 @@ describe('SecurityAnalystWorkbench', () => {
     expect(requestVulnerabilityAssessment).toHaveBeenCalledWith({
       data: { vulnerabilityId: '66666666-6666-6666-6666-666666666666' },
     })
+  })
+
+  it('shows the exact failed patch assessment error with readable context', () => {
+    const error = 'Malformed AI response: Expected depth to be zero at the end of the JSON payload. LineNumber: 43'
+
+    renderWorkbench({
+      ...dataFixture,
+      patchAssessment: {
+        ...dataFixture.patchAssessment,
+        vulnerabilityId: '66666666-6666-6666-6666-666666666666',
+        jobStatus: 'Failed',
+        jobError: error,
+      },
+    })
+
+    expect(screen.getByText('Assessment failed')).toBeInTheDocument()
+    expect(screen.getByText(/The AI response was not valid JSON/i)).toBeInTheDocument()
+    expect(screen.getByText(error)).toBeInTheDocument()
   })
 })

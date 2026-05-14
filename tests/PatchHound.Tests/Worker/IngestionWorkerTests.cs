@@ -36,6 +36,7 @@ public class IngestionWorkerTests
 
         request.UseProviderNativeWebResearch.Should().BeTrue();
         request.MaxResearchSources.Should().Be(10);
+        request.MaxOutputTokens.Should().Be(4000);
         request.UserPrompt.Should().Contain("CVE-2026-4242");
     }
 }

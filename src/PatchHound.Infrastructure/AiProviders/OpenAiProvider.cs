@@ -42,13 +42,14 @@ public class OpenAiProvider : IAiReportProvider
     )
     {
         var userPrompt = BuildUserPrompt(request);
+        var maxOutputTokens = request.MaxOutputTokens ?? profile.Profile.MaxOutputTokens;
 
         return request.UseProviderNativeWebResearch
             ? SendResponsesApiRequestAsync(
                 profile,
                 request.SystemPrompt,
                 userPrompt,
-                profile.Profile.MaxOutputTokens,
+                maxOutputTokens,
                 request,
                 ct
             )
@@ -56,7 +57,7 @@ public class OpenAiProvider : IAiReportProvider
                 profile,
                 request.SystemPrompt,
                 userPrompt,
-                profile.Profile.MaxOutputTokens,
+                maxOutputTokens,
                 ct
             );
     }

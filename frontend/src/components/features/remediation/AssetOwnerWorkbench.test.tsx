@@ -121,6 +121,7 @@ const dataFixture: DecisionContext = {
     references: null,
     aiProfileName: null,
     assessedAt: null,
+    jobError: null,
     jobStatus: 'None',
   },
   threatIntel: {

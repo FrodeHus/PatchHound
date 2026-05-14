@@ -7,5 +7,6 @@ public record AiTextGenerationRequest(
     bool UseProviderNativeWebResearch = false,
     IReadOnlyList<string>? AllowedDomains = null,
     int? MaxResearchSources = null,
-    bool IncludeCitations = true
+    bool IncludeCitations = true,
+    int? MaxOutputTokens = null
 );

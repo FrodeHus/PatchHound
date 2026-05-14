@@ -1351,19 +1351,25 @@ public class RemediationDecisionQueryService(
             .FirstOrDefault();
 
         if (vulnerabilityId is null)
-            return new PatchAssessmentDto(null, null, null, null, null, null, null, null, null, null, null, null, "None");
+            return new PatchAssessmentDto(null, null, null, null, null, null, null, null, null, null, null, null, null, "None");
 
         var assessment = await dbContext.VulnerabilityPatchAssessments.AsNoTracking()
             .FirstOrDefaultAsync(a => a.VulnerabilityId == vulnerabilityId, ct);
 
         var job = await dbContext.VulnerabilityAssessmentJobs.AsNoTracking()
-            .FirstOrDefaultAsync(j => j.VulnerabilityId == vulnerabilityId, ct);
+            .Where(j => j.VulnerabilityId == vulnerabilityId)
+            .OrderByDescending(j => j.UpdatedAt)
+            .ThenByDescending(j => j.RequestedAt)
+            .FirstOrDefaultAsync(ct);
 
         // Assessment existence takes precedence over transient job state
         var jobStatus = assessment is not null ? "Succeeded" : job?.Status.ToString() ?? "None";
+        var jobError = assessment is null && job?.Status == VulnerabilityAssessmentJobStatus.Failed
+            ? NullIfWhiteSpace(job.Error)
+            : null;
 
         if (assessment is null)
-            return new PatchAssessmentDto(vulnerabilityId, null, null, null, null, null, null, null, null, null, null, null, jobStatus);
+            return new PatchAssessmentDto(vulnerabilityId, null, null, null, null, null, null, null, null, null, null, null, jobError, jobStatus);
 
         return new PatchAssessmentDto(
             vulnerabilityId,
@@ -1378,6 +1384,7 @@ public class RemediationDecisionQueryService(
             ParseJsonStringArray(assessment.References),
             assessment.AiProfileName,
             assessment.AssessedAt,
+            null,
             jobStatus);
     }
 
@@ -1395,4 +1402,7 @@ public class RemediationDecisionQueryService(
             return null;
         }
     }
+
+    private static string? NullIfWhiteSpace(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

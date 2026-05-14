@@ -203,6 +203,52 @@ public class RemediationDecisionListTests : IDisposable
     }
 
     [Fact]
+    public async Task BuildByCaseIdAsync_ReturnsFailedPatchAssessmentError()
+    {
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var device = CanonicalTestData.MakeDevice(_tenantId);
+        var installedSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, device.Id, product.Id);
+        var vulnerability = Vulnerability.Create(
+            "nvd",
+            "CVE-2026-4242",
+            "Remote code execution",
+            "A remotely exploitable vulnerability.",
+            Severity.Critical,
+            9.8m,
+            null,
+            DateTimeOffset.UtcNow.AddDays(-30)
+        );
+        var exposure = DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            device.Id,
+            vulnerability.Id,
+            product.Id,
+            installedSoftware.Id,
+            installedSoftware.Version,
+            ExposureMatchSource.Product,
+            DateTimeOffset.UtcNow.AddDays(-2)
+        );
+        var error = "Malformed AI response: Expected depth to be zero at the end of the JSON payload.";
+        var job = VulnerabilityAssessmentJob.Create(vulnerability.Id, _tenantId, DateTimeOffset.UtcNow.AddMinutes(-2));
+        job.Start(DateTimeOffset.UtcNow.AddMinutes(-1));
+        job.CompleteFailed(DateTimeOffset.UtcNow, error);
+
+        await _dbContext.AddRangeAsync(product, remediationCase, device, installedSoftware, vulnerability, exposure, job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.BuildByCaseIdAsync(
+            _tenantId,
+            remediationCase.Id,
+            CancellationToken.None
+        );
+
+        result.Should().NotBeNull();
+        result!.PatchAssessment.JobStatus.Should().Be(nameof(VulnerabilityAssessmentJobStatus.Failed));
+        result.PatchAssessment.JobError.Should().Be(error);
+    }
+
+    [Fact]
     public async Task ListAsync_ReturnsSoftwareOwnerRoutingFields()
     {
         var ownerTeam = Team.Create(_tenantId, "Platform Engineering");

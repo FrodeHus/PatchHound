@@ -40,7 +40,7 @@ public class AzureOpenAiProvider : IAiReportProvider
         profile,
         request.SystemPrompt,
         BuildUserPrompt(request),
-        profile.Profile.MaxOutputTokens,
+        request.MaxOutputTokens ?? profile.Profile.MaxOutputTokens,
         ct
     );
 

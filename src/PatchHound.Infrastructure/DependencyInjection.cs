@@ -159,12 +159,15 @@ public static class DependencyInjection
         // AI Report Providers
         services
             .AddHttpClient<OllamaAiProvider>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(3))
             .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
         services
             .AddHttpClient<AzureOpenAiProvider>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(3))
             .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
         services
             .AddHttpClient<OpenAiProvider>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(3))
             .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
         services.AddScoped<IAiReportProvider>(sp => sp.GetRequiredService<OllamaAiProvider>());
         services.AddScoped<IAiReportProvider>(sp => sp.GetRequiredService<AzureOpenAiProvider>());
