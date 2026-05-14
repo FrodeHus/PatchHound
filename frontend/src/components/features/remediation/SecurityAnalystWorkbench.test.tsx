@@ -286,6 +286,10 @@ describe('SecurityAnalystWorkbench', () => {
     renderWorkbench()
 
     expect(screen.getByText('Patch Priority Assessment')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Recommendation' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Urgency' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Summary' })).toBeInTheDocument()
+    expect(screen.getByText('Patch Priority Assessment').closest('[data-slot="card"]')).toHaveClass('h-[34rem]')
     expect(screen.queryByText('Threat intelligence')).not.toBeInTheDocument()
   })
 

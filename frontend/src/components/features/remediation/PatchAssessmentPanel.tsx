@@ -2,8 +2,9 @@ import type { PatchAssessment } from '@/api/remediation.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChevronLeft, ChevronRight, LoaderCircle, ShieldAlert } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
 type Props = {
   assessment: PatchAssessment
@@ -162,16 +163,15 @@ export function PatchAssessmentPanel({
   }
 
   return (
-    <div className="space-y-2">
+    <Card className="h-[34rem] min-h-0">
       {(displayedAssessment.urgencyTier === URGENCY_TIER.Emergency || emergencyAssessment) && (
-        <div className="flex items-center gap-2 rounded-md bg-destructive/15 border border-destructive px-4 py-3 text-destructive font-semibold">
+        <div className="mx-4 flex shrink-0 items-center gap-2 rounded-md border border-destructive bg-destructive/15 px-4 py-3 text-destructive font-semibold">
           <ShieldAlert className="h-5 w-5 shrink-0" />
           <span>Emergency patch required — Target SLA: {displayedAssessment.urgencyTargetSla ?? 'as soon as possible'}</span>
         </div>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="flex shrink-0 flex-row items-center justify-between pb-2">
           <div className="space-y-1">
             <CardTitle className="text-sm font-medium">Patch Priority Assessment</CardTitle>
             {orderedVulnerabilities.length > 1 ? (
@@ -195,11 +195,12 @@ export function PatchAssessmentPanel({
               {hasAssessment ? 'Re-assess' : 'Request assessment'}
             </Button>
           )}
-        </CardHeader>
+      </CardHeader>
 
-        <CardContent>
+      <CardContent className="min-h-0 flex-1 overflow-hidden">
+        <div className="flex h-full min-h-0 flex-col">
           {runningVulnerabilityIds.size > 0 && orderedVulnerabilities.length > 1 && (
-            <div className="mb-4 space-y-2">
+            <div className="mb-4 max-h-28 shrink-0 space-y-2 overflow-y-auto pr-1">
               {orderedVulnerabilities
                 .filter((vulnerability) => runningVulnerabilityIds.has(vulnerability.vulnerabilityId))
                 .map((vulnerability) => (
@@ -217,8 +218,8 @@ export function PatchAssessmentPanel({
           )}
 
           {showSelection && (
-            <div className="space-y-3">
-              <div className="space-y-2">
+            <div className="flex min-h-0 flex-1 flex-col space-y-3">
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                 {orderedVulnerabilities.map((vulnerability) => (
                   <label
                     key={vulnerability.vulnerabilityId}
@@ -252,7 +253,7 @@ export function PatchAssessmentPanel({
           )}
 
           {!showSelection && completedAssessments.length > 1 && (
-            <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-border bg-muted/15 px-3 py-2">
+            <div className="mb-4 flex shrink-0 items-center justify-between gap-3 rounded-md border border-border bg-muted/15 px-3 py-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -278,7 +279,7 @@ export function PatchAssessmentPanel({
           )}
 
           {!showSelection && isLoading && (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
               <LoaderCircle className="h-4 w-4 animate-spin" />
               Assessment in progress…
             </div>
@@ -299,8 +300,8 @@ export function PatchAssessmentPanel({
           )}
 
           {!showSelection && hasAssessment && !isLoading && (
-            <div className="space-y-4 text-sm">
-              <div className="flex flex-wrap gap-2">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 text-sm">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 <Badge variant={urgencyVariant(displayedAssessment.urgencyTier)}>
                   {urgencyLabel(displayedAssessment.urgencyTier)}
                 </Badge>
@@ -312,61 +313,63 @@ export function PatchAssessmentPanel({
                 )}
               </div>
 
-              {displayedAssessment.recommendation && (
-                <div>
-                  <div className="font-medium mb-1">Recommendation</div>
+              <Tabs defaultValue="recommendation" className="min-h-0 flex-1">
+                <TabsList className="grid h-auto w-full grid-cols-3 overflow-hidden rounded-lg bg-muted/50 p-1 md:grid-cols-6">
+                  <TabsTrigger value="recommendation">Recommendation</TabsTrigger>
+                  <TabsTrigger value="urgency">Urgency</TabsTrigger>
+                  <TabsTrigger value="summary">Summary</TabsTrigger>
+                  <TabsTrigger value="similar">Similar</TabsTrigger>
+                  <TabsTrigger value="controls">Controls</TabsTrigger>
+                  <TabsTrigger value="references">References</TabsTrigger>
+                </TabsList>
+
+                <AssessmentTabContent value="recommendation">
                   <p className="text-muted-foreground">{displayedAssessment.recommendation}</p>
-                </div>
-              )}
+                </AssessmentTabContent>
 
-              {displayedAssessment.urgencyReason && (
-                <div>
-                  <div className="font-medium mb-1">Urgency Reason</div>
-                  <p className="text-muted-foreground">{displayedAssessment.urgencyReason}</p>
-                </div>
-              )}
+                <AssessmentTabContent value="urgency">
+                  <div className="space-y-3">
+                    <div>
+                      <div className="mb-1 font-medium">Urgency Reason</div>
+                      <p className="text-muted-foreground">{displayedAssessment.urgencyReason ?? 'No urgency rationale was returned.'}</p>
+                    </div>
+                    {displayedAssessment.urgencyTargetSla ? (
+                      <div>
+                        <div className="mb-1 font-medium">Target SLA</div>
+                        <p className="text-muted-foreground">{displayedAssessment.urgencyTargetSla}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </AssessmentTabContent>
 
-              {displayedAssessment.summary && (
-                <div>
-                  <div className="font-medium mb-1">Summary</div>
-                  <p className="text-muted-foreground">{displayedAssessment.summary}</p>
-                </div>
-              )}
+                <AssessmentTabContent value="summary">
+                  <p className="text-muted-foreground">{displayedAssessment.summary ?? 'No summary was returned.'}</p>
+                </AssessmentTabContent>
 
-              {displayedAssessment.similarVulnerabilities && displayedAssessment.similarVulnerabilities.length > 0 && (
-                <div>
-                  <div className="font-medium mb-1">Similar Vulnerabilities</div>
-                  <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                    {displayedAssessment.similarVulnerabilities.map((v, i) => (
-                      <li key={i}>{v}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                <AssessmentTabContent value="similar">
+                  <StringList
+                    items={displayedAssessment.similarVulnerabilities}
+                    emptyText="No similar vulnerabilities were returned."
+                    linkItems={false}
+                  />
+                </AssessmentTabContent>
 
-              {displayedAssessment.compensatingControlsUntilPatched && displayedAssessment.compensatingControlsUntilPatched.length > 0 && (
-                <div>
-                  <div className="font-medium mb-1">Compensating Controls</div>
-                  <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                    {displayedAssessment.compensatingControlsUntilPatched.map((c, i) => (
-                      <li key={i}>{c}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                <AssessmentTabContent value="controls">
+                  <StringList
+                    items={displayedAssessment.compensatingControlsUntilPatched}
+                    emptyText="No compensating controls were returned."
+                    linkItems={false}
+                  />
+                </AssessmentTabContent>
 
-              {displayedAssessment.references && displayedAssessment.references.length > 0 && (
-                <div>
-                  <div className="font-medium mb-1">References</div>
-                  <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                    {displayedAssessment.references.map((r, i) => (
-                      <li key={i}>
-                        <a href={r} className="underline break-all" target="_blank" rel="noreferrer">{r}</a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                <AssessmentTabContent value="references">
+                  <StringList
+                    items={displayedAssessment.references}
+                    emptyText="No references were returned."
+                    linkItems={true}
+                  />
+                </AssessmentTabContent>
+              </Tabs>
 
               {displayedAssessment.assessedAt && (
                 <p className="text-xs text-muted-foreground">
@@ -376,9 +379,54 @@ export function PatchAssessmentPanel({
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
+
+function AssessmentTabContent({
+  value,
+  children,
+}: {
+  value: string
+  children: ReactNode
+}) {
+  return (
+    <TabsContent
+      value={value}
+      className="mt-2 min-h-0 overflow-y-auto rounded-md border border-border bg-muted/15 p-3"
+    >
+      {children}
+    </TabsContent>
+  )
+}
+
+function StringList({
+  items,
+  emptyText,
+  linkItems,
+}: {
+  items: IReadonlyStringList
+  emptyText: string
+  linkItems: boolean
+}) {
+  if (!items || items.length === 0) {
+    return <p className="text-muted-foreground">{emptyText}</p>
+  }
+
+  return (
+    <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+      {items.map((item, index) => (
+        <li key={index}>
+          {linkItems ? (
+            <a href={item} className="underline break-all" target="_blank" rel="noreferrer">{item}</a>
+          ) : item}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+type IReadonlyStringList = ReadonlyArray<string> | null
 
