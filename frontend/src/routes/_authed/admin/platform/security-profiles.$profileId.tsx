@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { toast } from 'sonner'
@@ -31,37 +31,8 @@ function EditSecurityProfilePage() {
   const loaderData: unknown = Route.useLoaderData()
   const profile = isSecurityProfile(loaderData) ? loaderData : null
   const navigate = Route.useNavigate()
-  const queryClient = useQueryClient()
   const { selectedTenantId, tenants } = useTenantScope()
   const tenantName = tenants.find((tenant) => tenant.id === selectedTenantId)?.name ?? 'No tenant selected'
-  const [draft, setDraft] = useState<SecurityProfileDraft>(() => createSecurityProfileDraft(profile))
-
-  useEffect(() => {
-    setDraft(createSecurityProfileDraft(profile))
-  }, [profile])
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (!profile) {
-        throw new Error('Security profile was not found.')
-      }
-
-      await updateSecurityProfile({
-        data: {
-          id: profile.id,
-          ...securityProfilePayload(draft),
-        },
-      })
-    },
-    onSuccess: async () => {
-      toast.success('Security profile updated')
-      await queryClient.invalidateQueries({ queryKey: ['security-profiles'] })
-      void navigate({ to: '/admin/platform/security-profiles', search: { page: 1, pageSize: 25 } })
-    },
-    onError: () => {
-      toast.error('Failed to update security profile')
-    },
-  })
 
   if (!profile) {
     return (
@@ -72,6 +43,50 @@ function EditSecurityProfilePage() {
   }
 
   return (
+    <EditSecurityProfileWorkbench
+      key={profile.id}
+      profile={profile}
+      tenantName={tenantName}
+      onCancel={() => void navigate({ to: '/admin/platform/security-profiles', search: { page: 1, pageSize: 25 } })}
+      onSaved={() => void navigate({ to: '/admin/platform/security-profiles', search: { page: 1, pageSize: 25 } })}
+    />
+  )
+}
+
+function EditSecurityProfileWorkbench({
+  profile,
+  tenantName,
+  onCancel,
+  onSaved,
+}: {
+  profile: SecurityProfile
+  tenantName: string
+  onCancel: () => void
+  onSaved: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [draft, setDraft] = useState<SecurityProfileDraft>(() => createSecurityProfileDraft(profile))
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      await updateSecurityProfile({
+        data: {
+          id: profile.id,
+          ...securityProfilePayload(draft),
+        },
+      })
+    },
+    onSuccess: async () => {
+      toast.success('Security profile updated')
+      await queryClient.invalidateQueries({ queryKey: ['security-profiles'] })
+      onSaved()
+    },
+    onError: () => {
+      toast.error('Failed to update security profile')
+    },
+  })
+
+  return (
     <SecurityProfileWorkbench
       mode="edit"
       tenantName={tenantName}
@@ -79,7 +94,7 @@ function EditSecurityProfilePage() {
       draft={draft}
       isSaving={saveMutation.isPending}
       onDraftChange={setDraft}
-      onCancel={() => void navigate({ to: '/admin/platform/security-profiles', search: { page: 1, pageSize: 25 } })}
+      onCancel={onCancel}
       onSave={() => saveMutation.mutate()}
     />
   )

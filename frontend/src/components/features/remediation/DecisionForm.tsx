@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -50,72 +50,57 @@ const REQUIRES_EXPIRY = new Set<string>(['RiskAcceptance', 'AlternateMitigation'
 const REQUIRES_REEVALUATION = new Set<string>(['PatchingDeferred'])
 
 export function DecisionForm({
+  decisionSeed = null,
+  initialMaintenanceWindowDate: _initialMaintenanceWindowDate = null,
+  ...props
+}: DecisionFormProps) {
+  const initialOutcome = decisionSeed?.outcome ?? props.initialOutcome ?? null
+  const initialJustification = decisionSeed?.justification ?? props.initialJustification ?? null
+  const initialExpiryDate = decisionSeed?.expiryDate ?? props.initialExpiryDate ?? null
+  const initialReEvaluationDate = decisionSeed?.reEvaluationDate ?? props.initialReEvaluationDate ?? null
+  const formKey = [
+    decisionSeed?.token ?? 'initial',
+    initialOutcome ?? '',
+    initialJustification ?? '',
+    initialExpiryDate ?? '',
+    initialReEvaluationDate ?? '',
+  ].join('|')
+
+  return (
+    <DecisionFormFields
+      key={formKey}
+      {...props}
+      initialOutcome={initialOutcome}
+      initialJustification={initialJustification}
+      initialExpiryDate={initialExpiryDate}
+      initialReEvaluationDate={initialReEvaluationDate}
+    />
+  )
+}
+
+function DecisionFormFields({
   caseId,
   queryKey,
   readOnly = false,
   initialOutcome = null,
   initialJustification = null,
-  initialMaintenanceWindowDate = null,
   initialExpiryDate = null,
   initialReEvaluationDate = null,
   submitLabel = 'Submit owner decision',
-  decisionSeed = null,
-}: DecisionFormProps) {
+}: Omit<DecisionFormProps, 'decisionSeed' | 'initialMaintenanceWindowDate'>) {
   const queryClient = useQueryClient()
   const [outcome, setOutcome] = useState(initialOutcome ?? '')
   const [justification, setJustification] = useState(initialJustification ?? '')
   const [expiryDate, setExpiryDate] = useState(toDateInputValue(initialExpiryDate))
-  const [expiryMode, setExpiryMode] = useState<'forever' | 'date'>('forever')
+  const [expiryMode, setExpiryMode] = useState<'forever' | 'date'>(initialExpiryDate ? 'date' : 'forever')
   const [reEvaluationDate, setReEvaluationDate] = useState(toDateInputValue(initialReEvaluationDate))
-  const [deferralMode, setDeferralMode] = useState<'forever' | 'date'>('forever')
+  const [deferralMode, setDeferralMode] = useState<'forever' | 'date'>(initialReEvaluationDate ? 'date' : 'forever')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const needsJustification = REQUIRES_JUSTIFICATION.has(outcome)
   const needsExpiry = REQUIRES_EXPIRY.has(outcome)
   const needsReEvaluation = REQUIRES_REEVALUATION.has(outcome)
-
-  useEffect(() => {
-    setOutcome(initialOutcome ?? '')
-    setJustification(initialJustification ?? '')
-    setExpiryDate(toDateInputValue(initialExpiryDate))
-    setReEvaluationDate(toDateInputValue(initialReEvaluationDate))
-    setExpiryMode(initialExpiryDate ? 'date' : 'forever')
-    setDeferralMode(initialReEvaluationDate ? 'date' : 'forever')
-  }, [initialOutcome, initialJustification, initialMaintenanceWindowDate, initialExpiryDate, initialReEvaluationDate])
-
-  useEffect(() => {
-    if (!decisionSeed) {
-      return
-    }
-
-    setOutcome(decisionSeed.outcome ?? initialOutcome ?? '')
-    setJustification(decisionSeed.justification ?? initialJustification ?? '')
-    setExpiryDate(toDateInputValue(decisionSeed.expiryDate ?? initialExpiryDate))
-    setReEvaluationDate(toDateInputValue(decisionSeed.reEvaluationDate ?? initialReEvaluationDate))
-    setExpiryMode(decisionSeed.expiryDate || initialExpiryDate ? 'date' : 'forever')
-    setDeferralMode(decisionSeed.reEvaluationDate || initialReEvaluationDate ? 'date' : 'forever')
-  }, [decisionSeed?.token, decisionSeed, initialExpiryDate, initialJustification, initialMaintenanceWindowDate, initialOutcome, initialReEvaluationDate])
-
-  useEffect(() => {
-    if (!needsExpiry) {
-      setExpiryMode('forever')
-      setExpiryDate('')
-    }
-  }, [needsExpiry])
-
-  useEffect(() => {
-    if (needsExpiry) {
-      setExpiryMode(initialExpiryDate ? 'date' : 'forever')
-    }
-  }, [initialExpiryDate, needsExpiry])
-
-  useEffect(() => {
-    if (!needsReEvaluation) {
-      setDeferralMode('forever')
-      setReEvaluationDate('')
-    }
-  }, [needsReEvaluation])
 
   const canSubmit =
     outcome !== '' &&
@@ -153,11 +138,26 @@ export function DecisionForm({
     }
   }
 
+  function handleOutcomeChange(value: string | null) {
+    const nextOutcome = value ?? ''
+    setOutcome(nextOutcome)
+
+    if (!REQUIRES_EXPIRY.has(nextOutcome)) {
+      setExpiryMode('forever')
+      setExpiryDate('')
+    }
+
+    if (!REQUIRES_REEVALUATION.has(nextOutcome)) {
+      setDeferralMode('forever')
+      setReEvaluationDate('')
+    }
+  }
+
   return (
     <div className="space-y-5 pt-1">
       <div className="space-y-2">
         <label className="text-sm font-medium">Decision posture</label>
-        <Select value={outcome} onValueChange={(v) => setOutcome(v ?? '')} disabled={readOnly}>
+        <Select value={outcome} onValueChange={handleOutcomeChange} disabled={readOnly}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select remediation outcome..." />
           </SelectTrigger>
