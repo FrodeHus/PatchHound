@@ -286,22 +286,99 @@ describe('SecurityAnalystWorkbench', () => {
     renderWorkbench()
 
     expect(screen.getByText('Patch Priority Assessment')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Recommendation' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Recommendation' })).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Urgency' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Summary' })).toBeInTheDocument()
     expect(screen.getByText('Patch Priority Assessment').closest('[data-slot="card"]')).toHaveClass('h-[34rem]')
     expect(screen.queryByText('Threat intelligence')).not.toBeInTheDocument()
   })
 
+  it('uses compact emergency styling without a separate alert block', () => {
+    renderWorkbench({
+      ...dataFixture,
+      patchAssessment: {
+        ...dataFixture.patchAssessments[1],
+        urgencyTier: 'emergency',
+        urgencyTargetSla: 'Within 24 hours',
+        urgencyReason: 'Externally reachable service.',
+      },
+      patchAssessments: [{
+        ...dataFixture.patchAssessments[1],
+        urgencyTier: 'emergency',
+        urgencyTargetSla: 'Within 24 hours',
+        urgencyReason: 'Externally reachable service.',
+      }],
+    })
+
+    const card = screen.getByText('Patch Priority Assessment').closest('[data-slot="card"]')
+
+    expect(card).toHaveClass('border-t-destructive')
+    expect(screen.queryByText(/Emergency patch required/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Emergency')).toBeInTheDocument()
+    expect(screen.getByText('SLA: Within 24 hours')).toBeInTheDocument()
+  })
+
   it('requests a patch assessment from the side card', () => {
+    vi.mocked(requestVulnerabilityAssessment).mockClear()
     renderWorkbench()
 
     fireEvent.click(screen.getByRole('button', { name: /Re-assess/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Request 1 assessment/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Request assessment$/i }))
 
     expect(requestVulnerabilityAssessment).toHaveBeenCalledWith({
       data: { vulnerabilityId: '66666666-6666-6666-6666-666666666666' },
     })
+  })
+
+  it('replaces multi-CVE re-assess with request and cancel actions while choosing CVEs', () => {
+    renderWorkbench()
+
+    fireEvent.click(screen.getByRole('button', { name: /Re-assess/i }))
+
+    expect(screen.queryByRole('button', { name: /^Re-assess$/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Request assessment$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Cancel$/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /^Cancel$/i }))
+
+    expect(screen.getByRole('button', { name: /^Re-assess$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Cancel$/i })).not.toBeInTheDocument()
+  })
+
+  it('submits a single-vulnerability re-assess immediately', () => {
+    vi.mocked(requestVulnerabilityAssessment).mockClear()
+    renderWorkbench({
+      ...dataFixture,
+      openVulnerabilities: [dataFixture.openVulnerabilities[1]],
+      patchAssessments: [dataFixture.patchAssessments[1]],
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Re-assess/i }))
+
+    expect(requestVulnerabilityAssessment).toHaveBeenCalledWith({
+      data: { vulnerabilityId: '99999999-9999-9999-9999-999999999999' },
+    })
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('submits a single-vulnerability first assessment immediately', () => {
+    vi.mocked(requestVulnerabilityAssessment).mockClear()
+    renderWorkbench({
+      ...dataFixture,
+      openVulnerabilities: [dataFixture.openVulnerabilities[0]],
+      patchAssessment: {
+        ...dataFixture.patchAssessments[0],
+        vulnerabilityId: null,
+      },
+      patchAssessments: [],
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^Request assessment$/i }))
+
+    expect(requestVulnerabilityAssessment).toHaveBeenCalledWith({
+      data: { vulnerabilityId: '66666666-6666-6666-6666-666666666666' },
+    })
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
 
   it('shows assessment coverage and lets analysts choose CVEs to assess', () => {

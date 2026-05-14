@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChevronLeft, ChevronRight, LoaderCircle, ShieldAlert } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 
 type Props = {
   assessment: PatchAssessment
@@ -139,6 +140,7 @@ export function PatchAssessmentPanel({
     ...requestingVulnerabilityIds,
   ])
   const emergencyAssessment = completedAssessments.some((item) => item.urgencyTier === URGENCY_TIER.Emergency)
+  const hasEmergencyAssessment = displayedAssessment.urgencyTier === URGENCY_TIER.Emergency || emergencyAssessment
   const showSelection = orderedVulnerabilities.length > 1 && selecting
   const selectedCount = selectedIds.size
 
@@ -163,37 +165,61 @@ export function PatchAssessmentPanel({
   }
 
   return (
-    <Card className="h-[34rem] min-h-0">
-      {(displayedAssessment.urgencyTier === URGENCY_TIER.Emergency || emergencyAssessment) && (
-        <div className="mx-4 flex shrink-0 items-center gap-2 rounded-md border border-destructive bg-destructive/15 px-4 py-3 text-destructive font-semibold">
-          <ShieldAlert className="h-5 w-5 shrink-0" />
-          <span>Emergency patch required — Target SLA: {displayedAssessment.urgencyTargetSla ?? 'as soon as possible'}</span>
-        </div>
+    <Card
+      className={cn(
+        'h-[34rem] min-h-0',
+        hasEmergencyAssessment && 'border-t-2 border-t-destructive',
       )}
-
+    >
       <CardHeader className="flex shrink-0 flex-row items-center justify-between pb-2">
           <div className="space-y-1">
-            <CardTitle className="text-sm font-medium">Patch Priority Assessment</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              {hasEmergencyAssessment ? <ShieldAlert className="h-4 w-4 text-destructive" /> : null}
+              Patch Priority Assessment
+            </CardTitle>
             {orderedVulnerabilities.length > 1 ? (
               <Badge variant="outline">{assessedCount} of {orderedVulnerabilities.length} assessed</Badge>
             ) : null}
           </div>
           {canRequest && !isLoading && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (orderedVulnerabilities.length > 1) {
-                  setSelecting(true)
-                } else {
-                  onRequest(displayedAssessment.vulnerabilityId ? [displayedAssessment.vulnerabilityId] : undefined)
-                }
-              }}
-              disabled={requesting}
-            >
-              {requesting ? <LoaderCircle className="h-4 w-4 animate-spin mr-1" /> : null}
-              {hasAssessment ? 'Re-assess' : 'Request assessment'}
-            </Button>
+            showSelection ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={requestSelected}
+                  disabled={requesting || selectedCount === 0}
+                >
+                  {requesting ? <LoaderCircle className="h-4 w-4 animate-spin mr-1" /> : null}
+                  Request assessment
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelecting(false)}
+                  disabled={requesting}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (orderedVulnerabilities.length > 1) {
+                    setSelecting(true)
+                  } else {
+                    const vulnerabilityId = displayedAssessment.vulnerabilityId ?? orderedVulnerabilities[0]?.vulnerabilityId
+                    onRequest(vulnerabilityId ? [vulnerabilityId] : undefined)
+                  }
+                }}
+                disabled={requesting}
+              >
+                {requesting ? <LoaderCircle className="h-4 w-4 animate-spin mr-1" /> : null}
+                {hasAssessment ? 'Re-assess' : 'Request assessment'}
+              </Button>
+            )
           )}
       </CardHeader>
 
@@ -245,10 +271,9 @@ export function PatchAssessmentPanel({
                   </label>
                 ))}
               </div>
-              <Button onClick={requestSelected} disabled={requesting || selectedCount === 0}>
-                {requesting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-                Request {selectedCount} assessment{selectedCount === 1 ? '' : 's'}
-              </Button>
+              <p className="shrink-0 text-xs text-muted-foreground">
+                {selectedCount} {selectedCount === 1 ? 'vulnerability' : 'vulnerabilities'} selected for assessment.
+              </p>
             </div>
           )}
 
@@ -312,20 +337,18 @@ export function PatchAssessmentPanel({
                   <Badge variant="secondary">Confidence: {displayedAssessment.confidence}</Badge>
                 )}
               </div>
+              {displayedAssessment.recommendation ? (
+                <p className="shrink-0 text-sm text-muted-foreground">{displayedAssessment.recommendation}</p>
+              ) : null}
 
-              <Tabs defaultValue="recommendation" className="min-h-0 flex-1">
-                <TabsList className="grid h-auto w-full grid-cols-3 overflow-hidden rounded-lg bg-muted/50 p-1 md:grid-cols-6">
-                  <TabsTrigger value="recommendation">Recommendation</TabsTrigger>
+              <Tabs defaultValue="urgency" className="min-h-0 flex-1">
+                <TabsList className="grid h-auto w-full grid-cols-3 overflow-hidden rounded-lg bg-muted/50 p-1 md:grid-cols-5">
                   <TabsTrigger value="urgency">Urgency</TabsTrigger>
                   <TabsTrigger value="summary">Summary</TabsTrigger>
                   <TabsTrigger value="similar">Similar</TabsTrigger>
                   <TabsTrigger value="controls">Controls</TabsTrigger>
                   <TabsTrigger value="references">References</TabsTrigger>
                 </TabsList>
-
-                <AssessmentTabContent value="recommendation">
-                  <p className="text-muted-foreground">{displayedAssessment.recommendation}</p>
-                </AssessmentTabContent>
 
                 <AssessmentTabContent value="urgency">
                   <div className="space-y-3">
