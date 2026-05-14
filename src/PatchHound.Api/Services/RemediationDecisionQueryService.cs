@@ -1335,14 +1335,23 @@ public class RemediationDecisionQueryService(
                 (_, v) => new { v.Id, v.VendorSeverity })
             .ToListAsync(ct);
 
-        // Materialise before sorting — enum stored as string, alphabetical SQL order ≠ severity order
+        // Prefer an already-assessed candidate; fall back to highest severity (materialise first —
+        // enum stored as string, alphabetical SQL order ≠ severity order)
+        var candidateIds = candidates.Select(c => c.Id).ToList();
+        var assessedVulnIds = await dbContext.VulnerabilityPatchAssessments.AsNoTracking()
+            .Where(a => candidateIds.Contains(a.VulnerabilityId))
+            .Select(a => a.VulnerabilityId)
+            .ToHashSetAsync(ct);
+
         var vulnerabilityId = candidates
-            .OrderByDescending(x => x.VendorSeverity)
+            .OrderByDescending(x => assessedVulnIds.Contains(x.Id) ? 1 : 0)
+            .ThenByDescending(x => x.VendorSeverity)
+            .ThenBy(x => x.Id)
             .Select(x => (Guid?)x.Id)
             .FirstOrDefault();
 
         if (vulnerabilityId is null)
-            return new PatchAssessmentDto(null, null, null, null, null, null, null, null, null, null, null, "None");
+            return new PatchAssessmentDto(null, null, null, null, null, null, null, null, null, null, null, null, "None");
 
         var assessment = await dbContext.VulnerabilityPatchAssessments.AsNoTracking()
             .FirstOrDefaultAsync(a => a.VulnerabilityId == vulnerabilityId, ct);
@@ -1354,20 +1363,36 @@ public class RemediationDecisionQueryService(
         var jobStatus = assessment is not null ? "Succeeded" : job?.Status.ToString() ?? "None";
 
         if (assessment is null)
-            return new PatchAssessmentDto(null, null, null, null, null, null, null, null, null, null, null, jobStatus);
+            return new PatchAssessmentDto(vulnerabilityId, null, null, null, null, null, null, null, null, null, null, null, jobStatus);
 
         return new PatchAssessmentDto(
+            vulnerabilityId,
             assessment.Recommendation,
             assessment.Confidence,
             assessment.Summary,
             assessment.UrgencyTier,
             assessment.UrgencyTargetSla,
             assessment.UrgencyReason,
-            assessment.SimilarVulnerabilities,
-            assessment.CompensatingControlsUntilPatched,
-            assessment.References,
+            ParseJsonStringArray(assessment.SimilarVulnerabilities),
+            ParseJsonStringArray(assessment.CompensatingControlsUntilPatched),
+            ParseJsonStringArray(assessment.References),
             assessment.AiProfileName,
             assessment.AssessedAt,
             jobStatus);
+    }
+
+    private static IReadOnlyList<string>? ParseJsonStringArray(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json == "[]")
+            return null;
+        try
+        {
+            var parsed = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json);
+            return parsed is { Count: > 0 } ? parsed : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

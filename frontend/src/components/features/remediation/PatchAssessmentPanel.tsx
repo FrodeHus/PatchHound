@@ -11,24 +11,31 @@ type Props = {
   requesting: boolean
 }
 
+const URGENCY_TIER = {
+  Emergency: 'emergency',
+  AsSoonAsPossible: 'as_soon_as_possible',
+  NormalPatchWindow: 'normal_patch_window',
+  LowPriority: 'low_priority',
+} as const
+
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline'
 
 function urgencyVariant(tier: string | null): BadgeVariant {
   switch (tier) {
-    case 'emergency': return 'destructive'
-    case 'as_soon_as_possible': return 'default'
-    case 'normal_patch_window': return 'secondary'
-    case 'low_priority': return 'outline'
+    case URGENCY_TIER.Emergency: return 'destructive'
+    case URGENCY_TIER.AsSoonAsPossible: return 'default'
+    case URGENCY_TIER.NormalPatchWindow: return 'secondary'
+    case URGENCY_TIER.LowPriority: return 'outline'
     default: return 'secondary'
   }
 }
 
 function urgencyLabel(tier: string | null): string {
   switch (tier) {
-    case 'emergency': return 'Emergency'
-    case 'as_soon_as_possible': return 'As Soon As Possible'
-    case 'normal_patch_window': return 'Normal Patch Window'
-    case 'low_priority': return 'Low Priority'
+    case URGENCY_TIER.Emergency: return 'Emergency'
+    case URGENCY_TIER.AsSoonAsPossible: return 'As Soon As Possible'
+    case URGENCY_TIER.NormalPatchWindow: return 'Normal Patch Window'
+    case URGENCY_TIER.LowPriority: return 'Low Priority'
     default: return tier ?? 'Unknown'
   }
 }
@@ -39,7 +46,7 @@ export function PatchAssessmentPanel({ assessment, canRequest, onRequest, reques
 
   return (
     <div className="space-y-2">
-      {assessment.urgencyTier === 'emergency' && (
+      {assessment.urgencyTier === URGENCY_TIER.Emergency && (
         <div className="flex items-center gap-2 rounded-md bg-destructive/15 border border-destructive px-4 py-3 text-destructive font-semibold">
           <ShieldAlert className="h-5 w-5 shrink-0" />
           <span>Emergency patch required — Target SLA: {assessment.urgencyTargetSla}</span>
@@ -108,39 +115,35 @@ export function PatchAssessmentPanel({ assessment, canRequest, onRequest, reques
                 </div>
               )}
 
-              {assessment.similarVulnerabilities &&
-                assessment.similarVulnerabilities !== '[]' && (
+              {assessment.similarVulnerabilities && assessment.similarVulnerabilities.length > 0 && (
                 <div>
                   <div className="font-medium mb-1">Similar Vulnerabilities</div>
                   <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                    {tryParseArray(assessment.similarVulnerabilities).map((v, i) => (
-                      <li key={i}>{typeof v === 'string' ? v : JSON.stringify(v)}</li>
+                    {assessment.similarVulnerabilities.map((v, i) => (
+                      <li key={i}>{v}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {assessment.compensatingControlsUntilPatched &&
-                assessment.compensatingControlsUntilPatched !== '[]' && (
+              {assessment.compensatingControlsUntilPatched && assessment.compensatingControlsUntilPatched.length > 0 && (
                 <div>
                   <div className="font-medium mb-1">Compensating Controls</div>
                   <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                    {tryParseArray(assessment.compensatingControlsUntilPatched).map((c, i) => (
-                      <li key={i}>{typeof c === 'string' ? c : JSON.stringify(c)}</li>
+                    {assessment.compensatingControlsUntilPatched.map((c, i) => (
+                      <li key={i}>{c}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {assessment.references && assessment.references !== '[]' && (
+              {assessment.references && assessment.references.length > 0 && (
                 <div>
                   <div className="font-medium mb-1">References</div>
                   <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                    {tryParseArray(assessment.references).map((r, i) => (
+                    {assessment.references.map((r, i) => (
                       <li key={i}>
-                        {typeof r === 'string'
-                          ? <a href={r} className="underline break-all" target="_blank" rel="noreferrer">{r}</a>
-                          : JSON.stringify(r)}
+                        <a href={r} className="underline break-all" target="_blank" rel="noreferrer">{r}</a>
                       </li>
                     ))}
                   </ul>
@@ -161,11 +164,3 @@ export function PatchAssessmentPanel({ assessment, canRequest, onRequest, reques
   )
 }
 
-function tryParseArray(json: string | null): unknown[] {
-  try {
-    const parsed: unknown = JSON.parse(json ?? '[]')
-    return Array.isArray(parsed) ? (parsed as unknown[]) : [parsed]
-  } catch {
-    return []
-  }
-}

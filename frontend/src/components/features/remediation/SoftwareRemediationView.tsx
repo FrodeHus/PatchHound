@@ -174,12 +174,13 @@ export function SoftwareRemediationView({
   }
 
   async function handleRequestAssessment() {
-    if (!data?.topVulnerabilities[0]?.vulnerabilityId) return
+    const vulnId = data?.patchAssessment?.vulnerabilityId ?? data?.topVulnerabilities[0]?.vulnerabilityId
+    if (!vulnId) return
     setRequestingAssessment(true)
     setStageError(null)
     try {
       await requestVulnerabilityAssessment({
-        data: { vulnerabilityId: data.topVulnerabilities[0].vulnerabilityId }
+        data: { vulnerabilityId: vulnId }
       })
       await queryClient.invalidateQueries({ queryKey })
     } catch (err) {

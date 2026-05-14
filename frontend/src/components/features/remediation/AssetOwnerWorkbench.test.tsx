@@ -109,6 +109,7 @@ const dataFixture: DecisionContext = {
   riskScore: null,
   sla: null,
   patchAssessment: {
+    vulnerabilityId: null,
     recommendation: null,
     confidence: null,
     summary: null,

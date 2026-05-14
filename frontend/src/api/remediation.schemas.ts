@@ -145,15 +145,16 @@ export const threatIntelSchema = z.object({
 })
 
 export const patchAssessmentSchema = z.object({
+  vulnerabilityId: z.string().uuid().nullable(),
   recommendation: z.string().nullable(),
   confidence: z.string().nullable(),
   summary: z.string().nullable(),
   urgencyTier: z.string().nullable(),
   urgencyTargetSla: z.string().nullable(),
   urgencyReason: z.string().nullable(),
-  similarVulnerabilities: z.string().nullable(),
-  compensatingControlsUntilPatched: z.string().nullable(),
-  references: z.string().nullable(),
+  similarVulnerabilities: z.array(z.string()).nullable(),
+  compensatingControlsUntilPatched: z.array(z.string()).nullable(),
+  references: z.array(z.string()).nullable(),
   aiProfileName: z.string().nullable(),
   assessedAt: z.string().nullable(),
   jobStatus: z.string(),

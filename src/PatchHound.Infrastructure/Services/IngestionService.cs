@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using PatchHound.Core.Constants;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -1308,7 +1309,7 @@ public class IngestionService
     {
         var emergencyAssessments = await _dbContext.VulnerabilityPatchAssessments
             .AsNoTracking()
-            .Where(a => criticalVulnIds.Contains(a.VulnerabilityId) && a.UrgencyTier == "emergency")
+            .Where(a => criticalVulnIds.Contains(a.VulnerabilityId) && a.UrgencyTier == PatchUrgencyTier.Emergency)
             .Join(_dbContext.Vulnerabilities.AsNoTracking(),
                 a => a.VulnerabilityId,
                 v => v.Id,

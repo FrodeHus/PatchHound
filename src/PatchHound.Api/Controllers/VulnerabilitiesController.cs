@@ -245,8 +245,9 @@ public class VulnerabilitiesController : ControllerBase
         if (_tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var exists = await _dbContext.Vulnerabilities.AnyAsync(v => v.Id == id, ct);
-        if (!exists)
+        var exposedToTenant = await _dbContext.DeviceVulnerabilityExposures
+            .AnyAsync(e => e.TenantId == tenantId && e.VulnerabilityId == id && e.Status == ExposureStatus.Open, ct);
+        if (!exposedToTenant)
             return NotFound();
 
         var accepted = await _assessmentJobService.RequestManualAsync(tenantId, id, ct);

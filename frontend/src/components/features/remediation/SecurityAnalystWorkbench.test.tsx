@@ -128,6 +128,7 @@ const dataFixture: DecisionContext = {
     dueDate: '2026-05-09T00:00:00Z',
   },
   patchAssessment: {
+    vulnerabilityId: null,
     recommendation: null,
     confidence: null,
     summary: null,
