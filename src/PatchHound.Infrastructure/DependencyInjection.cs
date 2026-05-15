@@ -260,6 +260,7 @@ public static class DependencyInjection
             sp.GetRequiredService<IngestionStagingPipeline>(),
             sp.GetRequiredService<IngestionSnapshotLifecycle>(),
             sp.GetRequiredService<IIngestionBulkWriter>(),
+            sp.GetRequiredService<IBulkExposureWriter>(),
             sp.GetService<MaterializedViewRefreshService>(),
             sp.GetRequiredService<ILogger<IngestionService>>()
         ));

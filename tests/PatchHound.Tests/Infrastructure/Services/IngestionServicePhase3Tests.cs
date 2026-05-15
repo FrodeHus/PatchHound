@@ -68,6 +68,7 @@ public class IngestionServicePhase3Tests
             new IngestionStagingPipeline(db, new EnrichmentJobEnqueuer(db, NullLogger<EnrichmentJobEnqueuer>.Instance), new IngestionLeaseManager(db, new InMemoryIngestionBulkWriter(db), NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(db)),
             new IngestionSnapshotLifecycle(db, new InMemoryIngestionBulkWriter(db)),
             new InMemoryIngestionBulkWriter(db),
+            new InMemoryBulkExposureWriter(db),
             materializedViewRefreshService: null,
             NullLogger<IngestionService>.Instance);
 
@@ -360,6 +361,7 @@ public class IngestionServicePhase3Tests
             new IngestionStagingPipeline(db, new EnrichmentJobEnqueuer(db, NullLogger<EnrichmentJobEnqueuer>.Instance), new IngestionLeaseManager(db, new InMemoryIngestionBulkWriter(db), NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(db)),
             new IngestionSnapshotLifecycle(db, new InMemoryIngestionBulkWriter(db)),
             new InMemoryIngestionBulkWriter(db),
+            new InMemoryBulkExposureWriter(db),
             materializedViewRefreshService: null,
             NullLogger<IngestionService>.Instance);
 

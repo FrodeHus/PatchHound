@@ -40,6 +40,7 @@ public class IngestionService
     private readonly IngestionStagingPipeline _stagingPipeline;
     private readonly IngestionSnapshotLifecycle _snapshotLifecycle;
     private readonly IIngestionBulkWriter _bulkWriter;
+    private readonly IBulkExposureWriter _bulkExposureWriter;
     private readonly MaterializedViewRefreshService? _materializedViewRefreshService;
     private readonly ILogger<IngestionService> _logger;
 
@@ -65,6 +66,7 @@ public class IngestionService
         IngestionStagingPipeline stagingPipeline,
         IngestionSnapshotLifecycle snapshotLifecycle,
         IIngestionBulkWriter bulkWriter,
+        IBulkExposureWriter bulkExposureWriter,
         MaterializedViewRefreshService? materializedViewRefreshService,
         ILogger<IngestionService> logger
     )
@@ -89,6 +91,7 @@ public class IngestionService
         _stagingPipeline = stagingPipeline;
         _snapshotLifecycle = snapshotLifecycle;
         _bulkWriter = bulkWriter;
+        _bulkExposureWriter = bulkExposureWriter;
         _materializedViewRefreshService = materializedViewRefreshService;
         _logger = logger;
     }
@@ -994,134 +997,85 @@ public class IngestionService
                 g => g.Key,
                 g => (g.First().SoftwareProductId, g.First().Id));
 
-        // ── Step 3: Load existing DeviceVulnerabilityExposures for this tenant (for upsert) ──
-        // Bound to the device IDs from this run: ProcessStagedResultsAsync only processes
-        // staged exposures for devices in this run, so exposures for other devices are untouched.
-        var runDeviceIds = deviceIdByExternalId.Values.ToList();
-        var existing = await _dbContext.DeviceVulnerabilityExposures
-            .Where(e => e.TenantId == tenantId && runDeviceIds.Contains(e.DeviceId))
-            .ToListAsync(ct);
-        var existingByPair = existing.ToDictionary(e => (e.DeviceId, e.VulnerabilityId));
-
-        // Track active pairs from this ingestion run (for resolving stale exposures)
-        var activePairs = new HashSet<(Guid DeviceId, Guid VulnerabilityId)>();
-
-        var mergedExposureCount = 0;
-        var openedCount = 0;
-        var resolvedCount = 0;
-
-        // ── Step 4: Upsert exposures in batches ──
-        for (var i = 0; i < stagedExposures.Count; i += IngestionStagingPipeline.VulnerabilityBatchSize)
+        // ── Step 3: Build ExposureUpsertRow batch from staged exposures ──
+        // The bulk writer's INSERT ... ON CONFLICT DO UPDATE handles existence
+        // checking server-side, so we no longer need to pre-load existing
+        // DeviceVulnerabilityExposure rows. Stale-resolution is handled later
+        // by IBulkExposureWriter.ResolveStaleAsync (called from the derivation
+        // pipeline), not in this method.
+        var rows = new List<ExposureUpsertRow>(stagedExposures.Count);
+        foreach (var exposure in stagedExposures)
         {
-            var batch = stagedExposures.Skip(i).Take(IngestionStagingPipeline.VulnerabilityBatchSize);
-            foreach (var exposure in batch)
+            if (!vulnExternalIdToId.TryGetValue(exposure.VulnerabilityExternalId, out var vulnerabilityId))
             {
-                if (!vulnExternalIdToId.TryGetValue(exposure.VulnerabilityExternalId, out var vulnerabilityId))
-                {
-                    // Vulnerability wasn't staged in this run — try to look it up directly
-                    var directLookup = await _dbContext.Vulnerabilities
-                        .Where(v => v.Source == sourceKey && v.ExternalId == exposure.VulnerabilityExternalId)
-                        .Select(v => v.Id)
-                        .FirstOrDefaultAsync(ct);
+                // Vulnerability wasn't staged in this run — try to look it up directly
+                var directLookup = await _dbContext.Vulnerabilities
+                    .Where(v => v.Source == sourceKey && v.ExternalId == exposure.VulnerabilityExternalId)
+                    .Select(v => v.Id)
+                    .FirstOrDefaultAsync(ct);
 
-                    if (directLookup == Guid.Empty)
-                    {
-                        _logger.LogDebug(
-                            "Skipping exposure for unknown vulnerability {ExternalId}",
-                            exposure.VulnerabilityExternalId);
-                        continue;
-                    }
-
-                    vulnerabilityId = directLookup;
-                }
-
-                if (!deviceIdByExternalId.TryGetValue(exposure.AssetExternalId, out var deviceId))
+                if (directLookup == Guid.Empty)
                 {
                     _logger.LogDebug(
-                        "Skipping exposure for unknown device external id {ExternalId}",
-                        exposure.AssetExternalId);
+                        "Skipping exposure for unknown vulnerability {ExternalId}",
+                        exposure.VulnerabilityExternalId);
                     continue;
                 }
 
-                var pair = (deviceId, vulnerabilityId);
-                activePairs.Add(pair);
-
-                if (existingByPair.TryGetValue(pair, out var existingExposure))
-                {
-                    if (existingExposure.Status == ExposureStatus.Resolved)
-                    {
-                        existingExposure.Reopen(now, ingestionRunId);
-                        openedCount++;
-                    }
-                    else
-                    {
-                        existingExposure.Reobserve(now, ingestionRunId);
-                    }
-                }
-                else
-                {
-                    // Attempt to resolve the software product for this exposure from the staged payload.
-                    Guid? softwareProductId = null;
-                    Guid? installedSoftwareId = null;
-                    IngestionAffectedAsset? affectedAssetPayload = null;
-                    if (!string.IsNullOrWhiteSpace(exposure.PayloadJson))
-                    {
-                        try
-                        {
-                            affectedAssetPayload = JsonSerializer.Deserialize<IngestionAffectedAsset>(
-                                exposure.PayloadJson, StagingSerializerOptions.Instance);
-                        }
-                        catch (JsonException) { /* best-effort */ }
-                    }
-
-                    if (affectedAssetPayload is { ProductVendor: not null, ProductName: not null })
-                    {
-                        var canonicalKey =
-                            $"{affectedAssetPayload.ProductVendor.Trim().ToLowerInvariant()}::{affectedAssetPayload.ProductName.Trim().ToLowerInvariant()}";
-                        if (installedByDeviceAndProduct.TryGetValue((deviceId, canonicalKey), out var swInfo))
-                        {
-                            softwareProductId = swInfo.SoftwareProductId;
-                            installedSoftwareId = swInfo.Id;
-                        }
-                    }
-
-                    var fresh = DeviceVulnerabilityExposure.Observe(
-                        tenantId,
-                        deviceId,
-                        vulnerabilityId,
-                        softwareProductId: softwareProductId,
-                        installedSoftwareId: installedSoftwareId,
-                        matchedVersion: string.Empty,
-                        ExposureMatchSource.Product,
-                        now,
-                        ingestionRunId);
-
-                    _dbContext.DeviceVulnerabilityExposures.Add(fresh);
-                    existingByPair[pair] = fresh;
-                    openedCount++;
-                }
-
-                mergedExposureCount++;
+                vulnerabilityId = directLookup;
             }
 
-            await _dbContext.SaveChangesAsync(ct);
-        }
-
-        // ── Step 5: Resolve exposures absent from this ingestion run ──
-        foreach (var exp in existing)
-        {
-            var pair = (exp.DeviceId, exp.VulnerabilityId);
-            if (activePairs.Contains(pair) || exp.Status == ExposureStatus.Resolved)
+            if (!deviceIdByExternalId.TryGetValue(exposure.AssetExternalId, out var deviceId))
+            {
+                _logger.LogDebug(
+                    "Skipping exposure for unknown device external id {ExternalId}",
+                    exposure.AssetExternalId);
                 continue;
+            }
 
-            exp.Resolve(now);
-            resolvedCount++;
+            // Attempt to resolve the software product for this exposure from the staged payload.
+            Guid? softwareProductId = null;
+            Guid? installedSoftwareId = null;
+            IngestionAffectedAsset? affectedAssetPayload = null;
+            if (!string.IsNullOrWhiteSpace(exposure.PayloadJson))
+            {
+                try
+                {
+                    affectedAssetPayload = JsonSerializer.Deserialize<IngestionAffectedAsset>(
+                        exposure.PayloadJson, StagingSerializerOptions.Instance);
+                }
+                catch (JsonException) { /* best-effort */ }
+            }
+
+            if (affectedAssetPayload is { ProductVendor: not null, ProductName: not null })
+            {
+                var canonicalKey =
+                    $"{affectedAssetPayload.ProductVendor.Trim().ToLowerInvariant()}::{affectedAssetPayload.ProductName.Trim().ToLowerInvariant()}";
+                if (installedByDeviceAndProduct.TryGetValue((deviceId, canonicalKey), out var swInfo))
+                {
+                    softwareProductId = swInfo.SoftwareProductId;
+                    installedSoftwareId = swInfo.Id;
+                }
+            }
+
+            rows.Add(new ExposureUpsertRow(
+                TenantId: tenantId,
+                DeviceId: deviceId,
+                VulnerabilityId: vulnerabilityId,
+                SoftwareProductId: softwareProductId,
+                InstalledSoftwareId: installedSoftwareId,
+                MatchedVersion: string.Empty,
+                MatchSource: nameof(ExposureMatchSource.Product),
+                ObservedAt: now,
+                RunId: ingestionRunId));
         }
 
-        if (resolvedCount > 0)
-        {
-            await _dbContext.SaveChangesAsync(ct);
-        }
+        // ── Step 4: Bulk-upsert exposures in a single round-trip ──
+        var bulkResult = await _bulkExposureWriter.UpsertAsync(rows, ct);
+
+        var openedCount = bulkResult.Inserted;
+        var mergedExposureCount = bulkResult.Inserted + bulkResult.Reobserved;
+        var resolvedCount = 0;
 
         await UpdateVulnerabilityMergeProgressAsync(stagedVulnCount, persistedVulnCount, ct);
 
