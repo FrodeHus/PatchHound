@@ -175,6 +175,31 @@ public class PatchHoundRiskScoringEngineTests
     }
 
     [Fact]
+    public void CalculateAssetRisk_ManyNonUrgentVulnerabilities_DoesNotSaturate()
+    {
+        var deviceId = Guid.NewGuid();
+        var inputs = new List<RiskExposureInput>();
+
+        inputs.AddRange(Enumerable.Range(0, 3)
+            .Select(_ => RiskExposureInput.Critical(
+                deviceId,
+                Guid.NewGuid(),
+                9.0m,
+                assetCriticality: Criticality.Critical)));
+        inputs.AddRange(Enumerable.Range(0, 38)
+            .Select(_ => RiskExposureInput.High(
+                deviceId,
+                Guid.NewGuid(),
+                7.5m,
+                assetCriticality: Criticality.Critical)));
+
+        var result = PatchHoundRiskScoringEngine.CalculateAssetRisk(inputs, businessLabelWeight: 1.5m);
+
+        result.OverallScore.Should().BeLessThan(950m);
+        result.RiskBand.Should().Be("Critical");
+    }
+
+    [Fact]
     public void CalculateSoftwareRisk_ExtremeInputs_ClampsScoreAt1000()
     {
         var deviceId = Guid.NewGuid();

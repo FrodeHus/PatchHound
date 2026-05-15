@@ -210,10 +210,10 @@ The device score is based on all open exposures on that device.
 
 ```text
 BaseComponent      = MaxDetectionScore * 6.5
-CountComponent     = CriticalCount * 45
-                   + HighCount     * 12
-                   + MediumCount   * 3
-                   + LowCount      * 1
+CountComponent     = min(CriticalCount * 15, 60)
+                   + min(HighCount     * 3, 60)
+                   + min(MediumCount   * 1, 20)
+                   + min(LowCount      * 0.25, 8)
 
 RawDeviceScore     = BaseComponent + CountComponent
 
@@ -233,6 +233,8 @@ Final score is clamped to 0-1000.
 
 Why this compression exists: device criticality and business labels should increase prioritization, but they should not turn a small number of non-urgent exposures into a perfect `1000` score by themselves. Reducing labels, such as `Informational`, still reduce the score directly.
 
+Why the device count component is capped: a single device with many findings needs to be prioritized, but raw finding volume should not dominate the score the same way it does for a remediation case that may affect many devices. Software and remediation risk still use the stronger linear count component shown in Step 4.
+
 Risk floors are applied after the numeric score:
 
 | Condition | Minimum device score |
@@ -247,7 +249,7 @@ flowchart TD
     M["Max DetectionScore"]
     C["Severity counts"]
     BASE["BaseComponent\nMaxDetectionScore * 6.5"]
-    COUNT["CountComponent\ncritical/high/medium/low bonuses"]
+    COUNT["CountComponent\ncapped critical/high/medium/low pressure"]
     IMPACT["Apply compressed asset impact\nfrom criticality and business label"]
     FLOOR["Apply risk floors"]
     SCORE["DeviceRiskScore\n0-1000"]
@@ -279,15 +281,15 @@ Calculation:
 ```text
 MaxDetectionScore       = 75
 BaseComponent           = 75 * 6.5 = 487.5
-CountComponent          = 1 high * 12 + 1 medium * 3 = 15
-RawDeviceScore          = 487.5 + 15 = 502.5
+CountComponent          = 1 high * 3 + 1 medium * 1 = 4
+RawDeviceScore          = 487.5 + 4 = 491.5
 
 RawImpactMultiplier     = 1.35 * 1.50 = 2.025
 EffectiveImpactMultiplier
                          = 1.0 + ((2.025 - 1.0) * 0.35)
                          = 1.35875
 
-DeviceRiskScore         = 502.5 * 1.35875 = 682.8
+DeviceRiskScore         = 491.5 * 1.35875 = 667.9
 Band                    = Medium
 ```
 
@@ -307,18 +309,52 @@ Calculation:
 
 ```text
 BaseComponent  = 95 * 6.5 = 617.5
-CountComponent = 1 * 45 = 45
-Raw score      = 617.5 + 45 = 662.5
+CountComponent = 1 * 15 = 15
+Raw score      = 617.5 + 15 = 632.5
 Raw impact multiplier = 1.20 * 1.00 = 1.20
 Effective multiplier  = 1.0 + ((1.20 - 1.0) * 0.35) = 1.07
-Impact score   = 662.5 * 1.07 = 708.9
+Impact score   = 632.5 * 1.07 = 676.8
 
 Emergency floor = at least 700
-Final score     = max(708.9, 700) = 708.9
+Final score     = max(676.8, 700) = 700
 Band            = High
 ```
 
 The old model could make this look low because CVSS-scale values were too small for a 0-1000 band. The v2 model keeps the score in the right range.
+
+### Example - Many Non-Urgent Findings On A Critical Device
+
+Input:
+
+| Signal | Value |
+|---|---:|
+| Highest Environmental CVSS | 9.0 |
+| Critical exposures | 3 |
+| High exposures | 38 |
+| Emergency patch recommended | no |
+| Device criticality | Critical, multiplier 1.35 |
+| Business label | Sensitive, multiplier 1.50 |
+
+Calculation:
+
+```text
+MaxDetectionScore       = 90
+BaseComponent           = 90 * 6.5 = 585
+CountComponent          = min(3 critical * 15, 60)
+                        + min(38 high * 3, 60)
+                        = 45 + 60 = 105
+RawDeviceScore          = 585 + 105 = 690
+
+RawImpactMultiplier     = 1.35 * 1.50 = 2.025
+EffectiveImpactMultiplier
+                         = 1.0 + ((2.025 - 1.0) * 0.35)
+                         = 1.35875
+
+DeviceRiskScore         = 690 * 1.35875 = 937.5
+Band                    = Critical
+```
+
+This is still critical, but it is no longer automatically `1000` when the findings are not emergency, known exploited, active-alert, malware, or ransomware exposures.
 
 ---
 
@@ -537,16 +573,16 @@ Assume a tenant has these top device scores:
 
 | Device | Score | Band |
 |---|---:|---|
-| Device A | 708.9 | High |
+| Device A | 700 | High |
 | Device B | 620 | Medium |
 | Device C | 520 | Medium |
 | Device D | 120 | Low |
 | Device E | 0 | None |
 
 ```text
-MaxDeviceRiskScore          = 708.9
-AverageTopFiveDeviceScores  = (708.9 + 620 + 520 + 120 + 0) / 5
-                             = 393.78
+MaxDeviceRiskScore          = 700
+AverageTopFiveDeviceScores  = (700 + 620 + 520 + 120 + 0) / 5
+                             = 392
 
 CriticalAssetCount = 0
 HighAssetCount     = 1
@@ -554,15 +590,15 @@ MediumAssetCount   = 2
 LowAssetCount      = 1
 
 TenantRiskScore =
-    0.55 * 708.9
-  + 0.30 * 393.78
+    0.55 * 700
+  + 0.30 * 392
   + min(0 * 18, 90)
   + min(1 * 8, 40)
   + min(2 * 2, 10)
   + min(1 * 0.5, 5)
 
-= 389.90 + 118.13 + 0 + 8 + 4 + 0.5
-= 520.53
+= 385 + 117.6 + 0 + 8 + 4 + 0.5
+= 515.1
 
 Band = Medium
 ```

@@ -249,6 +249,51 @@ public class DevicesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task List_CountsOnlyOpenVulnerabilities()
+    {
+        var device = CreateDevice("device-a", "Device A", Criticality.High);
+        var openVuln = Vulnerability.Create("nvd", "CVE-2026-OPEN", "Open", "desc", Severity.High, 7.5m, null, DateTimeOffset.UtcNow);
+        var resolvedVuln = Vulnerability.Create("nvd", "CVE-2026-RESOLVED", "Resolved", "desc", Severity.Critical, 9.1m, null, DateTimeOffset.UtcNow);
+        var install = InstalledSoftware.Observe(_tenantId, device.Id, Guid.NewGuid(), _sourceSystemId, "1.0", DateTimeOffset.UtcNow);
+
+        await _dbContext.AddRangeAsync(device, openVuln, resolvedVuln, install);
+        await _dbContext.SaveChangesAsync();
+
+        var openExposure = DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            device.Id,
+            openVuln.Id,
+            install.SoftwareProductId,
+            install.Id,
+            install.Version,
+            ExposureMatchSource.Product,
+            DateTimeOffset.UtcNow);
+        var resolvedExposure = DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            device.Id,
+            resolvedVuln.Id,
+            install.SoftwareProductId,
+            install.Id,
+            install.Version,
+            ExposureMatchSource.Product,
+            DateTimeOffset.UtcNow);
+        resolvedExposure.Resolve(DateTimeOffset.UtcNow);
+
+        await _dbContext.AddRangeAsync(openExposure, resolvedExposure);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new DeviceFilterQuery(),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var payload = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<DeviceDto>>().Subject;
+        payload.Items.Single().VulnerabilityCount.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Get_ReturnsDeviceDetailWithCanonicalFields()
     {
         var label = BusinessLabel.Create(_tenantId, "Revenue", null, "#00ff00");

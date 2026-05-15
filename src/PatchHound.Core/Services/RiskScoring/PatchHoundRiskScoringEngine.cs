@@ -17,7 +17,7 @@ public static class PatchHoundRiskScoringEngine
         }
 
         var baseComponent = metrics.MaxDetectionScore * 6.5m;
-        var countComponent = CalculateCountComponent(metrics);
+        var countComponent = CalculateSoftwareCountComponent(metrics);
         var breadthComponent = affectedDeviceCount <= 1
             ? 0m
             : Math.Min((decimal)Math.Log10(affectedDeviceCount) * 80m, 180m);
@@ -50,7 +50,7 @@ public static class PatchHoundRiskScoringEngine
         }
 
         var baseComponent = metrics.MaxDetectionScore * 6.5m;
-        var countComponent = CalculateCountComponent(metrics);
+        var countComponent = CalculateAssetCountComponent(metrics);
         var criticalityMultiplier = exposures.Max(exposure => GetAssetCriticalityMultiplier(exposure.AssetCriticality));
         var businessMultiplier = Math.Max(businessLabelWeight, 0m);
         var rawImpactMultiplier = criticalityMultiplier * businessMultiplier;
@@ -60,7 +60,7 @@ public static class PatchHoundRiskScoringEngine
 
         var factorsJson = CreateFactors(
             ("BaseComponent", "Highest detection score scaled to the PatchHound 0-1000 score range.", baseComponent),
-            ("CountComponent", "Severity count pressure from critical, high, medium, and low detections.", countComponent),
+            ("CountComponent", "Diminishing severity count pressure from critical, high, medium, and low detections.", countComponent),
             ("AssetCriticalityMultiplier", "Asset criticality impact multiplier.", criticalityMultiplier),
             ("BusinessLabelWeight", "Business-label impact multiplier.", businessMultiplier),
             ("EffectiveImpactMultiplier", "Compressed asset impact multiplier applied to sparse device exposure risk.", impactMultiplier),
@@ -132,11 +132,17 @@ public static class PatchHoundRiskScoringEngine
         return score;
     }
 
-    private static decimal CalculateCountComponent(ExposureMetrics metrics) =>
+    private static decimal CalculateSoftwareCountComponent(ExposureMetrics metrics) =>
         metrics.CriticalCount * 45m
         + metrics.HighCount * 12m
         + metrics.MediumCount * 3m
         + metrics.LowCount;
+
+    private static decimal CalculateAssetCountComponent(ExposureMetrics metrics) =>
+        Math.Min(metrics.CriticalCount * 15m, 60m)
+        + Math.Min(metrics.HighCount * 3m, 60m)
+        + Math.Min(metrics.MediumCount, 20m)
+        + Math.Min(metrics.LowCount * 0.25m, 8m);
 
     private static decimal ApplyFloors(decimal numericScore, ExposureMetrics metrics)
     {

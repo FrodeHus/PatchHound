@@ -131,7 +131,10 @@ public class DevicesController : ControllerBase
                 .Select(score => (decimal?)score.OverallScore)
                 .FirstOrDefault(),
             VulnerabilityCount = _dbContext.DeviceVulnerabilityExposures
-                .Where(e => e.TenantId == _tenantContext.CurrentTenantId.Value && e.DeviceId == d.Id)
+                .Where(e =>
+                    e.TenantId == _tenantContext.CurrentTenantId.Value
+                    && e.DeviceId == d.Id
+                    && e.Status == ExposureStatus.Open)
                 .Select(e => e.VulnerabilityId)
                 .Distinct()
                 .Count(),
@@ -193,10 +196,13 @@ public class DevicesController : ControllerBase
                     .Select(profile => profile.Name)
                     .FirstOrDefault(),
                 VulnerabilityCount = _dbContext.DeviceVulnerabilityExposures
-                    .Where(e => e.TenantId == _tenantContext.CurrentTenantId.Value && e.DeviceId == d.Id)
-                .Select(e => e.VulnerabilityId)
-                .Distinct()
-                .Count(),
+                    .Where(e =>
+                        e.TenantId == _tenantContext.CurrentTenantId.Value
+                        && e.DeviceId == d.Id
+                        && e.Status == ExposureStatus.Open)
+                    .Select(e => e.VulnerabilityId)
+                    .Distinct()
+                    .Count(),
                 d.HealthStatus,
                 d.OnboardingStatus,
                 d.DeviceValue,
