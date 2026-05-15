@@ -534,7 +534,7 @@ Remediation posture changes the inputs before rollup.
 
 | Remediation state | Scoring behavior |
 |---|---|
-| Approved for patching, maintenance window not missed | Detection score is reduced by the remediation adjustment factor while work is on track |
+| Approved for patching, maintenance window not missed | The exposure's Environmental CVSS input is reduced by the remediation adjustment factor while work is on track. ThreatScore and exploit/urgency floors still apply. |
 | Approved for patching, maintenance window missed | No reduction |
 | Risk acceptance | Visibility only; no score reduction |
 | Alternate mitigation approved | Covered vulnerabilities are removed from active risk |

@@ -65,6 +65,7 @@ public class RiskScoreServiceTruRiskCalibrationTests : IAsyncDisposable
 
         var score = await _db.SoftwareRiskScores.SingleAsync(item => item.SoftwareProductId == product.Id);
         score.OverallScore.Should().BeGreaterThanOrEqualTo(850m);
+        score.MaxExposureScore.Should().Be(980m);
         RiskBand.FromScore(score.OverallScore).Should().Be("Critical");
         score.CalculationVersion.Should().Be("2-trurisk-inspired");
     }
@@ -141,6 +142,7 @@ public class RiskScoreServiceTruRiskCalibrationTests : IAsyncDisposable
 
         var score = await _db.SoftwareRiskScores.SingleAsync(item => item.SoftwareProductId == product.Id);
         score.OverallScore.Should().BeGreaterThanOrEqualTo(700m);
+        score.MaxExposureScore.Should().Be(950m);
         RiskBand.FromScore(score.OverallScore).Should().Be("High");
     }
 

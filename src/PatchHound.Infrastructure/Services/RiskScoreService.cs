@@ -519,7 +519,7 @@ public class RiskScoreService(
                 return new AssetRiskResult(
                     group.Key,
                     result.OverallScore,
-                    result.MaxDetectionScore,
+                    ScaleDetectionScoreToComposite(result.MaxDetectionScore),
                     result.CriticalCount,
                     result.HighCount,
                     result.MediumCount,
@@ -616,7 +616,7 @@ public class RiskScoreService(
                 return new SoftwareRiskResult(
                     group.Key,
                     result.OverallScore,
-                    result.MaxDetectionScore,
+                    ScaleDetectionScoreToComposite(result.MaxDetectionScore),
                     result.CriticalCount,
                     result.HighCount,
                     result.MediumCount,
@@ -640,13 +640,9 @@ public class RiskScoreService(
             return [];
         }
 
-        var assessments = await dbContext.ThreatAssessments.AsNoTracking()
+        return await dbContext.ThreatAssessments.AsNoTracking()
             .Where(item => vulnerabilityIds.Contains(item.VulnerabilityId))
-            .ToListAsync(ct);
-
-        return assessments
-            .GroupBy(item => item.VulnerabilityId)
-            .ToDictionary(item => item.Key, item => item.OrderByDescending(assessment => assessment.CalculatedAt).First());
+            .ToDictionaryAsync(item => item.VulnerabilityId, ct);
     }
 
     private async Task<HashSet<Guid>> LoadEmergencyPatchVulnerabilityIdsAsync(
@@ -705,6 +701,9 @@ public class RiskScoreService(
                 emergencyPatchVulnerabilityIds.Contains(vulnerabilityId))
         );
     }
+
+    private static decimal ScaleDetectionScoreToComposite(decimal detectionScore) =>
+        Math.Clamp(Math.Round(detectionScore * 10m, 1), 0m, 1000m);
 
     private async Task<List<DeviceGroupRiskResult>> CalculateDeviceGroupScoresAsync(
         Guid tenantId,

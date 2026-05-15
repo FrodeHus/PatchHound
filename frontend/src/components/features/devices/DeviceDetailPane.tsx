@@ -17,7 +17,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { InsetPanel } from '@/components/ui/inset-panel'
-import { riskDetectionScoreTone, riskScoreTone } from '@/lib/risk-scoring'
+import { riskScoreTone } from '@/lib/risk-scoring'
 
 // Phase 1 canonical cleanup (Task 15): device-native detail pane.
 // Vulnerability list, software inventory and software CPE binding
@@ -197,7 +197,7 @@ export function DeviceDetailPane({
                     <MetricCard
                       label="Max episode"
                       value={device.risk.maxEpisodeRiskScore.toFixed(0)}
-                      tone={riskDetectionScoreTone(device.risk.maxEpisodeRiskScore, device.risk.overallScore)}
+                      tone={riskScoreTone(device.risk.maxEpisodeRiskScore)}
                     />
                     <MetricCard
                       label="Open episodes"
