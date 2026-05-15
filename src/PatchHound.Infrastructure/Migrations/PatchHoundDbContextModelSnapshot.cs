@@ -4916,6 +4916,19 @@ namespace PatchHound.Infrastructure.Migrations
                     b.ToTable("WorkflowNodeExecutions");
                 });
 
+            modelBuilder.Entity("PatchHound.Infrastructure.Data.Views.AlternateMitigationVulnId", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VulnerabilityId")
+                        .HasColumnType("uuid");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("mv_alternate_mitigation_vuln_ids", (string)null);
+                });
+
             modelBuilder.Entity("PatchHound.Infrastructure.Data.Views.ExposureLatestAssessment", b =>
                 {
                     b.Property<Guid>("DeviceVulnerabilityExposureId")
@@ -4930,6 +4943,36 @@ namespace PatchHound.Infrastructure.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("mv_exposure_latest_assessment", (string)null);
+                });
+
+            modelBuilder.Entity("PatchHound.Infrastructure.Data.Views.OpenExposureVulnSummary", b =>
+                {
+                    b.Property<int>("AffectedDeviceCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("LatestSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("MaxCvss")
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<DateTimeOffset?>("PublishedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VendorSeverity")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("VulnerabilityId")
+                        .HasColumnType("uuid");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("mv_open_exposure_vuln_summary", (string)null);
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.AIReport", b =>

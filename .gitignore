@@ -18,3 +18,4 @@ frontend/.tanstack/
 .codex/
 .superpowers/
 .gitnexus
+*.lscache
