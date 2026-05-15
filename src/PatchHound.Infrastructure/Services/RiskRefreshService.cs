@@ -7,7 +7,8 @@ namespace PatchHound.Infrastructure.Services;
 public class RiskRefreshService(
     PatchHoundDbContext dbContext,
     ExposureAssessmentService exposureAssessmentService,
-    RiskScoreService riskScoreService
+    RiskScoreService riskScoreService,
+    MaterializedViewRefreshService materializedViewRefreshService
 )
 {
     public async Task RefreshForAssetAsync(
@@ -58,6 +59,8 @@ public class RiskRefreshService(
             await exposureAssessmentService.AssessForTenantAsync(tenantId, DateTimeOffset.UtcNow, ct);
         }
 
+        await materializedViewRefreshService.RefreshExposureLatestAssessmentAsync(ct);
+        await materializedViewRefreshService.RefreshAlternateMitigationVulnIdsAsync(ct);
         await riskScoreService.RecalculateForTenantAsync(tenantId, ct);
         await dbContext.SaveChangesAsync(ct);
     }
@@ -75,6 +78,8 @@ public class RiskRefreshService(
             await exposureAssessmentService.AssessForTenantAsync(tenantId, DateTimeOffset.UtcNow, ct);
         }
 
+        await materializedViewRefreshService.RefreshExposureLatestAssessmentAsync(ct);
+        await materializedViewRefreshService.RefreshAlternateMitigationVulnIdsAsync(ct);
         await riskScoreService.RecalculateForTenantAsync(tenantId, ct);
         await dbContext.SaveChangesAsync(ct);
     }
@@ -91,6 +96,8 @@ public class RiskRefreshService(
             await exposureAssessmentService.AssessForTenantAsync(tenantId, DateTimeOffset.UtcNow, ct);
         }
 
+        await materializedViewRefreshService.RefreshExposureLatestAssessmentAsync(ct);
+        await materializedViewRefreshService.RefreshAlternateMitigationVulnIdsAsync(ct);
         await riskScoreService.RecalculateForTenantAsync(tenantId, ct);
         await dbContext.SaveChangesAsync(ct);
     }
@@ -106,6 +113,8 @@ public class RiskRefreshService(
             await exposureAssessmentService.AssessForTenantAsync(tenantId, DateTimeOffset.UtcNow, ct);
         }
 
+        await materializedViewRefreshService.RefreshExposureLatestAssessmentAsync(ct);
+        await materializedViewRefreshService.RefreshAlternateMitigationVulnIdsAsync(ct);
         await riskScoreService.RecalculateForTenantAsync(tenantId, ct);
         await dbContext.SaveChangesAsync(ct);
     }
