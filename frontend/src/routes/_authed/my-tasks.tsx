@@ -1,38 +1,21 @@
 import { useState } from 'react'
-import { useQueries } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchDecisionList } from '@/api/remediation.functions'
+import { fetchMyTasks } from '@/api/my-tasks.functions'
 import { MyTasksPage } from '@/components/features/tasks/MyTasksPage'
-import {
-  bucketsForRoles,
-  BUCKET_FILTERS,
-  type TaskBucketKey,
-} from '@/components/features/tasks/my-tasks-buckets'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { baseListSearchSchema } from '@/routes/-list-search'
 
+const myTasksSearchSchema = baseListSearchSchema.extend({
+  recommendationPage: baseListSearchSchema.shape.page,
+  decisionPage: baseListSearchSchema.shape.page,
+  approvalPage: baseListSearchSchema.shape.page,
+})
+
 export const Route = createFileRoute('/_authed/my-tasks')({
-  validateSearch: baseListSearchSchema,
+  validateSearch: myTasksSearchSchema,
   loaderDeps: ({ search }) => search,
-  beforeLoad: ({ context }) => {
-    const buckets = bucketsForRoles(context.user?.activeRoles ?? [])
-    return { buckets }
-  },
-  loader: async ({ context, deps }) => {
-    const buckets = (context as { buckets: TaskBucketKey[] }).buckets
-    const results = await Promise.all(
-      buckets.map((bucket) =>
-        fetchDecisionList({
-          data: {
-            ...BUCKET_FILTERS[bucket],
-            page: deps.page,
-            pageSize: deps.pageSize,
-          },
-        }).then((data) => [bucket, data] as const),
-      ),
-    )
-    return Object.fromEntries(results) as Record<TaskBucketKey, Awaited<ReturnType<typeof fetchDecisionList>>>
-  },
+  loader: ({ deps }) => fetchMyTasks({ data: toMyTasksQuery(deps) }),
   component: MyTasksRoute,
 })
 
@@ -40,39 +23,58 @@ function MyTasksRoute() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const initialData = Route.useLoaderData()
-  const { buckets } = Route.useRouteContext()
   const { selectedTenantId } = useTenantScope()
   const [initialTenantId] = useState(selectedTenantId)
   const canUseInitialData = initialTenantId === selectedTenantId
 
-  const queries = useQueries({
-    queries: buckets.map((bucket) => ({
-      queryKey: ['my-tasks', bucket, selectedTenantId, search],
-      queryFn: () =>
-        fetchDecisionList({
-          data: {
-            ...BUCKET_FILTERS[bucket],
-            page: search.page,
-            pageSize: search.pageSize,
-          },
-        }),
-      initialData: canUseInitialData ? initialData[bucket] : undefined,
-    })),
+  const query = useQuery({
+    queryKey: ['my-tasks', selectedTenantId, search],
+    queryFn: () => fetchMyTasks({ data: toMyTasksQuery(search) }),
+    initialData: canUseInitialData ? initialData : undefined,
   })
 
-  const sections = buckets.flatMap((bucket, index) => {
-    const data = queries[index].data
-    return data ? [{ bucket, data }] : []
-  })
+  const data = query.data ?? (canUseInitialData ? initialData : undefined)
+  if (!data) {
+    return null
+  }
 
   return (
     <MyTasksPage
-      sections={sections}
-      onPageChange={(page) => {
+      sections={data.sections}
+      pageSize={search.pageSize}
+      onLoadNext={(bucket) => {
         void navigate({
-          search: (prev) => ({ ...prev, page }),
+          search: (prev) => ({
+            ...prev,
+            [`${bucket}Page`]: prev[`${bucket}Page`] + 1,
+          }),
+        })
+      }}
+      onPageSizeChange={(pageSize) => {
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            pageSize,
+            recommendationPage: 1,
+            decisionPage: 1,
+            approvalPage: 1,
+          }),
         })
       }}
     />
   )
+}
+
+function toMyTasksQuery(search: {
+  pageSize: number
+  recommendationPage: number
+  decisionPage: number
+  approvalPage: number
+}) {
+  return {
+    pageSize: search.pageSize,
+    recommendationPage: search.recommendationPage,
+    decisionPage: search.decisionPage,
+    approvalPage: search.approvalPage,
+  }
 }

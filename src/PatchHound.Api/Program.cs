@@ -423,6 +423,7 @@ builder.Services.AddScoped<PatchHound.Api.Services.RemediationWorkflowAuthorizat
 builder.Services.AddScoped<PatchHound.Api.Services.BlockedTenantAccessLogger>();
 builder.Services.AddScoped<PatchHound.Api.Services.ApprovalTaskQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.RemediationTaskQueryService>();
+builder.Services.AddScoped<PatchHound.Api.Services.MyTasksQueryService>();
 builder.Services.AddHttpContextAccessor();
 
 // Background workers

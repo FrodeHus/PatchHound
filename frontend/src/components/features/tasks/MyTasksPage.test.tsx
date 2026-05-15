@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnchorHTMLAttributes } from 'react'
-import type { PagedDecisionList } from '@/api/remediation.schemas'
+import type { MyTaskBucket } from '@/api/my-tasks.schemas'
 import { MyTasksPage } from './MyTasksPage'
 import { bucketsForRoles } from './my-tasks-buckets'
 
@@ -11,7 +11,8 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }))
 
-const makeList = (overrides?: Partial<PagedDecisionList>): PagedDecisionList => ({
+const makeBucket = (overrides?: Partial<MyTaskBucket>): MyTaskBucket => ({
+  bucket: 'recommendation',
   items: [
     {
       remediationCaseId: '11111111-1111-1111-1111-111111111111',
@@ -19,9 +20,6 @@ const makeList = (overrides?: Partial<PagedDecisionList>): PagedDecisionList => 
       criticality: 'High',
       outcome: null,
       approvalStatus: null,
-      decidedAt: null,
-      maintenanceWindowDate: null,
-      expiryDate: null,
       totalVulnerabilities: 4,
       criticalCount: 1,
       highCount: 2,
@@ -30,22 +28,14 @@ const makeList = (overrides?: Partial<PagedDecisionList>): PagedDecisionList => 
       slaStatus: 'DueSoon',
       slaDueDate: '2026-05-09T00:00:00Z',
       affectedDeviceCount: 12,
-      openEpisodeTrend: [],
       workflowStage: 'SecurityAnalysis',
       softwareOwnerTeamName: 'Platform Engineering',
       softwareOwnerAssignmentSource: 'Rule',
     },
   ],
-  totalCount: 1,
   page: 1,
   pageSize: 25,
-  totalPages: 1,
-  summary: {
-    softwareInScope: 1,
-    withDecision: 0,
-    pendingApproval: 0,
-    noDecision: 1,
-  },
+  hasMore: false,
   ...overrides,
 })
 
@@ -53,8 +43,10 @@ describe('MyTasksPage', () => {
   it('renders the recommendation section with a link to the security analyst workbench', () => {
     render(
       <MyTasksPage
-        sections={[{ bucket: 'recommendation', data: makeList() }]}
-        onPageChange={() => {}}
+        sections={[makeBucket()]}
+        pageSize={25}
+        onLoadNext={() => {}}
+        onPageSizeChange={() => {}}
       />,
     )
 
@@ -71,11 +63,13 @@ describe('MyTasksPage', () => {
     render(
       <MyTasksPage
         sections={[
-          { bucket: 'recommendation', data: makeList() },
-          { bucket: 'decision', data: makeList({ totalCount: 2 }) },
-          { bucket: 'approval', data: makeList({ totalCount: 5 }) },
+          makeBucket(),
+          makeBucket({ bucket: 'decision' }),
+          makeBucket({ bucket: 'approval' }),
         ]}
-        onPageChange={() => {}}
+        pageSize={25}
+        onLoadNext={() => {}}
+        onPageSizeChange={() => {}}
       />,
     )
 
@@ -94,20 +88,20 @@ describe('MyTasksPage', () => {
     render(
       <MyTasksPage
         sections={[
-          {
+          makeBucket({
             bucket: 'approval',
-            data: makeList({
-              items: [
-                {
-                  ...makeList().items[0],
-                  outcome: 'RiskAcceptance',
-                  approvalStatus: 'PendingApproval',
-                },
-              ],
-            }),
-          },
+            items: [
+              {
+                ...makeBucket().items[0],
+                outcome: 'RiskAcceptance',
+                approvalStatus: 'PendingApproval',
+              },
+            ],
+          }),
         ]}
-        onPageChange={() => {}}
+        pageSize={25}
+        onLoadNext={() => {}}
+        onPageSizeChange={() => {}}
       />,
     )
 
@@ -121,20 +115,20 @@ describe('MyTasksPage', () => {
     render(
       <MyTasksPage
         sections={[
-          {
+          makeBucket({
             bucket: 'approval',
-            data: makeList({
-              items: [
-                {
-                  ...makeList().items[0],
-                  outcome: 'ApprovedForPatching',
-                  approvalStatus: 'PendingApproval',
-                },
-              ],
-            }),
-          },
+            items: [
+              {
+                ...makeBucket().items[0],
+                outcome: 'ApprovedForPatching',
+                approvalStatus: 'PendingApproval',
+              },
+            ],
+          }),
         ]}
-        onPageChange={() => {}}
+        pageSize={25}
+        onLoadNext={() => {}}
+        onPageSizeChange={() => {}}
       />,
     )
 
@@ -148,9 +142,11 @@ describe('MyTasksPage', () => {
     render(
       <MyTasksPage
         sections={[
-          { bucket: 'recommendation', data: makeList({ items: [], totalCount: 0 }) },
+          makeBucket({ items: [] }),
         ]}
-        onPageChange={() => {}}
+        pageSize={25}
+        onLoadNext={() => {}}
+        onPageSizeChange={() => {}}
       />,
     )
 
@@ -158,7 +154,14 @@ describe('MyTasksPage', () => {
   })
 
   it('falls back to a friendly message when the user has no buckets', () => {
-    render(<MyTasksPage sections={[]} onPageChange={() => {}} />)
+    render(
+      <MyTasksPage
+        sections={[]}
+        pageSize={25}
+        onLoadNext={() => {}}
+        onPageSizeChange={() => {}}
+      />,
+    )
     expect(screen.getByText(/don't have any task queues/i)).toBeInTheDocument()
   })
 })
@@ -178,6 +181,10 @@ describe('bucketsForRoles', () => {
 
   it('maps SecurityManager to recommendation and approval', () => {
     expect(bucketsForRoles(['SecurityManager'])).toEqual(['recommendation', 'approval'])
+  })
+
+  it('maps TechnicalManager to approval', () => {
+    expect(bucketsForRoles(['TechnicalManager'])).toEqual(['approval'])
   })
 
   it('combines buckets when the user holds multiple non-admin roles', () => {

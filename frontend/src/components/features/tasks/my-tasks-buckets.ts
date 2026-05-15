@@ -35,6 +35,6 @@ export function bucketsForRoles(roles: readonly string[]): TaskBucketKey[] {
     out.push('recommendation')
   }
   if (roles.includes('AssetOwner')) out.push('decision')
-  if (roles.includes('SecurityManager')) out.push('approval')
+  if (roles.includes('SecurityManager') || roles.includes('TechnicalManager')) out.push('approval')
   return out
 }
