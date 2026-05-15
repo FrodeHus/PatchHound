@@ -7,6 +7,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
+using PatchHound.Core.Services.RiskScoring;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 
@@ -313,14 +314,7 @@ public class RemediationDecisionQueryService(
             if (riskScoresByCaseId.TryGetValue(rc.Id, out var risk))
             {
                 riskScore = (double)risk.OverallScore;
-                riskBand = risk.OverallScore switch
-                {
-                    >= 900m => "Critical",
-                    >= 750m => "High",
-                    >= 500m => "Medium",
-                    > 0m => "Low",
-                    _ => "None",
-                };
+                riskBand = RiskBand.FromScore(risk.OverallScore);
             }
 
             string? slaStatus = null;

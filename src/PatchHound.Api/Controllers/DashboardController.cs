@@ -8,6 +8,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
+using PatchHound.Core.Services.RiskScoring;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 
@@ -1882,14 +1883,17 @@ public class DashboardController : ControllerBase
             .FirstOrDefault();
     }
 
-    private static string DescribeRiskLevel(decimal score) =>
-        score switch
+    private static string DescribeRiskLevel(decimal score)
+    {
+        var riskBand = RiskBand.FromScore(score);
+
+        return riskBand switch
         {
-            >= 900m => "Critical",
-            >= 750m => "High",
-            >= 500m => "Elevated",
-            _ => "Contained",
+            "Medium" => "Elevated",
+            "Low" or "None" => "Contained",
+            _ => riskBand,
         };
+    }
 
     private static string DescribeScoreTrend(decimal? delta)
     {

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Services.RiskScoring;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Tests.Infrastructure;
 
@@ -105,7 +106,8 @@ public class BusinessLabelRiskWeightTests : IAsyncDisposable
 
         var weightedScore = _db.DeviceRiskScores.Single(s => s.DeviceId == seed.DeviceA.Id).OverallScore;
         var expected = Math.Clamp(Math.Round(baselineScore * 0.5m, 2), 0m, 1000m);
-        weightedScore.Should().Be(expected);
+        weightedScore.Should().Be(Math.Max(expected, RiskBand.MediumThreshold));
+        weightedScore.Should().BeLessThan(baselineScore);
     }
 
     [Fact]

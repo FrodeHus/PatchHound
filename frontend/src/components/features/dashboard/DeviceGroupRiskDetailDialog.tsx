@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { fetchDeviceGroupRiskDetail } from '@/api/risk-score.functions'
 import type { DeviceGroupRiskDetail, RiskAssetScoreSummary } from '@/api/risk-score.schemas'
 import { Link } from '@tanstack/react-router'
+import { riskScoreBadgeClass } from '@/lib/risk-scoring'
 
 type DeviceGroupRiskDetailDialogProps = {
   deviceGroupName: string | null
@@ -214,23 +215,7 @@ function RiskMetric({
 }
 
 function riskBand(score: number) {
-  if (score >= 900) {
-    return {
-      badgeClass: 'border-destructive/25 bg-destructive/10 text-destructive',
-    }
-  }
-  if (score >= 750) {
-    return {
-      badgeClass:
-        'border-tone-warning-border bg-tone-warning text-tone-warning-foreground',
-    }
-  }
-  if (score >= 500) {
-    return {
-      badgeClass: 'border-chart-2/25 bg-chart-2/10 text-chart-2',
-    }
-  }
   return {
-    badgeClass: 'border-border/70 bg-background/40 text-muted-foreground',
+    badgeClass: riskScoreBadgeClass(score),
   }
 }

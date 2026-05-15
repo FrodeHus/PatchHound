@@ -1,9 +1,10 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using PatchHound.Core.Constants;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
-using PatchHound.Core.Services;
+using PatchHound.Core.Services.RiskScoring;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Infrastructure.Services;
@@ -13,7 +14,7 @@ public class RiskScoreService(
     ILogger<RiskScoreService> logger
 )
 {
-    public const string CalculationVersion = "1";
+    public const string CalculationVersion = "2-trurisk-inspired";
 
     /// <summary>
     /// Multiplier applied to an exposure's environmental CVSS when an active, approved
@@ -399,10 +400,10 @@ public class RiskScoreService(
             .ToList();
         var maxAsset = ordered[0].OverallScore;
         var topFiveAverage = ordered.Take(5).Average(item => item.OverallScore);
-        var criticalAssetCount = ordered.Count(item => item.OverallScore >= 900m);
-        var highAssetCount = ordered.Count(item => item.OverallScore >= 750m && item.OverallScore < 900m);
-        var mediumAssetCount = ordered.Count(item => item.OverallScore >= 500m && item.OverallScore < 750m);
-        var lowAssetCount = ordered.Count(item => item.OverallScore > 0m && item.OverallScore < 500m);
+        var criticalAssetCount = ordered.Count(item => item.OverallScore >= RiskBand.CriticalThreshold);
+        var highAssetCount = ordered.Count(item => item.OverallScore >= RiskBand.HighThreshold && item.OverallScore < RiskBand.CriticalThreshold);
+        var mediumAssetCount = ordered.Count(item => item.OverallScore >= RiskBand.MediumThreshold && item.OverallScore < RiskBand.HighThreshold);
+        var lowAssetCount = ordered.Count(item => item.OverallScore > 0m && item.OverallScore < RiskBand.MediumThreshold);
 
         var score = Math.Clamp(
             Math.Round(
@@ -454,43 +455,30 @@ public class RiskScoreService(
             .Select(d => d.SoftwareProductId)
             .ToHashSet();
 
-        var episodeScores = await dbContext.ExposureAssessments.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.Exposure.Status == ExposureStatus.Open)
+        var exposureRows = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.Status == ExposureStatus.Open)
             .Where(item => !dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
                 remediation.TenantId == tenantId
                 && remediation.Outcome == RemediationOutcome.AlternateMitigation
-                && remediation.VulnerabilityId == item.Exposure.VulnerabilityId))
+                && remediation.VulnerabilityId == item.VulnerabilityId))
             .Select(item => new
             {
-                AssetId = item.Exposure.DeviceId,
-                EpisodeRiskScore = item.EnvironmentalCvss,
-                SoftwareProductId = item.Exposure.SoftwareProductId,
-                RiskBand = item.EnvironmentalCvss >= 9.0m
-                    ? "Critical"
-                    : item.EnvironmentalCvss >= 7.0m
-                        ? "High"
-                        : item.EnvironmentalCvss >= 4.0m
-                            ? "Medium"
-                            : "Low",
+                item.DeviceId,
+                item.VulnerabilityId,
+                item.SoftwareProductId,
+                DeviceCriticality = item.Device.Criticality,
+                VendorSeverity = item.Vulnerability.VendorSeverity,
+                VulnerabilityCvss = item.Vulnerability.CvssScore,
+                AssessmentScore = dbContext.ExposureAssessments
+                    .Where(assessment => assessment.DeviceVulnerabilityExposureId == item.Id)
+                    .Select(assessment => (decimal?)assessment.EnvironmentalCvss)
+                    .FirstOrDefault(),
             })
             .ToListAsync(ct);
 
-        // Apply the remediation adjustment to episodes covered by an active decision.
-        var adjusted = episodeScores.Select(item =>
-        {
-            var score = item.EpisodeRiskScore;
-            var hasReduction = item.SoftwareProductId.HasValue
-                               && reducedSoftwareProductIds.Contains(item.SoftwareProductId.Value);
-            if (hasReduction)
-                score = Math.Round(score * RemediationAdjustmentFactor, 2);
-
-            var band = score >= 9.0m ? "Critical"
-                : score >= 7.0m ? "High"
-                : score >= 4.0m ? "Medium"
-                : "Low";
-
-            return (item.AssetId, EpisodeRiskScore: score, RiskBand: band, HasReduction: hasReduction);
-        });
+        var vulnerabilityIds = exposureRows.Select(item => item.VulnerabilityId).Distinct().ToList();
+        var threatAssessments = await LoadThreatAssessmentsAsync(vulnerabilityIds, ct);
+        var emergencyPatchVulnerabilityIds = await LoadEmergencyPatchVulnerabilityIdsAsync(vulnerabilityIds, ct);
 
         // Load the highest active business-label weight per device. The CASE expression
         // translates to SQL so aggregation happens server-side — only one row per device
@@ -509,82 +497,35 @@ public class RiskScoreService(
             })
             .ToDictionaryAsync(item => item.DeviceId, item => item.MaxWeight, ct);
 
-        return BuildAssetRiskResults(
-            adjusted.Select(item => (item.AssetId, item.EpisodeRiskScore, item.RiskBand, item.HasReduction)),
-            deviceLabelWeights
-        );
-    }
-
-    private static List<AssetRiskResult> BuildAssetRiskResults(
-        IEnumerable<(Guid AssetId, decimal EpisodeRiskScore, string RiskBand, bool HasReduction)> episodeScores,
-        Dictionary<Guid, decimal>? deviceLabelWeights = null
-    )
-    {
-        return episodeScores
+        return exposureRows
+            .Select(item => BuildExposureInput(
+                item.DeviceId,
+                item.VulnerabilityId,
+                item.SoftwareProductId,
+                item.AssessmentScore ?? item.VulnerabilityCvss ?? 0m,
+                item.VendorSeverity,
+                item.DeviceCriticality,
+                threatAssessments,
+                emergencyPatchVulnerabilityIds,
+                reducedSoftwareProductIds))
             .GroupBy(item => item.AssetId)
             .Select(group =>
             {
-                var orderedScores = group
-                    .Select(item => item.EpisodeRiskScore)
-                    .OrderByDescending(score => score)
-                    .ToList();
-                var maxEpisodeRisk = orderedScores.FirstOrDefault();
-                var topThreeAverage = orderedScores.Take(3).DefaultIfEmpty(0m).Average();
-                var criticalCount = group.Count(item => item.RiskBand == "Critical");
-                var highCount = group.Count(item => item.RiskBand == "High");
-                var mediumCount = group.Count(item => item.RiskBand == "Medium");
-                var lowCount = group.Count(item => item.RiskBand == "Low");
-                var reducedCount = group.Count(item => item.HasReduction);
-
-                // Clamp the unweighted score first so the multiplier applies to the
-                // same value reported as the asset's pre-label "base" risk.
-                var baseScore = Math.Clamp(
-                    Math.Round(
-                        (0.7m * maxEpisodeRisk)
-                        + (0.2m * topThreeAverage)
-                        + Math.Min(criticalCount * 35m, 120m)
-                        + Math.Min(highCount * 15m, 60m)
-                        + Math.Min(mediumCount * 5m, 20m)
-                        + Math.Min(lowCount * 1m, 5m),
-                        2),
-                    0m,
-                    1000m);
-
-                var labelWeight = deviceLabelWeights?.GetValueOrDefault(group.Key, 1.0m) ?? 1.0m;
-                var overallScore = Math.Clamp(Math.Round(baseScore * labelWeight, 2), 0m, 1000m);
-
-                var factors = new List<RiskFactor>
-                {
-                    new("MaxEpisodeRisk", "Highest unresolved episode risk on the asset.", maxEpisodeRisk),
-                    new("TopThreeAverage", "Average of the top three unresolved episode risks.", Math.Round(topThreeAverage, 2)),
-                    new("CriticalEpisodes", $"{criticalCount} critical-risk episodes.", Math.Min(criticalCount * 35m, 120m)),
-                    new("HighEpisodes", $"{highCount} high-risk episodes.", Math.Min(highCount * 15m, 60m)),
-                    new("MediumEpisodes", $"{mediumCount} medium-risk episodes.", Math.Min(mediumCount * 5m, 20m)),
-                    new("LowEpisodes", $"{lowCount} low-risk episodes.", Math.Min(lowCount * 1m, 5m)),
-                };
-
-                if (reducedCount > 0)
-                    factors.Add(new("RemediationReduction",
-                        $"{reducedCount} episode(s) score reduced by active remediation decision (factor {RemediationAdjustmentFactor}).",
-                        -reducedCount));
-
-                if (labelWeight != 1.0m)
-                    factors.Add(new("BusinessLabelWeight",
-                        $"Asset score multiplied by business label weight {labelWeight}x.",
-                        Math.Round(overallScore - baseScore, 2)));
-
-                var factorsJson = JsonSerializer.Serialize(factors);
+                var labelWeight = deviceLabelWeights.GetValueOrDefault(group.Key, 1.0m);
+                var result = PatchHoundRiskScoringEngine.CalculateAssetRisk(
+                    group.Select(item => item.Input).ToList(),
+                    labelWeight);
 
                 return new AssetRiskResult(
                     group.Key,
-                    overallScore,
-                    maxEpisodeRisk,
-                    criticalCount,
-                    highCount,
-                    mediumCount,
-                    lowCount,
+                    result.OverallScore,
+                    ScaleDetectionScoreToComposite(result.MaxDetectionScore),
+                    result.CriticalCount,
+                    result.HighCount,
+                    result.MediumCount,
+                    result.LowCount,
                     group.Count(),
-                    factorsJson
+                    result.FactorsJson
                 );
             })
             .OrderByDescending(item => item.OverallScore)
@@ -596,8 +537,27 @@ public class RiskScoreService(
         CancellationToken ct
     )
     {
+        var now = DateTimeOffset.UtcNow;
+        var activeDecisions = await dbContext.RemediationDecisions.AsNoTracking()
+            .Where(d => d.TenantId == tenantId && d.ApprovalStatus == DecisionApprovalStatus.Approved)
+            .Select(d => new
+            {
+                SoftwareProductId = d.RemediationCase.SoftwareProductId,
+                d.Outcome,
+                d.MaintenanceWindowDate,
+            })
+            .ToListAsync(ct);
+        var reducedSoftwareProductIds = activeDecisions
+            .Where(d =>
+                d.Outcome == RemediationOutcome.ApprovedForPatching
+                && !(d.MaintenanceWindowDate.HasValue && d.MaintenanceWindowDate.Value < now))
+            .Select(d => d.SoftwareProductId)
+            .ToHashSet();
+
         var exposures = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.SoftwareProductId != null)
+            .Where(item => item.TenantId == tenantId
+                && item.SoftwareProductId != null
+                && item.Status == ExposureStatus.Open)
             .Where(item => !dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
                 remediation.TenantId == tenantId
                 && remediation.Outcome == RemediationOutcome.AlternateMitigation
@@ -607,103 +567,143 @@ public class RiskScoreService(
                 item.Id,
                 item.DeviceId,
                 SoftwareProductId = item.SoftwareProductId!.Value,
-                item.Status,
-                VulnId = item.VulnerabilityId,
-                VulnExternalId = item.Vulnerability.ExternalId,
-                VulnSeverity = item.Vulnerability.VendorSeverity,
-                VulnCvssScore = item.Vulnerability.CvssScore,
+                item.VulnerabilityId,
+                DeviceCriticality = item.Device.Criticality,
+                VendorSeverity = item.Vulnerability.VendorSeverity,
+                VulnerabilityCvss = item.Vulnerability.CvssScore,
                 AssessmentScore = dbContext.ExposureAssessments
-                    .Where(a => a.DeviceVulnerabilityExposureId == item.Id)
-                    .Select(a => (decimal?)a.EnvironmentalCvss)
+                    .Where(assessment => assessment.DeviceVulnerabilityExposureId == item.Id)
+                    .Select(assessment => (decimal?)assessment.EnvironmentalCvss)
                     .FirstOrDefault(),
             })
             .ToListAsync(ct);
 
-        var allDeviceIds = exposures.Select(e => e.DeviceId).Distinct().ToList();
-        var highValueDeviceIds = (await dbContext.Devices.AsNoTracking()
-            .Where(d => allDeviceIds.Contains(d.Id)
-                && (d.Criticality == Criticality.High || d.Criticality == Criticality.Critical))
-            .Select(d => d.Id)
-            .ToListAsync(ct))
-            .ToHashSet();
+        var vulnerabilityIds = exposures.Select(item => item.VulnerabilityId).Distinct().ToList();
+        var threatAssessments = await LoadThreatAssessmentsAsync(vulnerabilityIds, ct);
+        var emergencyPatchVulnerabilityIds = await LoadEmergencyPatchVulnerabilityIdsAsync(vulnerabilityIds, ct);
 
         return exposures
             .GroupBy(item => item.SoftwareProductId)
             .Select(group =>
             {
-                var openExposures = group.Where(e => e.Status == ExposureStatus.Open).ToList();
-
-                // Use assessment score; fall back to vulnerability CVSS when no assessment exists.
-                var scores = openExposures
-                    .Select(e => e.AssessmentScore ?? e.VulnCvssScore ?? 0m)
-                    .OrderByDescending(s => s)
+                var openExposures = group.ToList();
+                var inputs = openExposures
+                    .Select(item => BuildExposureInput(
+                        item.DeviceId,
+                        item.VulnerabilityId,
+                        item.SoftwareProductId,
+                        item.AssessmentScore ?? item.VulnerabilityCvss ?? 0m,
+                        item.VendorSeverity,
+                        item.DeviceCriticality,
+                        threatAssessments,
+                        emergencyPatchVulnerabilityIds,
+                        reducedSoftwareProductIds).Input)
                     .ToList();
-                var maxScore = scores.FirstOrDefault();
-                var topThreeAvg = scores.Take(3).DefaultIfEmpty(0m).Average();
-                var criticalCount = openExposures.Count(e => (e.AssessmentScore ?? e.VulnCvssScore ?? 0m) >= 9.0m);
-                var highCount = openExposures.Count(e => { var s = e.AssessmentScore ?? e.VulnCvssScore ?? 0m; return s >= 7.0m && s < 9.0m; });
-                var mediumCount = openExposures.Count(e => { var s = e.AssessmentScore ?? e.VulnCvssScore ?? 0m; return s >= 4.0m && s < 7.0m; });
-                var lowCount = openExposures.Count(e => { var s = e.AssessmentScore ?? e.VulnCvssScore ?? 0m; return s > 0m && s < 4.0m; });
-                var affectedDeviceIds = openExposures.Select(e => e.DeviceId).Distinct().ToList();
+                var affectedDeviceIds = openExposures.Select(item => item.DeviceId).Distinct().ToList();
                 var affectedDeviceCount = affectedDeviceIds.Count;
-                var highValueDeviceCount = affectedDeviceIds.Count(id => highValueDeviceIds.Contains(id));
-
-                var overallScore = Math.Clamp(
-                    Math.Round(
-                        (0.7m * maxScore)
-                        + (0.2m * topThreeAvg)
-                        + Math.Min(criticalCount * 35m, 120m)
-                        + Math.Min(highCount * 15m, 60m)
-                        + Math.Min(mediumCount * 5m, 20m)
-                        + Math.Min(lowCount * 1m, 5m),
-                        2),
-                    0m,
-                    1000m);
-
-                // Impact score uses the same ExposureImpactCalculator as the detail view,
-                // keyed on unique vulnerabilities so count/device weighting is consistent.
-                var uniqueVulns = openExposures
-                    .GroupBy(e => e.VulnId)
-                    .Select(g => new ExposureImpactCalculator.SoftwareVulnerabilityInput(
-                        g.First().VulnSeverity,
-                        g.First().VulnCvssScore,
-                        g.First().VulnExternalId))
-                    .ToList();
-                var impactScore = ExposureImpactCalculator.CalculateSoftwareImpact(
-                    new ExposureImpactCalculator.SoftwareImpactInput(
-                        group.Key,
-                        affectedDeviceCount,
-                        highValueDeviceCount,
-                        uniqueVulns))
-                    .ImpactScore;
-
-                var factorsJson = JsonSerializer.Serialize(new List<RiskFactor>
-                {
-                    new("MaxExposureScore", "Highest open exposure score for this software product.", maxScore),
-                    new("TopThreeAverage", "Average of the top three open exposure scores.", Math.Round(topThreeAvg, 2)),
-                    new("CriticalExposures", $"{criticalCount} critical-risk open exposures.", Math.Min(criticalCount * 35m, 120m)),
-                    new("HighExposures", $"{highCount} high-risk open exposures.", Math.Min(highCount * 15m, 60m)),
-                    new("MediumExposures", $"{mediumCount} medium-risk open exposures.", Math.Min(mediumCount * 5m, 20m)),
-                    new("LowExposures", $"{lowCount} low-risk open exposures.", Math.Min(lowCount * 1m, 5m)),
-                });
+                var highValueDeviceCount = openExposures
+                    .GroupBy(item => item.DeviceId)
+                    .Count(deviceGroup =>
+                    {
+                        var criticality = deviceGroup.First().DeviceCriticality;
+                        return criticality == Criticality.High || criticality == Criticality.Critical;
+                    });
+                var result = PatchHoundRiskScoringEngine.CalculateSoftwareRisk(
+                    inputs,
+                    affectedDeviceCount,
+                    highValueDeviceCount);
 
                 return new SoftwareRiskResult(
                     group.Key,
-                    overallScore,
-                    impactScore,
-                    criticalCount,
-                    highCount,
-                    mediumCount,
-                    lowCount,
+                    result.OverallScore,
+                    ScaleDetectionScoreToComposite(result.MaxDetectionScore),
+                    result.CriticalCount,
+                    result.HighCount,
+                    result.MediumCount,
+                    result.LowCount,
                     affectedDeviceCount,
                     openExposures.Count,
-                    factorsJson
+                    result.FactorsJson
                 );
             })
             .Where(r => r.OpenExposureCount > 0)
             .OrderByDescending(r => r.OverallScore)
             .ToList();
     }
+
+    private async Task<Dictionary<Guid, ThreatAssessment>> LoadThreatAssessmentsAsync(
+        IReadOnlyCollection<Guid> vulnerabilityIds,
+        CancellationToken ct)
+    {
+        if (vulnerabilityIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.ThreatAssessments.AsNoTracking()
+            .Where(item => vulnerabilityIds.Contains(item.VulnerabilityId))
+            .ToDictionaryAsync(item => item.VulnerabilityId, ct);
+    }
+
+    private async Task<HashSet<Guid>> LoadEmergencyPatchVulnerabilityIdsAsync(
+        IReadOnlyCollection<Guid> vulnerabilityIds,
+        CancellationToken ct)
+    {
+        if (vulnerabilityIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = await dbContext.VulnerabilityPatchAssessments.AsNoTracking()
+            .Where(item => vulnerabilityIds.Contains(item.VulnerabilityId)
+                && item.UrgencyTier == PatchUrgencyTier.Emergency)
+            .Select(item => item.VulnerabilityId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        return ids.ToHashSet();
+    }
+
+    private static (Guid AssetId, RiskExposureInput Input) BuildExposureInput(
+        Guid deviceId,
+        Guid vulnerabilityId,
+        Guid? softwareProductId,
+        decimal environmentalCvss,
+        Severity vendorSeverity,
+        Criticality deviceCriticality,
+        IReadOnlyDictionary<Guid, ThreatAssessment> threatAssessments,
+        IReadOnlySet<Guid> emergencyPatchVulnerabilityIds,
+        IReadOnlySet<Guid> reducedSoftwareProductIds)
+    {
+        var adjustedCvss = environmentalCvss;
+        if (softwareProductId.HasValue && reducedSoftwareProductIds.Contains(softwareProductId.Value))
+        {
+            adjustedCvss = Math.Round(adjustedCvss * RemediationAdjustmentFactor, 2);
+        }
+
+        threatAssessments.TryGetValue(vulnerabilityId, out var threat);
+
+        return (
+            deviceId,
+            new RiskExposureInput(
+                deviceId,
+                vulnerabilityId,
+                adjustedCvss,
+                vendorSeverity,
+                deviceCriticality,
+                threat?.ThreatScore,
+                threat?.EpssScore,
+                threat?.KnownExploited ?? false,
+                threat?.PublicExploit ?? false,
+                threat?.ActiveAlert ?? false,
+                threat?.HasRansomwareAssociation ?? false,
+                threat?.HasMalwareAssociation ?? false,
+                emergencyPatchVulnerabilityIds.Contains(vulnerabilityId))
+        );
+    }
+
+    private static decimal ScaleDetectionScoreToComposite(decimal detectionScore) =>
+        Math.Clamp(Math.Round(detectionScore * 10m, 1), 0m, 1000m);
 
     private async Task<List<DeviceGroupRiskResult>> CalculateDeviceGroupScoresAsync(
         Guid tenantId,

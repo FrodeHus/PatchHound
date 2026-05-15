@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select'
 import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
 import { formatDate, startCase } from '@/lib/formatting'
+import { riskScoreTone } from '@/lib/risk-scoring'
 import { toneText } from '@/lib/tone-classes'
 import { SearchIcon } from 'lucide-react'
 
@@ -192,7 +193,7 @@ export function SoftwareTable({
           const score = row.original.currentRiskScore
           const softwareProductId = row.original.softwareProductId
           if (score == null) return <span className="text-muted-foreground">—</span>
-          const tone = score >= 900 ? 'danger' : score >= 750 ? 'warning' : score >= 500 ? 'info' : 'success'
+          const tone = riskScoreTone(score)
           if (!softwareProductId) {
             return <span className={`font-medium tabular-nums ${toneText(tone)}`}>{score.toFixed(0)}</span>
           }

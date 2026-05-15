@@ -10,6 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import type { RiskAssetEpisodeDriver, RiskAssetScoreSummary, RiskScoreSummary } from '@/api/risk-score.schemas'
+import { riskScoreBadgeClass } from '@/lib/risk-scoring'
 
 type RiskScoreDetailDialogProps = {
   open: boolean
@@ -178,23 +179,7 @@ function DriverFactor({ label, value }: { label: string; value: number }) {
 }
 
 function riskBand(score: number) {
-  if (score >= 900) {
-    return {
-      badgeClass: 'border-destructive/25 bg-destructive/10 text-destructive',
-    }
-  }
-  if (score >= 750) {
-    return {
-      badgeClass:
-        'border-tone-warning-border bg-tone-warning text-tone-warning-foreground',
-    }
-  }
-  if (score >= 500) {
-    return {
-      badgeClass: 'border-chart-2/25 bg-chart-2/10 text-chart-2',
-    }
-  }
   return {
-    badgeClass: 'border-border/70 bg-background/40 text-muted-foreground',
+    badgeClass: riskScoreBadgeClass(score),
   }
 }
