@@ -79,78 +79,178 @@ public class DashboardController : ControllerBase
 
         var presentationExposureQuery = ExcludeAcceptedRiskVulnerabilities(exposureBaseQuery, tenantId);
 
-        var exposureSeverityCounts = await presentationExposureQuery
-            .GroupBy(e => new { e.Status, e.Vulnerability.VendorSeverity })
-            .Select(g => new { g.Key.Status, g.Key.VendorSeverity, Count = g.Select(e => e.VulnerabilityId).Distinct().Count() })
-            .ToListAsync(ct);
+        // Build a view-backed summary query for the no-filteredAssetIds fast path.
+        // The view pre-aggregates across all devices, so it cannot be used when filtering by asset.
+        // InMemory provider (tests) does not populate materialized views, so fall back to base table.
+        var useViewFastPath = filteredAssetIds is null
+            && _dbContext.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
+        var summaryQuery = useViewFastPath
+            ? _dbContext.OpenExposureVulnSummaries.AsNoTracking()
+                .Where(s => s.TenantId == tenantId)
+                .Where(s => !_dbContext.ApprovedVulnerabilityRemediations.Any(r =>
+                    r.TenantId == tenantId
+                    && (r.Outcome == RemediationOutcome.RiskAcceptance || r.Outcome == RemediationOutcome.AlternateMitigation)
+                    && r.VulnerabilityId == s.VulnerabilityId))
+                .Where(s => !minPublishedDate.HasValue || s.PublishedDate >= minPublishedDate.Value)
+            : null;
 
-        var vulnsBySeverity = Enum.GetValues<Severity>().ToDictionary(
-            s => s.ToString(),
-            s => exposureSeverityCounts.Where(r => r.Status == ExposureStatus.Open && r.VendorSeverity == s).Sum(r => r.Count));
-        var openCount = exposureSeverityCounts.Where(r => r.Status == ExposureStatus.Open).Sum(r => r.Count);
-        var resolvedCount = exposureSeverityCounts.Where(r => r.Status == ExposureStatus.Resolved).Sum(r => r.Count);
+        // ── Severity counts ─────────────────────────────────────────────────────────
+        Dictionary<string, int> vulnsBySeverity;
+        int openCount;
+        int resolvedCount;
+
+        if (summaryQuery is not null)
+        {
+            var summaryRows = await summaryQuery.ToListAsync(ct);
+            vulnsBySeverity = Enum.GetValues<Severity>().ToDictionary(
+                s => s.ToString(),
+                s => summaryRows.Count(r => r.VendorSeverity == s));
+            openCount = summaryRows.Count;
+            resolvedCount = await presentationExposureQuery
+                .Where(e => e.Status == ExposureStatus.Resolved)
+                .Select(e => e.VulnerabilityId).Distinct().CountAsync(ct);
+        }
+        else
+        {
+            var exposureSeverityCounts = await presentationExposureQuery
+                .GroupBy(e => new { e.Status, e.Vulnerability.VendorSeverity })
+                .Select(g => new { g.Key.Status, g.Key.VendorSeverity, Count = g.Select(e => e.VulnerabilityId).Distinct().Count() })
+                .ToListAsync(ct);
+            vulnsBySeverity = Enum.GetValues<Severity>().ToDictionary(
+                s => s.ToString(),
+                s => exposureSeverityCounts.Where(r => r.Status == ExposureStatus.Open && r.VendorSeverity == s).Sum(r => r.Count));
+            openCount = exposureSeverityCounts.Where(r => r.Status == ExposureStatus.Open).Sum(r => r.Count);
+            resolvedCount = exposureSeverityCounts.Where(r => r.Status == ExposureStatus.Resolved).Sum(r => r.Count);
+        }
+
         var vulnsByStatus = new Dictionary<string, int>
         {
             [nameof(VulnerabilityStatus.Open)] = openCount,
             [nameof(VulnerabilityStatus.Resolved)] = resolvedCount,
         };
 
-        // Top critical vulnerabilities
-        var topVulnRows = await presentationExposureQuery
-            .Where(e => e.Status == ExposureStatus.Open
-                && (e.Vulnerability.VendorSeverity == Severity.Critical || e.Vulnerability.VendorSeverity == Severity.High))
-            .GroupBy(e => e.VulnerabilityId)
-            .Select(g => new
-            {
-                VulnerabilityId = g.Key,
-                ExternalId = g.First().Vulnerability.ExternalId,
-                Title = g.First().Vulnerability.Title,
-                VendorSeverity = g.First().Vulnerability.VendorSeverity,
-                CvssScore = g.First().Vulnerability.CvssScore,
-                PublishedDate = g.First().Vulnerability.PublishedDate,
-                AffectedAssetCount = g.Select(e => e.DeviceId).Distinct().Count(),
-            })
-            .OrderByDescending(r => r.VendorSeverity)
-            .ThenByDescending(r => r.AffectedAssetCount)
-            .Take(10)
-            .ToListAsync(ct);
+        // ── Top critical/high vulnerabilities ───────────────────────────────────────
+        List<TopVulnerabilityDto> topVulns;
 
-        var topVulns = topVulnRows.Select(r => new TopVulnerabilityDto(
-            r.VulnerabilityId, r.ExternalId, r.Title,
-            r.VendorSeverity.ToString(), r.CvssScore,
-            r.AffectedAssetCount,
-            r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0
-        )).ToList();
+        if (summaryQuery is not null)
+        {
+            var topVulnRows = await summaryQuery
+                .Where(s => s.VendorSeverity == Severity.Critical || s.VendorSeverity == Severity.High)
+                .OrderByDescending(s => s.VendorSeverity)
+                .ThenByDescending(s => s.AffectedDeviceCount)
+                .Take(10)
+                .Join(_dbContext.Vulnerabilities.AsNoTracking(),
+                    s => s.VulnerabilityId,
+                    v => v.Id,
+                    (s, v) => new
+                    {
+                        s.VulnerabilityId,
+                        v.ExternalId,
+                        v.Title,
+                        s.VendorSeverity,
+                        CvssScore = s.MaxCvss,
+                        s.PublishedDate,
+                        s.AffectedDeviceCount,
+                    })
+                .ToListAsync(ct);
+            topVulns = topVulnRows.Select(r => new TopVulnerabilityDto(
+                r.VulnerabilityId, r.ExternalId, r.Title,
+                r.VendorSeverity.ToString(), r.CvssScore,
+                r.AffectedDeviceCount,
+                r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0
+            )).ToList();
+        }
+        else
+        {
+            // original base-table query
+            var topVulnRows = await presentationExposureQuery
+                .Where(e => e.Status == ExposureStatus.Open
+                    && (e.Vulnerability.VendorSeverity == Severity.Critical || e.Vulnerability.VendorSeverity == Severity.High))
+                .GroupBy(e => e.VulnerabilityId)
+                .Select(g => new
+                {
+                    VulnerabilityId = g.Key,
+                    ExternalId = g.First().Vulnerability.ExternalId,
+                    Title = g.First().Vulnerability.Title,
+                    VendorSeverity = g.First().Vulnerability.VendorSeverity,
+                    CvssScore = g.First().Vulnerability.CvssScore,
+                    PublishedDate = g.First().Vulnerability.PublishedDate,
+                    AffectedAssetCount = g.Select(e => e.DeviceId).Distinct().Count(),
+                })
+                .OrderByDescending(r => r.VendorSeverity)
+                .ThenByDescending(r => r.AffectedAssetCount)
+                .Take(10)
+                .ToListAsync(ct);
+            topVulns = topVulnRows.Select(r => new TopVulnerabilityDto(
+                r.VulnerabilityId, r.ExternalId, r.Title,
+                r.VendorSeverity.ToString(), r.CvssScore,
+                r.AffectedAssetCount,
+                r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0
+            )).ToList();
+        }
 
-        // Latest unhandled (open, no remediation case)
-        var latestUnhandledRows = await (
-            from e in presentationExposureQuery
-            where e.Status == ExposureStatus.Open
-            join rc in _dbContext.RemediationCases.AsNoTracking()
-                on e.SoftwareProductId equals rc.SoftwareProductId into rcJoin
-            from rc in rcJoin.DefaultIfEmpty()
-            where rc == null || rc.TenantId != tenantId
-            group e by e.VulnerabilityId into g
-            select new
-            {
-                VulnerabilityId = g.Key,
-                ExternalId = g.First().Vulnerability.ExternalId,
-                Title = g.First().Vulnerability.Title,
-                VendorSeverity = g.First().Vulnerability.VendorSeverity,
-                CvssScore = g.First().Vulnerability.CvssScore,
-                PublishedDate = g.First().Vulnerability.PublishedDate,
-                AffectedAssetCount = g.Select(e => e.DeviceId).Distinct().Count(),
-                LatestSeenAt = g.Max(e => e.LastObservedAt),
-            }
-        ).OrderByDescending(r => r.LatestSeenAt).Take(10).ToListAsync(ct);
+        // ── Latest unhandled (open, no remediation case) ─────────────────────────────
+        List<UnhandledVulnerabilityDto> latestUnhandled;
 
-        var latestUnhandled = latestUnhandledRows.Select(r => new UnhandledVulnerabilityDto(
-            r.VulnerabilityId, r.ExternalId, r.Title,
-            r.VendorSeverity.ToString(), r.CvssScore,
-            r.AffectedAssetCount,
-            r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0,
-            r.LatestSeenAt
-        )).ToList();
+        if (summaryQuery is not null)
+        {
+            var latestUnhandledRows = await (
+                from s in summaryQuery
+                join v in _dbContext.Vulnerabilities.AsNoTracking() on s.VulnerabilityId equals v.Id
+                where !_dbContext.RemediationCases.AsNoTracking()
+                    .Any(rc => rc.TenantId == tenantId && rc.SoftwareProductId == s.VulnerabilityId)
+                orderby s.LatestSeenAt descending
+                select new
+                {
+                    s.VulnerabilityId,
+                    v.ExternalId,
+                    v.Title,
+                    s.VendorSeverity,
+                    CvssScore = s.MaxCvss,
+                    s.PublishedDate,
+                    s.AffectedDeviceCount,
+                    s.LatestSeenAt,
+                }
+            ).Take(10).ToListAsync(ct);
+            latestUnhandled = latestUnhandledRows.Select(r => new UnhandledVulnerabilityDto(
+                r.VulnerabilityId, r.ExternalId, r.Title,
+                r.VendorSeverity.ToString(), r.CvssScore,
+                r.AffectedDeviceCount,
+                r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0,
+                r.LatestSeenAt
+            )).ToList();
+        }
+        else
+        {
+            // original base-table query
+            var latestUnhandledRows = await (
+                from e in presentationExposureQuery
+                where e.Status == ExposureStatus.Open
+                join rc in _dbContext.RemediationCases.AsNoTracking()
+                    on e.SoftwareProductId equals rc.SoftwareProductId into rcJoin
+                from rc in rcJoin.DefaultIfEmpty()
+                where rc == null || rc.TenantId != tenantId
+                group e by e.VulnerabilityId into g
+                select new
+                {
+                    VulnerabilityId = g.Key,
+                    ExternalId = g.First().Vulnerability.ExternalId,
+                    Title = g.First().Vulnerability.Title,
+                    VendorSeverity = g.First().Vulnerability.VendorSeverity,
+                    CvssScore = g.First().Vulnerability.CvssScore,
+                    PublishedDate = g.First().Vulnerability.PublishedDate,
+                    AffectedAssetCount = g.Select(e => e.DeviceId).Distinct().Count(),
+                    LatestSeenAt = g.Max(e => e.LastObservedAt),
+                }
+            ).OrderByDescending(r => r.LatestSeenAt).Take(10).ToListAsync(ct);
+            latestUnhandled = latestUnhandledRows.Select(r => new UnhandledVulnerabilityDto(
+                r.VulnerabilityId, r.ExternalId, r.Title,
+                r.VendorSeverity.ToString(), r.CvssScore,
+                r.AffectedAssetCount,
+                r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0,
+                r.LatestSeenAt
+            )).ToList();
+        }
 
         // MTTR: average days from first episode open to close for resolved exposures
         var closedEpisodes = await _dbContext.ExposureEpisodes.AsNoTracking()
