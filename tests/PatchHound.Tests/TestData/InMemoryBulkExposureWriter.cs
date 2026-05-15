@@ -8,11 +8,17 @@ using PatchHound.Infrastructure.Data;
 namespace PatchHound.Tests.TestData;
 
 /// <summary>
-/// Test/InMemory implementation of <see cref="IBulkExposureWriter"/>. The
-/// production implementation uses Postgres COPY + INSERT ... ON CONFLICT, which
-/// the EF InMemory provider cannot honor. This fake mirrors the same upsert
-/// semantics using load-mutate-SaveChanges so InMemory-backed tests can verify
-/// the resulting DeviceVulnerabilityExposure rows.
+/// In-memory replacement for <see cref="IBulkExposureWriter"/> used by Phase-3 tests that
+/// run against the EF Core InMemory provider (which cannot execute the real PostgreSQL UPSERT).
+///
+/// IMPORTANT: This fake DIVERGES from the production writer in one semantic:
+/// on conflict it calls <c>Reobserve</c> which reopens a previously-Resolved exposure.
+/// The real <see cref="PatchHound.Infrastructure.Services.PostgresBulkExposureWriter"/> preserves <c>Status='Resolved'</c>
+/// on conflict (see <c>ExposureDerivationService.cs:74</c> — "respect direct-report resolution").
+///
+/// Do NOT use this fake in tests that seed a pre-existing Resolved exposure and then
+/// verify upsert behavior on it — the fake will return the wrong status. Either use
+/// the Testcontainers Postgres fixture, or substitute a per-test mock via NSubstitute.
 /// </summary>
 internal sealed class InMemoryBulkExposureWriter(PatchHoundDbContext db) : IBulkExposureWriter
 {

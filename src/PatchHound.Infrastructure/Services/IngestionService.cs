@@ -1058,6 +1058,18 @@ public class IngestionService
                 }
             }
 
+            // Mirror ExposureDerivationService provenance rules (ExposureDerivationService.cs:83-85):
+            // when we resolved a concrete SoftwareProductId from the device's installed software,
+            // the match is product-based; when we could only derive a CPE from the staged payload
+            // (vendor+name) without an installed-software match, the match is CPE-based.
+            // MatchSource is NOT overwritten by the upsert's DO UPDATE, so first-write provenance
+            // sticks — we must set it correctly here.
+            var matchSource = softwareProductId is not null
+                ? ExposureMatchSource.Product
+                : (affectedAssetPayload is { ProductVendor: not null, ProductName: not null }
+                    ? ExposureMatchSource.Cpe
+                    : ExposureMatchSource.Product);
+
             rows.Add(new ExposureUpsertRow(
                 TenantId: tenantId,
                 DeviceId: deviceId,
@@ -1065,7 +1077,7 @@ public class IngestionService
                 SoftwareProductId: softwareProductId,
                 InstalledSoftwareId: installedSoftwareId,
                 MatchedVersion: string.Empty,
-                MatchSource: nameof(ExposureMatchSource.Product),
+                MatchSource: matchSource.ToString(),
                 ObservedAt: now,
                 RunId: ingestionRunId));
         }
@@ -1470,8 +1482,7 @@ internal sealed record IngestionArtifactCleanupSummary(
     int PrunedSoftwareLinkCount
 );
 
-// Defined here after StagedVulnerabilityMergeService was deleted in Phase 2.
-// Phase 3 will replace this with a proper merge summary from DeviceVulnerabilityExposure processing.
+// Summary of staged vulnerability + exposure processing produced by ProcessStagedResultsAsync.
 internal sealed record StagedVulnerabilityMergeSummary(
     int StagedVulnerabilityCount,
     int PersistedVulnerabilityCount,
