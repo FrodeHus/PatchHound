@@ -10,6 +10,7 @@ using PatchHound.Api.Services;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
+using PatchHound.Core.Services.RiskScoring;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Services.Inventory;
@@ -109,8 +110,6 @@ public class DevicesController : ControllerBase
             );
         if (!string.IsNullOrEmpty(filter.HealthStatus))
             query = query.Where(d => d.HealthStatus == filter.HealthStatus);
-        if (!string.IsNullOrEmpty(filter.ExposureLevel))
-            query = query.Where(d => d.ExposureLevel == filter.ExposureLevel);
         if (!string.IsNullOrEmpty(filter.Tag))
             query = query.Where(d =>
                 _dbContext.DeviceTags.Any(t => t.DeviceId == d.Id && t.Value.Contains(filter.Tag))
@@ -123,8 +122,6 @@ public class DevicesController : ControllerBase
             );
         if (!string.IsNullOrEmpty(filter.OnboardingStatus))
             query = query.Where(d => d.OnboardingStatus == filter.OnboardingStatus);
-
-        var totalCount = await query.CountAsync(ct);
 
         var rankedQuery = query.Select(d => new
         {
@@ -139,6 +136,24 @@ public class DevicesController : ControllerBase
                 .Distinct()
                 .Count(),
         });
+
+        if (!string.IsNullOrWhiteSpace(filter.RiskBand))
+        {
+            rankedQuery = filter.RiskBand.Trim().ToLowerInvariant() switch
+            {
+                "none" => rankedQuery.Where(item => item.CurrentRiskScore == null || item.CurrentRiskScore <= 0m),
+                "low" => rankedQuery.Where(item =>
+                    item.CurrentRiskScore > 0m && item.CurrentRiskScore < RiskBand.MediumThreshold),
+                "medium" => rankedQuery.Where(item =>
+                    item.CurrentRiskScore >= RiskBand.MediumThreshold && item.CurrentRiskScore < RiskBand.HighThreshold),
+                "high" => rankedQuery.Where(item =>
+                    item.CurrentRiskScore >= RiskBand.HighThreshold && item.CurrentRiskScore < RiskBand.CriticalThreshold),
+                "critical" => rankedQuery.Where(item => item.CurrentRiskScore >= RiskBand.CriticalThreshold),
+                _ => rankedQuery,
+            };
+        }
+
+        var totalCount = await rankedQuery.CountAsync(ct);
 
         var deviceIds = await rankedQuery
             .OrderByDescending(item => item.CurrentRiskScore ?? 0m)
@@ -179,12 +194,10 @@ public class DevicesController : ControllerBase
                     .FirstOrDefault(),
                 VulnerabilityCount = _dbContext.DeviceVulnerabilityExposures
                     .Where(e => e.TenantId == _tenantContext.CurrentTenantId.Value && e.DeviceId == d.Id)
-                    .Select(e => e.VulnerabilityId)
-                    .Distinct()
-                    .Count(),
+                .Select(e => e.VulnerabilityId)
+                .Distinct()
+                .Count(),
                 d.HealthStatus,
-                RiskScore = d.ExternalRiskLabel,
-                d.ExposureLevel,
                 d.OnboardingStatus,
                 d.DeviceValue,
             })
@@ -241,6 +254,7 @@ public class DevicesController : ControllerBase
                 d.ExternalId,
                 d.Name,
                 d.CurrentRiskScore,
+                d.CurrentRiskScore.HasValue ? RiskBand.FromScore(d.CurrentRiskScore.Value) : "None",
                 d.GroupName,
                 d.Criticality,
                 d.OwnerType,
@@ -250,8 +264,6 @@ public class DevicesController : ControllerBase
                 d.VulnerabilityCount,
                 recurringCountsByDeviceId.TryGetValue(d.Id, out var recurring) ? recurring : 0,
                 d.HealthStatus,
-                d.RiskScore,
-                d.ExposureLevel,
                 tagsByDeviceId.TryGetValue(d.Id, out var tags) ? tags : Array.Empty<string>(),
                 businessLabelLookup.TryGetValue(d.Id, out var labels) ? labels : [],
                 d.OnboardingStatus,

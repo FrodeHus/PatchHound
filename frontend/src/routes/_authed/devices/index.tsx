@@ -29,8 +29,7 @@ const devicesSearchSchema = baseListSearchSchema.extend({
   deviceGroup: searchStringSchema,
   healthStatus: searchStringSchema,
   onboardingStatus: searchStringSchema,
-  riskScore: searchStringSchema,
-  exposureLevel: searchStringSchema,
+  riskBand: searchStringSchema,
   tag: searchStringSchema,
   unassignedOnly: searchBooleanSchema,
 })
@@ -149,8 +148,7 @@ function DevicesPage() {
         deviceGroupFilter={deviceSearch.deviceGroup}
         healthStatusFilter={deviceSearch.healthStatus}
         onboardingStatusFilter={deviceSearch.onboardingStatus}
-        riskScoreFilter={deviceSearch.riskScore}
-        exposureLevelFilter={deviceSearch.exposureLevel}
+        riskBandFilter={deviceSearch.riskBand}
         tagFilter={deviceSearch.tag}
         unassignedOnly={deviceSearch.unassignedOnly}
         page={devices.page}
@@ -184,12 +182,8 @@ function DevicesPage() {
           searchActions.updateField('onboardingStatus', onboardingStatus)
           setSelectedDeviceId(null)
         }}
-        onRiskScoreFilterChange={(riskScore) => {
-          searchActions.updateField('riskScore', riskScore)
-          setSelectedDeviceId(null)
-        }}
-        onExposureLevelFilterChange={(exposureLevel) => {
-          searchActions.updateField('exposureLevel', exposureLevel)
+        onRiskBandFilterChange={(riskBand) => {
+          searchActions.updateField('riskBand', riskBand)
           setSelectedDeviceId(null)
         }}
         onTagFilterChange={(tag) => {
@@ -208,8 +202,7 @@ function DevicesPage() {
             deviceGroup: filters.deviceGroup,
             healthStatus: filters.healthStatus,
             onboardingStatus: filters.onboardingStatus,
-            riskScore: filters.riskScore,
-            exposureLevel: filters.exposureLevel,
+            riskBand: filters.riskBand,
             tag: filters.tag,
             unassignedOnly: filters.unassignedOnly,
           })
@@ -231,8 +224,7 @@ function DevicesPage() {
             deviceGroup: '',
             healthStatus: '',
             onboardingStatus: '',
-            riskScore: '',
-            exposureLevel: '',
+            riskBand: '',
             tag: '',
             unassignedOnly: false,
           })

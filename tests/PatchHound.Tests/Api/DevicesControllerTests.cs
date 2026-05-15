@@ -156,8 +156,7 @@ public class DevicesControllerTests : IDisposable
         deviceADto.Criticality.Should().Be("High");
         deviceADto.GroupName.Should().Be("Workstations");
         deviceADto.HealthStatus.Should().Be("Active");
-        deviceADto.RiskScore.Should().Be("High");
-        deviceADto.ExposureLevel.Should().Be("Medium");
+        deviceADto.RiskBand.Should().Be("None");
         deviceADto.OnboardingStatus.Should().Be("Onboarded");
         deviceADto.DeviceValue.Should().Be("Normal");
         deviceADto.Tags.Should().ContainSingle().Which.Should().Be("prod");
@@ -195,6 +194,58 @@ public class DevicesControllerTests : IDisposable
             .Value.Should().BeOfType<PagedResponse<DeviceDto>>().Subject;
         payload.TotalCount.Should().Be(1);
         payload.Items.Single().Id.Should().Be(deviceA.Id);
+    }
+
+    [Fact]
+    public async Task List_FiltersByPatchHoundRiskBand()
+    {
+        var deviceA = CreateDevice("device-a", "Device A", Criticality.High);
+        var deviceB = CreateDevice("device-b", "Device B", Criticality.Low);
+
+        await _dbContext.AddRangeAsync(
+            deviceA,
+            deviceB,
+            DeviceRiskScore.Create(
+                _tenantId,
+                deviceA.Id,
+                710m,
+                710m,
+                0,
+                1,
+                0,
+                0,
+                1,
+                "[]",
+                RiskScoreService.CalculationVersion
+            ),
+            DeviceRiskScore.Create(
+                _tenantId,
+                deviceB.Id,
+                430m,
+                430m,
+                0,
+                0,
+                1,
+                0,
+                1,
+                "[]",
+                RiskScoreService.CalculationVersion
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new DeviceFilterQuery(RiskBand: "High"),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var payload = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<DeviceDto>>().Subject;
+        payload.TotalCount.Should().Be(1);
+        var item = payload.Items.Single();
+        item.Id.Should().Be(deviceA.Id);
+        item.RiskBand.Should().Be("High");
     }
 
     [Fact]
@@ -249,7 +300,6 @@ public class DevicesControllerTests : IDisposable
         payload.ComputerDnsName.Should().Be("device-1.contoso.local");
         payload.OsPlatform.Should().Be("Windows");
         payload.GroupName.Should().Be("Workstations");
-        payload.ExposureLevel.Should().Be("Medium");
         payload.Tags.Should().ContainSingle().Which.Should().Be("prod");
         payload.BusinessLabels.Should().ContainSingle().Which.Name.Should().Be("Revenue");
         payload.Risk.Should().NotBeNull();

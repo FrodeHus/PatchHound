@@ -216,7 +216,6 @@ export function DeviceDetailPageView({
                     <DefinitionItem label="Health status" value={device.healthStatus ?? 'Unknown'} />
                     <DefinitionItem label="OS platform" value={device.osPlatform ?? 'Unknown'} />
                     <DefinitionItem label="OS version" value={device.osVersion ?? 'Unknown'} />
-                    <DefinitionItem label="Risk score" value={device.riskScore ?? 'Unknown'} />
                     <DefinitionItem
                       label="Last seen"
                       value={

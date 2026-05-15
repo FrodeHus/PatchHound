@@ -6,8 +6,7 @@ export type DevicesListSearch = {
   deviceGroup: string
   healthStatus: string
   onboardingStatus: string
-  riskScore: string
-  exposureLevel: string
+  riskBand: string
   tag: string
   unassignedOnly: boolean
   page: number
@@ -23,8 +22,7 @@ export function buildDevicesListRequest(search: DevicesListSearch) {
     ...(search.deviceGroup ? { deviceGroup: search.deviceGroup } : {}),
     ...(search.healthStatus ? { healthStatus: search.healthStatus } : {}),
     ...(search.onboardingStatus ? { onboardingStatus: search.onboardingStatus } : {}),
-    ...(search.riskScore ? { riskScore: search.riskScore } : {}),
-    ...(search.exposureLevel ? { exposureLevel: search.exposureLevel } : {}),
+    ...(search.riskBand ? { riskBand: search.riskBand } : {}),
     ...(search.tag ? { tag: search.tag } : {}),
     ...(search.unassignedOnly ? { unassignedOnly: true } : {}),
     page: search.page,
@@ -45,8 +43,7 @@ export const deviceQueryKeys = {
     search.deviceGroup,
     search.healthStatus,
     search.onboardingStatus,
-    search.riskScore,
-    search.exposureLevel,
+    search.riskBand,
     search.tag,
     search.unassignedOnly,
     search.page,

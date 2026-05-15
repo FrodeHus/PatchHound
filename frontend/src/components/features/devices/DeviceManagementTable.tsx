@@ -53,8 +53,7 @@ type DeviceManagementTableProps = {
   deviceGroupFilter: string;
   healthStatusFilter: string;
   onboardingStatusFilter: string;
-  riskScoreFilter: string;
-  exposureLevelFilter: string;
+  riskBandFilter: string;
   tagFilter: string;
   unassignedOnly: boolean;
   onSearchChange: (search: string) => void;
@@ -64,8 +63,7 @@ type DeviceManagementTableProps = {
   onDeviceGroupFilterChange: (deviceGroup: string) => void;
   onHealthStatusFilterChange: (healthStatus: string) => void;
   onOnboardingStatusFilterChange: (onboardingStatus: string) => void;
-  onRiskScoreFilterChange: (riskScore: string) => void;
-  onExposureLevelFilterChange: (exposureLevel: string) => void;
+  onRiskBandFilterChange: (riskBand: string) => void;
   onTagFilterChange: (tag: string) => void;
   onUnassignedOnlyChange: (value: boolean) => void;
   onApplyStructuredFilters: (filters: {
@@ -75,8 +73,7 @@ type DeviceManagementTableProps = {
     deviceGroup: string;
     healthStatus: string;
     onboardingStatus: string;
-    riskScore: string;
-    exposureLevel: string;
+    riskBand: string;
     tag: string;
     unassignedOnly: boolean;
   }) => void;
@@ -95,8 +92,7 @@ type DeviceManagementTableProps = {
 const criticalityOptions = ['Low', 'Medium', 'High', 'Critical']
 const healthStatusOptions = ['Active', 'Inactive', 'ImpairedCommunication', 'NoSensorData', 'NoSensorDataImpairedCommunication']
 const onboardingStatusOptions = ['Onboarded', 'CanBeOnboarded', 'Unsupported', 'InsufficientInfo']
-const riskScoreOptions = ['None', 'Low', 'Medium', 'High']
-const exposureLevelOptions = ['None', 'Low', 'Medium', 'High']
+const riskBandOptions = ['None', 'Low', 'Medium', 'High', 'Critical']
 const ownershipFilterOptions = [
   { label: 'Any ownership', value: '' },
   { label: 'Assigned user', value: 'User' },
@@ -110,8 +106,7 @@ function getCurrentDraftFilters({
   deviceGroupFilter,
   healthStatusFilter,
   onboardingStatusFilter,
-  riskScoreFilter,
-  exposureLevelFilter,
+  riskBandFilter,
   tagFilter,
   unassignedOnly,
 }: {
@@ -121,8 +116,7 @@ function getCurrentDraftFilters({
   deviceGroupFilter: string
   healthStatusFilter: string
   onboardingStatusFilter: string
-  riskScoreFilter: string
-  exposureLevelFilter: string
+  riskBandFilter: string
   tagFilter: string
   unassignedOnly: boolean
 }) {
@@ -133,8 +127,7 @@ function getCurrentDraftFilters({
     deviceGroup: deviceGroupFilter,
     healthStatus: healthStatusFilter,
     onboardingStatus: onboardingStatusFilter,
-    riskScore: riskScoreFilter,
-    exposureLevel: exposureLevelFilter,
+    riskBand: riskBandFilter,
     tag: tagFilter,
     unassignedOnly,
   }
@@ -158,8 +151,7 @@ export function DeviceManagementTable({
   deviceGroupFilter,
   healthStatusFilter,
   onboardingStatusFilter,
-  riskScoreFilter,
-  exposureLevelFilter,
+  riskBandFilter,
   tagFilter,
   unassignedOnly,
   onSearchChange,
@@ -169,8 +161,7 @@ export function DeviceManagementTable({
   onDeviceGroupFilterChange,
   onHealthStatusFilterChange,
   onOnboardingStatusFilterChange,
-  onRiskScoreFilterChange,
-  onExposureLevelFilterChange,
+  onRiskBandFilterChange,
   onTagFilterChange,
   onUnassignedOnlyChange,
   onApplyStructuredFilters,
@@ -178,11 +169,9 @@ export function DeviceManagementTable({
   onPageSizeChange,
   onClearFilters,
   onSelectDevice,
-  onAssignOwner,
+  onAssignOwner: _onAssignOwner,
   onSetCriticality,
 }: DeviceManagementTableProps) {
-  const [ownerType, _setOwnerType] = useState<"User" | "Team">("User");
-  const [ownerId, _setOwnerId] = useState("");
   const [searchInputState, setSearchInputState] = useState({
     source: searchValue,
     value: searchValue,
@@ -197,8 +186,7 @@ export function DeviceManagementTable({
     deviceGroupFilter,
     healthStatusFilter,
     onboardingStatusFilter,
-    riskScoreFilter,
-    exposureLevelFilter,
+    riskBandFilter,
     tagFilter,
     unassignedOnly,
   }));
@@ -222,8 +210,7 @@ export function DeviceManagementTable({
     deviceGroupFilter,
     healthStatusFilter,
     onboardingStatusFilter,
-    riskScoreFilter,
-    exposureLevelFilter,
+    riskBandFilter,
     tagFilter,
     unassignedOnly,
   });
@@ -304,21 +291,12 @@ export function DeviceManagementTable({
               },
             }
           : null,
-        riskScoreFilter
+        riskBandFilter
           ? {
-              key: "riskScore",
-              label: `Risk: ${riskScoreFilter}`,
+              key: "riskBand",
+              label: `PatchHound risk: ${riskBandFilter}`,
               onClear: () => {
-                onRiskScoreFilterChange("");
-              },
-            }
-          : null,
-        exposureLevelFilter
-          ? {
-              key: "exposureLevel",
-              label: `Exposure: ${exposureLevelFilter}`,
-              onClear: () => {
-                onExposureLevelFilterChange("");
+                onRiskBandFilterChange("");
               },
             }
           : null,
@@ -345,22 +323,20 @@ export function DeviceManagementTable({
       businessLabelIdFilter,
       criticalityFilter,
       deviceGroupFilter,
-      exposureLevelFilter,
       healthStatusFilter,
       onBusinessLabelFilterChange,
       onCriticalityFilterChange,
       onDeviceGroupFilterChange,
-      onExposureLevelFilterChange,
       onHealthStatusFilterChange,
       onOnboardingStatusFilterChange,
       onOwnerTypeFilterChange,
-      onRiskScoreFilterChange,
+      onRiskBandFilterChange,
       onSearchChange,
       onTagFilterChange,
       onUnassignedOnlyChange,
       onboardingStatusFilter,
       ownerTypeFilter,
-      riskScoreFilter,
+      riskBandFilter,
       searchValue,
       selectedBusinessLabelName,
       tagFilter,
@@ -377,8 +353,7 @@ export function DeviceManagementTable({
         deviceGroupFilter,
         healthStatusFilter,
         onboardingStatusFilter,
-        riskScoreFilter,
-        exposureLevelFilter,
+        riskBandFilter,
         tagFilter,
         unassignedOnly ? "unassigned" : "",
       ].filter(Boolean).length,
@@ -386,11 +361,10 @@ export function DeviceManagementTable({
       businessLabelIdFilter,
       criticalityFilter,
       deviceGroupFilter,
-      exposureLevelFilter,
       healthStatusFilter,
       onboardingStatusFilter,
       ownerTypeFilter,
-      riskScoreFilter,
+      riskBandFilter,
       tagFilter,
       unassignedOnly,
     ],
@@ -473,9 +447,17 @@ export function DeviceManagementTable({
             return <span className="text-muted-foreground">—</span>;
           const tone = riskScoreTone(score);
           return (
-            <span className={`font-medium tabular-nums ${toneBadge(tone)}`}>
-              {score.toFixed(0)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`font-medium tabular-nums ${toneBadge(tone)}`}>
+                {score.toFixed(0)}
+              </span>
+              <Badge
+                variant="outline"
+                className="rounded-full border-border/70 bg-background/70"
+              >
+                {row.original.riskBand}
+              </Badge>
+            </div>
           );
         },
       },
@@ -504,42 +486,6 @@ export function DeviceManagementTable({
         ),
         cell: ({ row }) => {
           const value = row.original.onboardingStatus;
-          if (!value) return <span className="text-muted-foreground">—</span>;
-          return (
-            <Badge
-              variant="outline"
-              className="rounded-full border-border/70 bg-background/70"
-            >
-              {value}
-            </Badge>
-          );
-        },
-      },
-      {
-        accessorKey: "riskScore",
-        header: ({ column }) => (
-          <SortableColumnHeader column={column} title="Risk" />
-        ),
-        cell: ({ row }) => {
-          const value = row.original.riskScore;
-          if (!value) return <span className="text-muted-foreground">—</span>;
-          return (
-            <Badge
-              variant="outline"
-              className="rounded-full border-border/70 bg-background/70"
-            >
-              {value}
-            </Badge>
-          );
-        },
-      },
-      {
-        accessorKey: "exposureLevel",
-        header: ({ column }) => (
-          <SortableColumnHeader column={column} title="Exposure" />
-        ),
-        cell: ({ row }) => {
-          const value = row.original.exposureLevel;
           if (!value) return <span className="text-muted-foreground">—</span>;
           return (
             <Badge
@@ -648,38 +594,10 @@ export function DeviceManagementTable({
           </span>
         ),
       },
-      {
-        id: "actions",
-        header: () => <div className="text-right">Actions</div>,
-        enableSorting: false,
-        cell: ({ row }) => (
-          <div className="text-right">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isUpdating || ownerId.trim().length === 0}
-              onClick={(event) => {
-                event.stopPropagation();
-                onAssignOwner(row.original.id, ownerType, ownerId);
-              }}
-            >
-              Assign owner
-            </Button>
-          </div>
-        ),
-      },
     ];
 
     return columns;
-  }, [
-    isUpdating,
-    onAssignOwner,
-    onSelectDevice,
-    onSetCriticality,
-    ownerId,
-    ownerType,
-  ]);
+  }, [isUpdating, onSelectDevice, onSetCriticality]);
 
   return (
     <DataTableWorkbench
@@ -747,8 +665,7 @@ export function DeviceManagementTable({
             deviceGroup: "",
             healthStatus: "",
             onboardingStatus: "",
-            riskScore: "",
-            exposureLevel: "",
+            riskBand: "",
             tag: "",
             unassignedOnly: false,
           });
@@ -938,48 +855,23 @@ export function DeviceManagementTable({
             </Select>
           </DataTableField>
 
-          <DataTableField label="Risk Score">
+          <DataTableField label="PatchHound Risk">
             <Select
-              value={draftFilters.riskScore || "all"}
+              value={draftFilters.riskBand || "all"}
               onValueChange={(value) => {
                 const nextValue = value ?? "all";
                 setDraftFilters((current) => ({
                   ...current,
-                  riskScore: nextValue === "all" ? "" : nextValue,
+                  riskBand: nextValue === "all" ? "" : nextValue,
                 }));
               }}
             >
               <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
-                <SelectValue placeholder="Any risk score" />
+                <SelectValue placeholder="Any PatchHound risk" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                <SelectItem value="all">Any risk score</SelectItem>
-                {riskScoreOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </DataTableField>
-
-          <DataTableField label="Exposure Level">
-            <Select
-              value={draftFilters.exposureLevel || "all"}
-              onValueChange={(value) => {
-                const nextValue = value ?? "all";
-                setDraftFilters((current) => ({
-                  ...current,
-                  exposureLevel: nextValue === "all" ? "" : nextValue,
-                }));
-              }}
-            >
-              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
-                <SelectValue placeholder="Any exposure level" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                <SelectItem value="all">Any exposure level</SelectItem>
-                {exposureLevelOptions.map((option) => (
+                <SelectItem value="all">Any PatchHound risk</SelectItem>
+                {riskBandOptions.map((option) => (
                   <SelectItem key={option} value={option}>
                     {option}
                   </SelectItem>

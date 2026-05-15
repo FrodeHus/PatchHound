@@ -90,7 +90,6 @@ export function DeviceSection({
     { label: "Health Status", value: device.healthStatus ?? "Unknown" },
     { label: "OS Platform", value: device.osPlatform ?? "Unknown" },
     { label: "OS Version", value: device.osVersion ?? "Unknown" },
-    { label: "Risk Score", value: device.riskScore ?? "Unknown" },
     {
       label: "Last Seen",
       value: device.lastSeenAt
@@ -99,7 +98,6 @@ export function DeviceSection({
     },
     { label: "Last IP Address", value: device.lastIpAddress ?? "Unknown" },
     { label: "Device Group", value: device.groupName ?? "Unknown" },
-    { label: "Exposure Level", value: device.exposureLevel ?? "Unknown" },
     {
       label: "AAD Joined",
       value:

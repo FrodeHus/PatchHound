@@ -137,18 +137,6 @@ export function DeviceDetailPane({
                       <span className="font-medium">{device.healthStatus}</span>
                     </>
                   ) : null}
-                  {device.riskScore ? (
-                    <>
-                      <span className="text-muted-foreground">Risk score</span>
-                      <span className="font-medium">{device.riskScore}</span>
-                    </>
-                  ) : null}
-                  {device.exposureLevel ? (
-                    <>
-                      <span className="text-muted-foreground">Exposure</span>
-                      <span className="font-medium">{device.exposureLevel}</span>
-                    </>
-                  ) : null}
                   {device.lastSeenAt ? (
                     <>
                       <span className="text-muted-foreground">Last seen</span>
