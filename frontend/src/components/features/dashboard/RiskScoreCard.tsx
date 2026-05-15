@@ -8,6 +8,7 @@ import { Sparkline } from '@/components/features/dashboard/Sparkline'
 import { fetchRiskScoreSummary, recalculateRiskScores } from '@/api/risk-score.functions'
 import type { RiskScoreSummary } from '@/api/risk-score.schemas'
 import { useTenantScope } from '@/components/layout/tenant-scope'
+import { riskScoreBand } from '@/lib/risk-scoring'
 import { MetricInfoTooltip } from './MetricInfoTooltip'
 import { RiskScoreDetailDialog } from './RiskScoreDetailDialog'
 
@@ -344,7 +345,9 @@ function formatUtcTimestamp(value: string) {
 }
 
 function riskPosture(score: number) {
-  if (score >= 900) {
+  const band = riskScoreBand(score)
+
+  if (band === 'critical') {
     return {
       label: 'Critical pressure',
       verdict: 'Needs immediate attention',
@@ -359,7 +362,7 @@ function riskPosture(score: number) {
       sparkColor: 'var(--color-destructive)',
     }
   }
-  if (score >= 750) {
+  if (band === 'high') {
     return {
       label: 'High pressure',
       verdict: 'Serious exposure needs attention',
@@ -374,7 +377,7 @@ function riskPosture(score: number) {
       sparkColor: 'var(--color-tone-warning-foreground)',
     }
   }
-  if (score >= 500) {
+  if (band === 'medium') {
     return {
       label: 'Elevated',
       verdict: 'Watch closely and reduce pressure',

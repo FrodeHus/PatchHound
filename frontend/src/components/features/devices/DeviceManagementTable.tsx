@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Link } from '@tanstack/react-router'
 import { ExternalLinkIcon, SearchIcon } from "lucide-react";
 import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
+import { riskScoreTone } from '@/lib/risk-scoring'
 import { toneBadge } from '@/lib/tone-classes'
 
 // Phase 1 canonical cleanup (Task 15): device-native management table.
@@ -470,14 +471,7 @@ export function DeviceManagementTable({
           const score = row.original.currentRiskScore;
           if (score == null)
             return <span className="text-muted-foreground">—</span>;
-          const tone =
-            score >= 900
-              ? "danger"
-              : score >= 750
-                ? "warning"
-                : score >= 500
-                  ? "info"
-                  : "success";
+          const tone = riskScoreTone(score);
           return (
             <span className={`font-medium tabular-nums ${toneBadge(tone)}`}>
               {score.toFixed(0)}

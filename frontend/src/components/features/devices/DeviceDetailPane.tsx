@@ -17,6 +17,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { InsetPanel } from '@/components/ui/inset-panel'
+import { riskDetectionScoreTone, riskScoreTone } from '@/lib/risk-scoring'
 
 // Phase 1 canonical cleanup (Task 15): device-native detail pane.
 // Vulnerability list, software inventory and software CPE binding
@@ -38,20 +39,24 @@ function MetricCard({
 }: {
   label: string
   value: string | number
-  tone?: 'default' | 'danger' | 'warning' | 'success'
+  tone?: 'default' | 'danger' | 'warning' | 'info' | 'success' | 'neutral'
 }) {
   const toneClasses = {
     default: 'border-border/70 bg-background',
     danger: 'border-tone-danger-border bg-tone-danger',
     warning: 'border-tone-warning-border bg-tone-warning',
+    info: 'border-tone-info-border bg-tone-info',
     success: 'border-tone-success-border bg-tone-success',
+    neutral: 'border-border/70 bg-background',
   }
 
   const valueToneClasses = {
     default: 'text-foreground',
     danger: 'text-tone-danger-foreground',
     warning: 'text-tone-warning-foreground',
+    info: 'text-tone-info-foreground',
     success: 'text-tone-success-foreground',
+    neutral: 'text-foreground',
   }
 
   return (
@@ -187,12 +192,12 @@ export function DeviceDetailPane({
                     <MetricCard
                       label="Device risk"
                       value={device.risk.overallScore.toFixed(0)}
-                      tone={device.risk.riskBand === 'Critical' ? 'danger' : device.risk.riskBand === 'High' ? 'warning' : 'default'}
+                      tone={riskScoreTone(device.risk.overallScore)}
                     />
                     <MetricCard
                       label="Max episode"
                       value={device.risk.maxEpisodeRiskScore.toFixed(0)}
-                      tone={device.risk.maxEpisodeRiskScore >= 900 ? 'danger' : device.risk.maxEpisodeRiskScore >= 750 ? 'warning' : 'default'}
+                      tone={riskDetectionScoreTone(device.risk.maxEpisodeRiskScore, device.risk.overallScore)}
                     />
                     <MetricCard
                       label="Open episodes"

@@ -4,6 +4,7 @@ using PatchHound.Api.Models.ApprovalTasks;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Services;
+using PatchHound.Core.Services.RiskScoring;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Api.Services;
@@ -172,7 +173,7 @@ public class ApprovalTaskQueryService(
             if (softwareScore is not null)
             {
                 riskScore = (double)softwareScore.OverallScore;
-                riskBand = ResolveRiskBand(softwareScore.OverallScore);
+                riskBand = RiskBand.FromScore(softwareScore.OverallScore);
             }
         }
 
@@ -508,9 +509,6 @@ public class ApprovalTaskQueryService(
         }
         return result;
     }
-
-    private static string ResolveRiskBand(decimal score) =>
-        score >= 900m ? "Critical" : score >= 750m ? "High" : score >= 500m ? "Medium" : "Low";
 
     private static string NormalizeVersionKey(string? version)        => string.IsNullOrWhiteSpace(version) ? string.Empty : version.Trim();
 

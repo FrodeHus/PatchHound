@@ -6,6 +6,7 @@ import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoToo
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { RISK_SCORE_RANGES, riskGaugeBand as deriveRiskGaugeBand } from '@/lib/risk-scoring'
 import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
 
@@ -36,7 +37,7 @@ const riskGaugeBands: Array<{
   {
     band: 'contained',
     label: 'Contained',
-    range: '0-499',
+    range: RISK_SCORE_RANGES.low,
     colorClass: 'text-chart-3',
     borderClass: 'border-chart-3',
     fill: 'var(--color-chart-3)',
@@ -44,7 +45,7 @@ const riskGaugeBands: Array<{
   {
     band: 'elevated',
     label: 'Elevated',
-    range: '500-749',
+    range: RISK_SCORE_RANGES.medium,
     colorClass: 'text-chart-2',
     borderClass: 'border-chart-2',
     fill: 'var(--color-chart-2)',
@@ -52,7 +53,7 @@ const riskGaugeBands: Array<{
   {
     band: 'high',
     label: 'High',
-    range: '750-899',
+    range: RISK_SCORE_RANGES.high,
     colorClass: 'text-tone-warning-foreground',
     borderClass: 'border-tone-warning-border',
     fill: 'var(--color-tone-warning-foreground)',
@@ -60,7 +61,7 @@ const riskGaugeBands: Array<{
   {
     band: 'critical',
     label: 'Critical',
-    range: '900-1000',
+    range: RISK_SCORE_RANGES.critical,
     colorClass: 'text-destructive',
     borderClass: 'border-destructive',
     fill: 'var(--color-destructive)',
@@ -176,13 +177,6 @@ function getTrendDirection(trends: TrendData) {
   }
 }
 
-function riskGaugeBand(score: number): RiskGaugeBand {
-  if (score >= 900) return 'critical'
-  if (score >= 750) return 'high'
-  if (score >= 500) return 'elevated'
-  return 'contained'
-}
-
 function normalizeRiskLevel(level: string | undefined): RiskGaugeBand {
   const normalized = level?.toLowerCase()
   if (normalized === 'critical' || normalized === 'high' || normalized === 'elevated' || normalized === 'contained') {
@@ -193,7 +187,7 @@ function normalizeRiskLevel(level: string | undefined): RiskGaugeBand {
 }
 
 function riskGaugeBandMeta(score: number) {
-  return riskGaugeBands.find((band) => band.band === riskGaugeBand(score)) ?? riskGaugeBands[0]
+  return riskGaugeBands.find((band) => band.band === deriveRiskGaugeBand(score)) ?? riskGaugeBands[0]
 }
 
 function describeExecutiveTrend(exposure: ExecutiveExposureSummary | null | undefined) {

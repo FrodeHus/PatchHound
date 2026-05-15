@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Models.Assets;
 using PatchHound.Api.Models.Devices;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Services.RiskScoring;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Api.Services;
@@ -132,7 +133,7 @@ public class DeviceDetailQueryService
             : new DeviceRiskDetailDto(
                 deviceRiskScore.OverallScore,
                 deviceRiskScore.MaxEpisodeRiskScore,
-                ResolveRiskBand(deviceRiskScore.OverallScore),
+                RiskBand.FromScore(deviceRiskScore.OverallScore),
                 deviceRiskScore.OpenEpisodeCount,
                 deviceRiskScore.CriticalCount,
                 deviceRiskScore.HighCount,
@@ -195,14 +196,4 @@ public class DeviceDetailQueryService
         );
     }
 
-    private static string ResolveRiskBand(decimal score)
-    {
-        if (score >= 900m)
-            return "Critical";
-        if (score >= 750m)
-            return "High";
-        if (score >= 500m)
-            return "Medium";
-        return "Low";
-    }
 }
