@@ -5,6 +5,7 @@ using PatchHound.Core.Entities.AuthenticatedScans;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Common;
+using PatchHound.Infrastructure.Data.Views;
 
 namespace PatchHound.Infrastructure.Data;
 
@@ -80,6 +81,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<DeviceVulnerabilityExposure> DeviceVulnerabilityExposures => Set<DeviceVulnerabilityExposure>();
     public DbSet<ExposureEpisode> ExposureEpisodes => Set<ExposureEpisode>();
     public DbSet<ExposureAssessment> ExposureAssessments => Set<ExposureAssessment>();
+    public DbSet<ExposureLatestAssessment> ExposureLatestAssessments => Set<ExposureLatestAssessment>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<AdvancedTool> AdvancedTools => Set<AdvancedTool>();
