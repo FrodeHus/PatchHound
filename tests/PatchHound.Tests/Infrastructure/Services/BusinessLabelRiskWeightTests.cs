@@ -58,7 +58,7 @@ public class BusinessLabelRiskWeightTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task RecalculateForTenantAsync_CriticalLabelDoublesBaseScore()
+    public async Task RecalculateForTenantAsync_CriticalLabelIncreasesScoreWithoutDoublingBaseScore()
     {
         var seed = await CanonicalSeed.PlantAsync(_db, _tenantId);
 
@@ -80,9 +80,8 @@ public class BusinessLabelRiskWeightTests : IAsyncDisposable
 
         var weightedScore = _db.DeviceRiskScores.Single(s => s.DeviceId == seed.DeviceA.Id).OverallScore;
 
-        // 2x multiplier — clamped at 1000
-        var expectedMax = Math.Clamp(Math.Round(baselineScore * 2.0m, 2), 0m, 1000m);
-        weightedScore.Should().Be(expectedMax);
+        weightedScore.Should().BeGreaterThan(baselineScore);
+        weightedScore.Should().BeLessThan(Math.Clamp(Math.Round(baselineScore * 2.0m, 2), 0m, 1000m));
     }
 
     [Fact]

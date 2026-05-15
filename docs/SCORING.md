@@ -192,12 +192,14 @@ flowchart LR
     D["Device"]
     C["Criticality multiplier"]
     B["Highest active\nbusiness label multiplier"]
-    I["Impact multiplier"]
+    R["Raw impact multiplier\nC * B"]
+    I["Effective impact multiplier\ncompressed above 1.0x"]
 
     D --> C
     D --> B
-    C --> I
-    B --> I
+    C --> R
+    B --> R
+    R --> I
 ```
 
 ---
@@ -214,12 +216,22 @@ CountComponent     = CriticalCount * 45
                    + LowCount      * 1
 
 RawDeviceScore     = BaseComponent + CountComponent
-DeviceRiskScore    = RawDeviceScore
-                   * DeviceCriticalityMultiplier
-                   * BusinessLabelMultiplier
+
+RawImpactMultiplier = DeviceCriticalityMultiplier
+                    * BusinessLabelMultiplier
+
+EffectiveImpactMultiplier =
+  if RawImpactMultiplier <= 1.0:
+      RawImpactMultiplier
+  else:
+      min(1.0 + ((RawImpactMultiplier - 1.0) * 0.35), 1.6)
+
+DeviceRiskScore    = RawDeviceScore * EffectiveImpactMultiplier
 
 Final score is clamped to 0-1000.
 ```
+
+Why this compression exists: device criticality and business labels should increase prioritization, but they should not turn a small number of non-urgent exposures into a perfect `1000` score by themselves. Reducing labels, such as `Informational`, still reduce the score directly.
 
 Risk floors are applied after the numeric score:
 
@@ -236,7 +248,7 @@ flowchart TD
     C["Severity counts"]
     BASE["BaseComponent\nMaxDetectionScore * 6.5"]
     COUNT["CountComponent\ncritical/high/medium/low bonuses"]
-    IMPACT["Apply device criticality\nand business label"]
+    IMPACT["Apply compressed asset impact\nfrom criticality and business label"]
     FLOOR["Apply risk floors"]
     SCORE["DeviceRiskScore\n0-1000"]
 
@@ -248,6 +260,35 @@ flowchart TD
     COUNT --> IMPACT
     IMPACT --> FLOOR
     FLOOR --> SCORE
+```
+
+### Example - Sparse High/Medium Exposure On A Valuable Device
+
+Input:
+
+| Signal | Value |
+|---|---:|
+| Highest Environmental CVSS | 7.5 |
+| High exposures | 1 |
+| Medium exposures | 1 |
+| Device criticality | Critical, multiplier 1.35 |
+| Business label | Sensitive, multiplier 1.50 |
+
+Calculation:
+
+```text
+MaxDetectionScore       = 75
+BaseComponent           = 75 * 6.5 = 487.5
+CountComponent          = 1 high * 12 + 1 medium * 3 = 15
+RawDeviceScore          = 487.5 + 15 = 502.5
+
+RawImpactMultiplier     = 1.35 * 1.50 = 2.025
+EffectiveImpactMultiplier
+                         = 1.0 + ((2.025 - 1.0) * 0.35)
+                         = 1.35875
+
+DeviceRiskScore         = 502.5 * 1.35875 = 682.8
+Band                    = Medium
 ```
 
 ### Example - One Emergency Critical On A High-Value Device
@@ -268,10 +309,12 @@ Calculation:
 BaseComponent  = 95 * 6.5 = 617.5
 CountComponent = 1 * 45 = 45
 Raw score      = 617.5 + 45 = 662.5
-Impact score   = 662.5 * 1.20 * 1.00 = 795
+Raw impact multiplier = 1.20 * 1.00 = 1.20
+Effective multiplier  = 1.0 + ((1.20 - 1.0) * 0.35) = 1.07
+Impact score   = 662.5 * 1.07 = 708.9
 
 Emergency floor = at least 700
-Final score     = max(795, 700) = 795
+Final score     = max(708.9, 700) = 708.9
 Band            = High
 ```
 
@@ -494,16 +537,16 @@ Assume a tenant has these top device scores:
 
 | Device | Score | Band |
 |---|---:|---|
-| Device A | 795 | High |
+| Device A | 708.9 | High |
 | Device B | 620 | Medium |
 | Device C | 520 | Medium |
 | Device D | 120 | Low |
 | Device E | 0 | None |
 
 ```text
-MaxDeviceRiskScore          = 795
-AverageTopFiveDeviceScores  = (795 + 620 + 520 + 120 + 0) / 5
-                             = 411
+MaxDeviceRiskScore          = 708.9
+AverageTopFiveDeviceScores  = (708.9 + 620 + 520 + 120 + 0) / 5
+                             = 393.78
 
 CriticalAssetCount = 0
 HighAssetCount     = 1
@@ -511,15 +554,15 @@ MediumAssetCount   = 2
 LowAssetCount      = 1
 
 TenantRiskScore =
-    0.55 * 795
-  + 0.30 * 411
+    0.55 * 708.9
+  + 0.30 * 393.78
   + min(0 * 18, 90)
   + min(1 * 8, 40)
   + min(2 * 2, 10)
   + min(1 * 0.5, 5)
 
-= 437.25 + 123.30 + 0 + 8 + 4 + 0.5
-= 573.05
+= 389.90 + 118.13 + 0 + 8 + 4 + 0.5
+= 520.53
 
 Band = Medium
 ```

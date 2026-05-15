@@ -151,6 +151,30 @@ public class PatchHoundRiskScoringEngineTests
     }
 
     [Fact]
+    public void CalculateAssetRisk_SparseModerateExposuresOnValuableAsset_DoesNotSaturate()
+    {
+        var deviceId = Guid.NewGuid();
+        var inputs = new[]
+        {
+            RiskExposureInput.High(
+                deviceId,
+                Guid.NewGuid(),
+                7.5m,
+                assetCriticality: Criticality.Critical),
+            RiskExposureInput.Medium(
+                deviceId,
+                Guid.NewGuid(),
+                5.1m,
+                assetCriticality: Criticality.Critical),
+        };
+
+        var result = PatchHoundRiskScoringEngine.CalculateAssetRisk(inputs, businessLabelWeight: 1.5m);
+
+        result.OverallScore.Should().BeLessThan(RiskBand.CriticalThreshold);
+        result.RiskBand.Should().Be("Medium");
+    }
+
+    [Fact]
     public void CalculateSoftwareRisk_ExtremeInputs_ClampsScoreAt1000()
     {
         var deviceId = Guid.NewGuid();
@@ -212,6 +236,7 @@ public class PatchHoundRiskScoringEngineTests
             "CountComponent",
             "AssetCriticalityMultiplier",
             "BusinessLabelWeight",
+            "EffectiveImpactMultiplier",
             "FloorAdjustedScore");
         factors.Select(factor => factor.Impact).Should().OnlyContain(impact => impact >= 0m);
     }

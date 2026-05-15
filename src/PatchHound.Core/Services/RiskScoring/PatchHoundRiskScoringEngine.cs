@@ -53,7 +53,8 @@ public static class PatchHoundRiskScoringEngine
         var countComponent = CalculateCountComponent(metrics);
         var criticalityMultiplier = exposures.Max(exposure => GetAssetCriticalityMultiplier(exposure.AssetCriticality));
         var businessMultiplier = Math.Max(businessLabelWeight, 0m);
-        var impactMultiplier = criticalityMultiplier * businessMultiplier;
+        var rawImpactMultiplier = criticalityMultiplier * businessMultiplier;
+        var impactMultiplier = CompressAssetImpactMultiplier(rawImpactMultiplier);
         var numericScore = (baseComponent + countComponent) * impactMultiplier;
         var score = ApplyFloors(numericScore, metrics);
 
@@ -62,6 +63,7 @@ public static class PatchHoundRiskScoringEngine
             ("CountComponent", "Severity count pressure from critical, high, medium, and low detections.", countComponent),
             ("AssetCriticalityMultiplier", "Asset criticality impact multiplier.", criticalityMultiplier),
             ("BusinessLabelWeight", "Business-label impact multiplier.", businessMultiplier),
+            ("EffectiveImpactMultiplier", "Compressed asset impact multiplier applied to sparse device exposure risk.", impactMultiplier),
             ("FloorAdjustedScore", "Score after mandatory threat and severity floors.", score));
 
         return BuildResult(score, metrics, factorsJson);
@@ -182,6 +184,16 @@ public static class PatchHoundRiskScoringEngine
         Criticality.Low => 0.85m,
         _ => 1.00m,
     };
+
+    private static decimal CompressAssetImpactMultiplier(decimal multiplier)
+    {
+        if (multiplier <= 1m)
+        {
+            return multiplier;
+        }
+
+        return Math.Min(1m + ((multiplier - 1m) * 0.35m), 1.6m);
+    }
 
     private static decimal ClampPercent(decimal score) => Math.Clamp(score, 0m, 100m);
 
