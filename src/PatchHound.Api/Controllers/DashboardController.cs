@@ -190,67 +190,33 @@ public class DashboardController : ControllerBase
         }
 
         // ── Latest unhandled (open, no remediation case) ─────────────────────────────
-        List<UnhandledVulnerabilityDto> latestUnhandled;
-
-        if (summaryQuery is not null)
-        {
-            var latestUnhandledRows = await (
-                from s in summaryQuery
-                join v in _dbContext.Vulnerabilities.AsNoTracking() on s.VulnerabilityId equals v.Id
-                where !_dbContext.RemediationCases.AsNoTracking()
-                    .Any(rc => rc.TenantId == tenantId && rc.SoftwareProductId == s.VulnerabilityId)
-                orderby s.LatestSeenAt descending
-                select new
-                {
-                    s.VulnerabilityId,
-                    v.ExternalId,
-                    v.Title,
-                    s.VendorSeverity,
-                    CvssScore = s.MaxCvss,
-                    s.PublishedDate,
-                    s.AffectedDeviceCount,
-                    s.LatestSeenAt,
-                }
-            ).Take(10).ToListAsync(ct);
-            latestUnhandled = latestUnhandledRows.Select(r => new UnhandledVulnerabilityDto(
-                r.VulnerabilityId, r.ExternalId, r.Title,
-                r.VendorSeverity.ToString(), r.CvssScore,
-                r.AffectedDeviceCount,
-                r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0,
-                r.LatestSeenAt
-            )).ToList();
-        }
-        else
-        {
-            // original base-table query
-            var latestUnhandledRows = await (
-                from e in presentationExposureQuery
-                where e.Status == ExposureStatus.Open
-                join rc in _dbContext.RemediationCases.AsNoTracking()
-                    on e.SoftwareProductId equals rc.SoftwareProductId into rcJoin
-                from rc in rcJoin.DefaultIfEmpty()
-                where rc == null || rc.TenantId != tenantId
-                group e by e.VulnerabilityId into g
-                select new
-                {
-                    VulnerabilityId = g.Key,
-                    ExternalId = g.First().Vulnerability.ExternalId,
-                    Title = g.First().Vulnerability.Title,
-                    VendorSeverity = g.First().Vulnerability.VendorSeverity,
-                    CvssScore = g.First().Vulnerability.CvssScore,
-                    PublishedDate = g.First().Vulnerability.PublishedDate,
-                    AffectedAssetCount = g.Select(e => e.DeviceId).Distinct().Count(),
-                    LatestSeenAt = g.Max(e => e.LastObservedAt),
-                }
-            ).OrderByDescending(r => r.LatestSeenAt).Take(10).ToListAsync(ct);
-            latestUnhandled = latestUnhandledRows.Select(r => new UnhandledVulnerabilityDto(
-                r.VulnerabilityId, r.ExternalId, r.Title,
-                r.VendorSeverity.ToString(), r.CvssScore,
-                r.AffectedAssetCount,
-                r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0,
-                r.LatestSeenAt
-            )).ToList();
-        }
+        var latestUnhandledRows = await (
+            from e in presentationExposureQuery
+            where e.Status == ExposureStatus.Open
+            join rc in _dbContext.RemediationCases.AsNoTracking()
+                on e.SoftwareProductId equals rc.SoftwareProductId into rcJoin
+            from rc in rcJoin.DefaultIfEmpty()
+            where rc == null || rc.TenantId != tenantId
+            group e by e.VulnerabilityId into g
+            select new
+            {
+                VulnerabilityId = g.Key,
+                ExternalId = g.First().Vulnerability.ExternalId,
+                Title = g.First().Vulnerability.Title,
+                VendorSeverity = g.First().Vulnerability.VendorSeverity,
+                CvssScore = g.First().Vulnerability.CvssScore,
+                PublishedDate = g.First().Vulnerability.PublishedDate,
+                AffectedAssetCount = g.Select(e => e.DeviceId).Distinct().Count(),
+                LatestSeenAt = g.Max(e => e.LastObservedAt),
+            }
+        ).OrderByDescending(r => r.LatestSeenAt).Take(10).ToListAsync(ct);
+        var latestUnhandled = latestUnhandledRows.Select(r => new UnhandledVulnerabilityDto(
+            r.VulnerabilityId, r.ExternalId, r.Title,
+            r.VendorSeverity.ToString(), r.CvssScore,
+            r.AffectedAssetCount,
+            r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0,
+            r.LatestSeenAt
+        )).ToList();
 
         // MTTR: average days from first episode open to close for resolved exposures
         var closedEpisodes = await _dbContext.ExposureEpisodes.AsNoTracking()
