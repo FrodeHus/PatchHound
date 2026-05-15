@@ -17,8 +17,8 @@ namespace PatchHound.Infrastructure.Services;
 /// </summary>
 public class StagedDeviceMergeService(
     PatchHoundDbContext db,
-    IDeviceResolver deviceResolver,
-    ISoftwareProductResolver softwareResolver
+    ISoftwareProductResolver softwareResolver,
+    IBulkDeviceMergeWriter bulkDeviceMergeWriter
 ) : IStagedDeviceMergeService
 {
     public async Task<StagedDeviceMergeSummary> MergeAsync(
@@ -83,15 +83,21 @@ public class StagedDeviceMergeService(
 
         // 5. Pre-load all existing devices for the staged external IDs to avoid N+1 SELECTs.
         //    Key: (SourceSystemId, ExternalId) — handles runs that span multiple source systems.
+        //    Use AsNoTracking — the bulk writer is the persistence boundary, not EF change tracking.
         var stagedExternalIds = stagedDevices.Select(d => d.ExternalId).Distinct().ToList();
         var devicesByKey = await db.Devices
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(d => d.TenantId == tenantId && stagedExternalIds.Contains(d.ExternalId))
             .ToDictionaryAsync(d => (d.SourceSystemId, d.ExternalId), d => d, ct);
 
-        // ── Pass 1: Upsert devices ──────────────────────────────────────────────────────────
-        // Collect Device entities by their ExternalId for the software-link pass below.
-        var deviceByExternalId = new Dictionary<(string SourceKey, string ExternalId), Device>();
+        // ── Pass 1: Build device merge rows ─────────────────────────────────────────────────
+        // For stale+inactive devices we still emit a row (with is_active=false) when the device
+        // already exists, so the writer deactivates it. New stale+inactive devices are skipped.
+        var deviceRows = new List<DeviceMergeRow>(stagedDevices.Count);
+        // Track which staged device rows participated in the upsert so Pass 2 can resolve their
+        // canonical ids. Maps (sourceKey, externalId) → (sourceSystemId, externalId).
+        var participatingDeviceKeys = new Dictionary<(string SourceKey, string ExternalId), (Guid SourceSystemId, string ExternalId)>();
 
         foreach (var stagedDevice in stagedDevices)
         {
@@ -114,116 +120,66 @@ public class StagedDeviceMergeService(
                 );
             }
 
-            // Pre-check to track created vs touched counts, and to determine
-            // whether a stale+inactive device is new (skip) or existing (deactivate).
-            // Uses the pre-loaded dictionary — no per-device SELECT.
-            devicesByKey.TryGetValue((sourceSystem.Id, stagedDevice.ExternalId), out var deviceBefore);
+            var existedBefore = devicesByKey.ContainsKey((sourceSystem.Id, stagedDevice.ExternalId));
 
             if (IsStaleAndInactive(payload))
             {
-                if (deviceBefore is null)
+                if (!existedBefore)
                 {
-                    // New device that is already stale — do not create it.
                     devicesSkipped++;
                     continue;
                 }
 
-                // Existing device that has gone stale — update inventory and deactivate.
-                deviceBefore.UpdateInventoryDetails(
-                    computerDnsName: payload.DeviceComputerDnsName,
-                    healthStatus: payload.DeviceHealthStatus,
-                    osPlatform: payload.DeviceOsPlatform,
-                    osVersion: payload.DeviceOsVersion,
-                    externalRiskLabel: payload.DeviceRiskScore,
-                    lastSeenAt: payload.DeviceLastSeenAt,
-                    lastIpAddress: payload.DeviceLastIpAddress,
-                    aadDeviceId: payload.DeviceAadDeviceId,
-                    groupId: payload.DeviceGroupId,
-                    groupName: payload.DeviceGroupName,
-                    exposureLevel: payload.DeviceExposureLevel,
-                    isAadJoined: payload.DeviceIsAadJoined,
-                    onboardingStatus: payload.DeviceOnboardingStatus,
-                    deviceValue: payload.DeviceValue
-                );
-                deviceBefore.SetActiveInTenant(false);
+                deviceRows.Add(BuildRow(tenantId, sourceSystem.Id, stagedDevice.ExternalId, stagedDevice.Name, payload, isActive: false));
+                participatingDeviceKeys[(stagedDevice.SourceKey, stagedDevice.ExternalId)] = (sourceSystem.Id, stagedDevice.ExternalId);
                 devicesDeactivated++;
                 continue;
             }
 
-            var device = await deviceResolver.ResolveAsync(
-                new DeviceObservation(
-                    TenantId: tenantId,
-                    SourceSystemId: sourceSystem.Id,
-                    ExternalId: stagedDevice.ExternalId,
-                    Name: stagedDevice.Name,
-                    BaselineCriticality: Criticality.Medium
-                ),
-                ct
-            );
+            deviceRows.Add(BuildRow(tenantId, sourceSystem.Id, stagedDevice.ExternalId, stagedDevice.Name, payload, isActive: true));
+            participatingDeviceKeys[(stagedDevice.SourceKey, stagedDevice.ExternalId)] = (sourceSystem.Id, stagedDevice.ExternalId);
 
-            if (deviceBefore is null)
-            {
-                devicesCreated++;
-                // Add newly created device to the dictionary so subsequent staged entries
-                // with the same ExternalId find it without a DB round-trip.
-                devicesByKey[(sourceSystem.Id, stagedDevice.ExternalId)] = device;
-            }
-            else
+            if (existedBefore)
             {
                 devicesTouched++;
             }
-
-            device.UpdateInventoryDetails(
-                computerDnsName: payload.DeviceComputerDnsName,
-                healthStatus: payload.DeviceHealthStatus,
-                osPlatform: payload.DeviceOsPlatform,
-                osVersion: payload.DeviceOsVersion,
-                externalRiskLabel: payload.DeviceRiskScore,
-                lastSeenAt: payload.DeviceLastSeenAt,
-                lastIpAddress: payload.DeviceLastIpAddress,
-                aadDeviceId: payload.DeviceAadDeviceId,
-                groupId: payload.DeviceGroupId,
-                groupName: payload.DeviceGroupName,
-                exposureLevel: payload.DeviceExposureLevel,
-                isAadJoined: payload.DeviceIsAadJoined,
-                onboardingStatus: payload.DeviceOnboardingStatus,
-                deviceValue: payload.DeviceValue
-            );
-            device.SetActiveInTenant(true);
-
-            deviceByExternalId[(stagedDevice.SourceKey, stagedDevice.ExternalId)] = device;
+            else
+            {
+                devicesCreated++;
+            }
         }
 
-        // Persist device upserts so all device IDs are stable before the software-link pass.
-        await db.SaveChangesAsync(ct);
+        // Bulk upsert all devices in a single round-trip.
+        var deviceIds = await bulkDeviceMergeWriter.UpsertDevicesAsync(deviceRows, ct);
 
-        // ── Pass 2: Upsert software links ───────────────────────────────────────────────────
-        // Pre-load all InstalledSoftware rows for devices touched in this run to avoid N+1 SELECTs.
-        var runDeviceIds = deviceByExternalId.Values.Select(d => d.Id).Distinct().ToList();
-        var existingInstalledSoftware = await db.InstalledSoftware
+        // ── Pass 2: Build installed-software merge rows ─────────────────────────────────────
+        // Pre-load existing rows so we can distinguish created vs touched in the summary.
+        var participatingDeviceIds = deviceIds.Values.Distinct().ToList();
+        var existingInstalled = await db.InstalledSoftware
             .IgnoreQueryFilters()
-            .Where(i => i.TenantId == tenantId && runDeviceIds.Contains(i.DeviceId))
+            .AsNoTracking()
+            .Where(i => i.TenantId == tenantId && participatingDeviceIds.Contains(i.DeviceId))
+            .Select(i => new { i.DeviceId, i.SoftwareProductId, i.SourceSystemId, i.Version })
             .ToListAsync(ct);
-        var installedByKey = existingInstalledSoftware
-            .ToDictionary(
-                i => (i.DeviceId, i.SoftwareProductId, i.SourceSystemId, i.Version),
-                i => i
-            );
+        var existingInstalledKeys = new HashSet<(Guid, Guid, Guid, string)>(
+            existingInstalled.Select(i => (i.DeviceId, i.SoftwareProductId, i.SourceSystemId, i.Version)));
+
+        var installedRows = new List<InstalledSoftwareMergeRow>();
+        var seenInstalledKeys = new HashSet<(Guid, Guid, Guid, string)>();
 
         foreach (var stagedDevice in stagedDevices)
         {
-            if (!deviceByExternalId.TryGetValue((stagedDevice.SourceKey, stagedDevice.ExternalId), out var device))
+            if (!participatingDeviceKeys.TryGetValue((stagedDevice.SourceKey, stagedDevice.ExternalId), out var deviceLookup))
             {
-                // Device was skipped or deactivated in Pass 1 — no software links to process.
                 continue;
             }
 
-            if (
-                !linksByDeviceExternalId.TryGetValue(
-                    stagedDevice.ExternalId,
-                    out var deviceLinks
-                )
-            )
+            if (!deviceIds.TryGetValue(deviceLookup, out var canonicalDeviceId))
+            {
+                continue;
+            }
+
+            if (!linksByDeviceExternalId.TryGetValue(stagedDevice.ExternalId, out var deviceLinks))
             {
                 continue;
             }
@@ -233,22 +189,12 @@ public class StagedDeviceMergeService(
 
             foreach (var link in deviceLinks)
             {
-                if (
-                    !stagedSoftwareByExternalId.TryGetValue(
-                        link.SoftwareExternalId,
-                        out var stagedSoftwareAsset
-                    )
-                )
+                if (!stagedSoftwareByExternalId.TryGetValue(link.SoftwareExternalId, out var stagedSoftwareAsset))
                 {
-                    // Link references a software external id that was not staged
-                    // as a software asset in this run. Skip - no metadata to
-                    // resolve a canonical product from.
                     continue;
                 }
 
-                var (vendor, productName, version) = ExtractSoftwareIdentity(
-                    stagedSoftwareAsset
-                );
+                var (vendor, productName, version) = ExtractSoftwareIdentity(stagedSoftwareAsset);
 
                 var product = await softwareResolver.ResolveAsync(
                     new SoftwareObservation(
@@ -261,37 +207,35 @@ public class StagedDeviceMergeService(
                 );
 
                 var normalizedVersion = version?.Trim() ?? string.Empty;
-                var installedKey = (device.Id, product.Id, sourceSystem.Id, normalizedVersion);
+                var key = (canonicalDeviceId, product.Id, sourceSystem.Id, normalizedVersion);
 
-                if (!installedByKey.TryGetValue(installedKey, out var existing))
+                if (!seenInstalledKeys.Add(key))
                 {
-                    var observedAt =
-                        link.ObservedAt == default ? DateTimeOffset.UtcNow : link.ObservedAt;
-                    var newInstalled = InstalledSoftware.Observe(
-                        tenantId: tenantId,
-                        deviceId: device.Id,
-                        softwareProductId: product.Id,
-                        sourceSystemId: sourceSystem.Id,
-                        version: normalizedVersion,
-                        at: observedAt
-                    );
-                    db.InstalledSoftware.Add(newInstalled);
-                    // Track the newly added row so subsequent links for the same
-                    // (device, product, source, version) tuple see it.
-                    installedByKey[installedKey] = newInstalled;
-                    installedCreated++;
+                    // Same logical row already queued for this batch; skip to keep counts honest.
+                    continue;
+                }
+
+                var observedAt = link.ObservedAt == default ? DateTimeOffset.UtcNow : link.ObservedAt;
+                installedRows.Add(new InstalledSoftwareMergeRow(
+                    TenantId: tenantId,
+                    DeviceId: canonicalDeviceId,
+                    SoftwareProductId: product.Id,
+                    SourceSystemId: sourceSystem.Id,
+                    Version: normalizedVersion,
+                    ObservedAt: observedAt));
+
+                if (existingInstalledKeys.Contains(key))
+                {
+                    installedTouched++;
                 }
                 else
                 {
-                    existing.Touch(
-                        link.ObservedAt == default ? DateTimeOffset.UtcNow : link.ObservedAt
-                    );
-                    installedTouched++;
+                    installedCreated++;
                 }
             }
         }
 
-        await db.SaveChangesAsync(ct);
+        await bulkDeviceMergeWriter.UpsertInstalledSoftwareAsync(installedRows, ct);
 
         return new StagedDeviceMergeSummary(
             DevicesCreated: devicesCreated,
@@ -301,6 +245,36 @@ public class StagedDeviceMergeService(
             DevicesSkipped: devicesSkipped,
             DevicesDeactivated: devicesDeactivated
         );
+    }
+
+    private static DeviceMergeRow BuildRow(
+        Guid tenantId,
+        Guid sourceSystemId,
+        string externalId,
+        string name,
+        IngestionAsset payload,
+        bool isActive)
+    {
+        return new DeviceMergeRow(
+            TenantId: tenantId,
+            SourceSystemId: sourceSystemId,
+            ExternalId: externalId,
+            Name: name,
+            ComputerDnsName: payload.DeviceComputerDnsName,
+            HealthStatus: payload.DeviceHealthStatus,
+            OsPlatform: payload.DeviceOsPlatform,
+            OsVersion: payload.DeviceOsVersion,
+            ExternalRiskLabel: payload.DeviceRiskScore,
+            LastSeenAt: payload.DeviceLastSeenAt,
+            LastIpAddress: payload.DeviceLastIpAddress,
+            AadDeviceId: payload.DeviceAadDeviceId,
+            GroupId: payload.DeviceGroupId,
+            GroupName: payload.DeviceGroupName,
+            ExposureLevel: payload.DeviceExposureLevel,
+            IsAadJoined: payload.DeviceIsAadJoined,
+            OnboardingStatus: payload.DeviceOnboardingStatus,
+            DeviceValue: payload.DeviceValue,
+            IsActive: isActive);
     }
 
     /// <summary>

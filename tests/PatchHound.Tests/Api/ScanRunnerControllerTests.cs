@@ -70,9 +70,8 @@ public class ScanRunnerControllerTests : IAsyncLifetime
         _secretStore.GetSecretAsync(Arg.Any<string>(), "password", Arg.Any<CancellationToken>())
             .Returns("s3cret");
 
-        var deviceResolver = new DeviceResolver(_db);
         var softwareResolver = new SoftwareProductResolver(_db);
-        var stagedDeviceMerge = new StagedDeviceMergeService(_db, deviceResolver, softwareResolver);
+        var stagedDeviceMerge = new StagedDeviceMergeService(_db, softwareResolver, new InMemoryBulkDeviceMergeWriter(_db));
         var projectionService = new NormalizedSoftwareProjectionService(_db);
         var validator = new AuthenticatedScanOutputValidator();
         var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedDeviceMerge, projectionService, new InMemoryIngestionBulkWriter(_db));

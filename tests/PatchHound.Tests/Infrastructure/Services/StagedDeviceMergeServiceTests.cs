@@ -8,6 +8,7 @@ using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Services.Inventory;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Infrastructure.Services;
 
@@ -26,8 +27,8 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
 
         _sut = new StagedDeviceMergeService(
             _db,
-            new DeviceResolver(_db),
-            new SoftwareProductResolver(_db)
+            new SoftwareProductResolver(_db),
+            new InMemoryBulkDeviceMergeWriter(_db)
         );
     }
 

@@ -65,6 +65,7 @@ public static class DependencyInjection
 
         // Bulk writers (Postgres-native)
         services.AddScoped<IBulkExposureWriter, PostgresBulkExposureWriter>();
+        services.AddScoped<IBulkDeviceMergeWriter, PostgresBulkDeviceMergeWriter>();
 
         // Repositories
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
