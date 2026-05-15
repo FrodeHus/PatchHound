@@ -10,7 +10,7 @@ public class OpenExposureVulnSummaryConfiguration
     public void Configure(EntityTypeBuilder<OpenExposureVulnSummary> builder)
     {
         builder.HasNoKey().ToView("mv_open_exposure_vuln_summary");
-        builder.Property(x => x.VendorSeverity).HasConversion<string>().HasMaxLength(16);
-        builder.Property(x => x.MaxCvss).HasColumnType("numeric(5,2)");
+        builder.Property(x => x.VendorSeverity).HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.MaxCvss).HasColumnType("numeric(4,2)");
     }
 }
