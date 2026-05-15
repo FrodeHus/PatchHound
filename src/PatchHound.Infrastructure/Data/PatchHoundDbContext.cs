@@ -82,6 +82,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<ExposureEpisode> ExposureEpisodes => Set<ExposureEpisode>();
     public DbSet<ExposureAssessment> ExposureAssessments => Set<ExposureAssessment>();
     public DbSet<ExposureLatestAssessment> ExposureLatestAssessments => Set<ExposureLatestAssessment>();
+    public DbSet<AlternateMitigationVulnId> AlternateMitigationVulnIds => Set<AlternateMitigationVulnId>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<AdvancedTool> AdvancedTools => Set<AdvancedTool>();
