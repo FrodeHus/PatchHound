@@ -27,7 +27,31 @@ public class RemediationDecisionQueryService(
         DateTimeOffset? ResolvedAt
     );
 
-
+    private sealed record DecisionListCaseRow(
+        Guid Id,
+        Guid SoftwareProductId,
+        string Name,
+        Guid? LatestDecisionId,
+        RemediationOutcome? LatestOutcome,
+        DecisionApprovalStatus? LatestApprovalStatus,
+        DateTimeOffset? LatestDecidedAt,
+        DateTimeOffset? LatestMaintenanceWindowDate,
+        DateTimeOffset? LatestExpiryDate,
+        Guid? ActiveWorkflowId,
+        RemediationWorkflowStage? ActiveWorkflowStage,
+        Guid? ActiveWorkflowOwnerTeamId,
+        bool HasAnalystRecommendation,
+        int CriticalityRank,
+        int HighestSeverityRank,
+        DateTimeOffset? EarliestFirstSeen,
+        int OpenAffectedDeviceCount,
+        int InstalledDeviceCount,
+        decimal? RiskScore,
+        int RiskAffectedDeviceCount,
+        int OpenExposureCount,
+        int CriticalExposureCount,
+        int HighExposureCount
+    );
 
     public async Task<RemediationDecisionListPageDto> ListAsync(
         Guid tenantId,
@@ -55,76 +79,247 @@ public class RemediationDecisionQueryService(
                 || (c.SoftwareProduct.Vendor != null && c.SoftwareProduct.Vendor.ToLower().Contains(term)));
         }
 
-        var caseRows = await casesQuery
-            .Select(c => new
-            {
+        var now = DateTimeOffset.UtcNow;
+        var caseMetricsQuery = casesQuery
+            .Select(c => new DecisionListCaseRow(
                 c.Id,
-                Name = c.SoftwareProduct.Name,
-                Vendor = c.SoftwareProduct.Vendor,
-            })
-            .OrderBy(c => c.Name)
+                c.SoftwareProductId,
+                c.SoftwareProduct.Name,
+                dbContext.RemediationDecisions.AsNoTracking()
+                    .Where(d => d.TenantId == tenantId
+                        && d.RemediationCaseId == c.Id
+                        && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                        && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .Select(d => (Guid?)d.Id)
+                    .FirstOrDefault(),
+                dbContext.RemediationDecisions.AsNoTracking()
+                    .Where(d => d.TenantId == tenantId
+                        && d.RemediationCaseId == c.Id
+                        && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                        && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .Select(d => (RemediationOutcome?)d.Outcome)
+                    .FirstOrDefault(),
+                dbContext.RemediationDecisions.AsNoTracking()
+                    .Where(d => d.TenantId == tenantId
+                        && d.RemediationCaseId == c.Id
+                        && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                        && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .Select(d => (DecisionApprovalStatus?)d.ApprovalStatus)
+                    .FirstOrDefault(),
+                dbContext.RemediationDecisions.AsNoTracking()
+                    .Where(d => d.TenantId == tenantId
+                        && d.RemediationCaseId == c.Id
+                        && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                        && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .Select(d => (DateTimeOffset?)d.DecidedAt)
+                    .FirstOrDefault(),
+                dbContext.RemediationDecisions.AsNoTracking()
+                    .Where(d => d.TenantId == tenantId
+                        && d.RemediationCaseId == c.Id
+                        && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                        && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .Select(d => d.MaintenanceWindowDate)
+                    .FirstOrDefault(),
+                dbContext.RemediationDecisions.AsNoTracking()
+                    .Where(d => d.TenantId == tenantId
+                        && d.RemediationCaseId == c.Id
+                        && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                        && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .Select(d => d.ExpiryDate)
+                    .FirstOrDefault(),
+                dbContext.RemediationWorkflows.AsNoTracking()
+                    .Where(w => w.TenantId == tenantId
+                        && w.RemediationCaseId == c.Id
+                        && w.Status == RemediationWorkflowStatus.Active)
+                    .OrderByDescending(w => w.UpdatedAt)
+                    .Select(w => (Guid?)w.Id)
+                    .FirstOrDefault(),
+                dbContext.RemediationWorkflows.AsNoTracking()
+                    .Where(w => w.TenantId == tenantId
+                        && w.RemediationCaseId == c.Id
+                        && w.Status == RemediationWorkflowStatus.Active)
+                    .OrderByDescending(w => w.UpdatedAt)
+                    .Select(w => (RemediationWorkflowStage?)w.CurrentStage)
+                    .FirstOrDefault(),
+                dbContext.RemediationWorkflows.AsNoTracking()
+                    .Where(w => w.TenantId == tenantId
+                        && w.RemediationCaseId == c.Id
+                        && w.Status == RemediationWorkflowStatus.Active)
+                    .OrderByDescending(w => w.UpdatedAt)
+                    .Select(w => w.SoftwareOwnerTeamId)
+                    .FirstOrDefault(),
+                dbContext.RemediationWorkflows.AsNoTracking()
+                    .Where(w => w.TenantId == tenantId
+                        && w.RemediationCaseId == c.Id
+                        && w.Status == RemediationWorkflowStatus.Active)
+                    .OrderByDescending(w => w.UpdatedAt)
+                    .Take(1)
+                    .Any(w => dbContext.AnalystRecommendations.AsNoTracking()
+                        .Any(r => r.TenantId == tenantId && r.RemediationWorkflowId == w.Id)),
+                dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                    .Where(e => e.TenantId == tenantId
+                        && e.SoftwareProductId == c.SoftwareProductId
+                        && e.Status == ExposureStatus.Open)
+                    .Select(e =>
+                        (int?)(e.Device.Criticality == Criticality.Critical ? 4 :
+                        e.Device.Criticality == Criticality.High ? 3 :
+                        e.Device.Criticality == Criticality.Medium ? 2 :
+                        e.Device.Criticality == Criticality.Low ? 1 : 0))
+                    .Max() ?? 0,
+                dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                    .Where(e => e.TenantId == tenantId
+                        && e.SoftwareProductId == c.SoftwareProductId
+                        && e.Status == ExposureStatus.Open)
+                    .Select(e =>
+                        (int?)(e.Vulnerability.VendorSeverity == Severity.Critical ? 4 :
+                        e.Vulnerability.VendorSeverity == Severity.High ? 3 :
+                        e.Vulnerability.VendorSeverity == Severity.Medium ? 2 :
+                        e.Vulnerability.VendorSeverity == Severity.Low ? 1 : 0))
+                    .Max() ?? 0,
+                dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                    .Where(e => e.TenantId == tenantId
+                        && e.SoftwareProductId == c.SoftwareProductId
+                        && e.Status == ExposureStatus.Open)
+                    .Select(e => (DateTimeOffset?)e.FirstObservedAt)
+                    .Min(),
+                dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                    .Where(e => e.TenantId == tenantId
+                        && e.SoftwareProductId == c.SoftwareProductId
+                        && e.Status == ExposureStatus.Open)
+                    .Select(e => e.DeviceId)
+                    .Distinct()
+                    .Count(),
+                dbContext.InstalledSoftware.AsNoTracking()
+                    .Where(i => i.TenantId == tenantId && i.SoftwareProductId == c.SoftwareProductId)
+                    .Select(i => i.DeviceId)
+                    .Distinct()
+                    .Count(),
+                dbContext.SoftwareRiskScores.AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
+                    .Select(s => (decimal?)s.OverallScore)
+                    .FirstOrDefault(),
+                dbContext.SoftwareRiskScores.AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
+                    .Select(s => s.AffectedDeviceCount)
+                    .FirstOrDefault(),
+                dbContext.SoftwareRiskScores.AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
+                    .Select(s => s.OpenExposureCount)
+                    .FirstOrDefault(),
+                dbContext.SoftwareRiskScores.AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
+                    .Select(s => s.CriticalExposureCount)
+                    .FirstOrDefault(),
+                dbContext.SoftwareRiskScores.AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
+                    .Select(s => s.HighExposureCount)
+                    .FirstOrDefault()
+            ));
+
+        if (!string.IsNullOrWhiteSpace(filter.Criticality)
+            && TryGetCriticalityRank(filter.Criticality, out var criticalityRank))
+        {
+            caseMetricsQuery = caseMetricsQuery.Where(c => c.CriticalityRank == criticalityRank);
+        }
+
+        if (string.Equals(filter.DecisionState, "WithDecision", StringComparison.OrdinalIgnoreCase))
+        {
+            caseMetricsQuery = caseMetricsQuery.Where(c => c.LatestDecisionId != null);
+        }
+
+        if (string.Equals(filter.DecisionState, "NoDecision", StringComparison.OrdinalIgnoreCase))
+        {
+            caseMetricsQuery = caseMetricsQuery.Where(c => c.LatestDecisionId == null);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Outcome)
+            && Enum.TryParse<RemediationOutcome>(filter.Outcome, true, out var outcome))
+        {
+            caseMetricsQuery = caseMetricsQuery.Where(c => c.LatestOutcome == outcome);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.ApprovalStatus)
+            && Enum.TryParse<DecisionApprovalStatus>(filter.ApprovalStatus, true, out var approvalStatus))
+        {
+            caseMetricsQuery = caseMetricsQuery.Where(c => c.LatestApprovalStatus == approvalStatus);
+        }
+
+        if (filter.MissedMaintenanceWindow == true)
+        {
+            caseMetricsQuery = caseMetricsQuery.Where(c =>
+                c.LatestMaintenanceWindowDate != null && c.LatestMaintenanceWindowDate < now);
+        }
+
+        if (filter.NeedsAnalystRecommendation == true)
+        {
+            caseMetricsQuery = caseMetricsQuery.Where(c =>
+                c.ActiveWorkflowId == null
+                || (c.ActiveWorkflowStage == RemediationWorkflowStage.SecurityAnalysis && !c.HasAnalystRecommendation));
+        }
+
+        if (filter.NeedsRemediationDecision == true)
+        {
+            caseMetricsQuery = caseMetricsQuery.Where(c =>
+                c.ActiveWorkflowStage == RemediationWorkflowStage.RemediationDecision
+                && c.LatestDecisionId == null);
+        }
+
+        if (filter.NeedsApproval == true)
+        {
+            caseMetricsQuery = caseMetricsQuery.Where(c =>
+                c.ActiveWorkflowStage == RemediationWorkflowStage.Approval
+                && c.LatestApprovalStatus == DecisionApprovalStatus.PendingApproval);
+        }
+
+        var orderedQuery = caseMetricsQuery
+            .OrderByDescending(c => c.CriticalityRank)
+            .ThenByDescending(c => c.RiskAffectedDeviceCount > 0
+                ? c.RiskAffectedDeviceCount
+                : c.OpenAffectedDeviceCount > 0
+                    ? c.OpenAffectedDeviceCount
+                    : c.InstalledDeviceCount)
+            .ThenByDescending(c => c.CriticalExposureCount)
+            .ThenByDescending(c => c.HighestSeverityRank)
+            .ThenBy(c => c.Name);
+
+        var totalCount = await orderedQuery.CountAsync(ct);
+        var summary = new RemediationDecisionListSummaryDto(
+            totalCount,
+            await orderedQuery.CountAsync(item => item.LatestDecisionId != null, ct),
+            await orderedQuery.CountAsync(item => item.LatestApprovalStatus == DecisionApprovalStatus.PendingApproval, ct),
+            await orderedQuery.CountAsync(item => item.LatestDecisionId == null, ct)
+        );
+
+        var boundedPage = Math.Max(pagination.Page, 1);
+        var boundedPageSize = Math.Max(pagination.BoundedPageSize, 1);
+        var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)boundedPageSize);
+        var caseRows = await orderedQuery
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
             .ToListAsync(ct);
 
-        var caseIds = caseRows.Select(c => c.Id).ToList();
+        var productIds = caseRows.Select(c => c.SoftwareProductId).Distinct().ToList();
 
-        var decisionsLookup = await dbContext.RemediationDecisions.AsNoTracking()
-            .Where(d => d.TenantId == tenantId
-                && caseIds.Contains(d.RemediationCaseId)
-                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
-            .GroupBy(d => d.RemediationCaseId)
-            .Select(g => g.OrderByDescending(d => d.CreatedAt).First())
-            .ToDictionaryAsync(d => d.RemediationCaseId, ct);
-
-        // Load SoftwareProductId for each RemediationCase to join with risk scores and exposures.
-        var caseToProduct = await dbContext.RemediationCases.AsNoTracking()
-            .Where(c => c.TenantId == tenantId && caseIds.Contains(c.Id))
-            .Select(c => new { c.Id, c.SoftwareProductId })
-            .ToDictionaryAsync(c => c.Id, c => c.SoftwareProductId, ct);
-
-        var productIds = caseToProduct.Values.Distinct().ToList();
-
-        // Vulnerability counts and risk scores from the computed SoftwareRiskScore table.
-        var softwareRiskScores = await dbContext.SoftwareRiskScores.AsNoTracking()
-            .Where(s => s.TenantId == tenantId && productIds.Contains(s.SoftwareProductId))
-            .ToDictionaryAsync(s => s.SoftwareProductId, ct);
-
-        // VendorSeverity and Device.Criticality are stored as strings (HasConversion<string>),
-        // so SQL-side Max((int)column) is impossible — Postgres would try to cast 'High' to
-        // integer. Materialize the open-exposure rows and compute the Max enum values in
-        // memory, which uses the natural int ordering of the enum.
-        var openExposureRows = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
-            .Where(e => e.TenantId == tenantId
-                && e.SoftwareProductId != null
-                && productIds.Contains(e.SoftwareProductId!.Value)
-                && e.Status == ExposureStatus.Open)
-            .Select(e => new
-            {
-                SoftwareProductId = e.SoftwareProductId!.Value,
-                e.FirstObservedAt,
-                Severity = e.Vulnerability.VendorSeverity,
-                Criticality = e.Device.Criticality,
-                DeviceId = e.DeviceId,
-                VulnerabilityId = e.VulnerabilityId,
-            })
-            .ToListAsync(ct);
-
-        var exposureSummaryByProduct = openExposureRows
-            .GroupBy(e => e.SoftwareProductId)
-            .ToDictionary(g => g.Key, g => new
-            {
-                SoftwareProductId = g.Key,
-                EarliestFirstSeen = g.Min(e => e.FirstObservedAt),
-                HighestSeverity = g.Max(e => e.Severity),
-            });
-
-        var criticalityByProduct = openExposureRows
-            .GroupBy(e => e.SoftwareProductId)
-            .ToDictionary(g => g.Key, g => new
-            {
-                SoftwareProductId = g.Key,
-                MaxCriticality = g.Max(e => e.Criticality),
-            });
+        var openExposureRows = productIds.Count == 0
+            ? []
+            : await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                .Where(e => e.TenantId == tenantId
+                    && e.SoftwareProductId != null
+                    && productIds.Contains(e.SoftwareProductId!.Value)
+                    && e.Status == ExposureStatus.Open)
+                .Select(e => new
+                {
+                    SoftwareProductId = e.SoftwareProductId!.Value,
+                    DeviceId = e.DeviceId,
+                    VulnerabilityId = e.VulnerabilityId,
+                })
+                .ToListAsync(ct);
 
         var deviceIdsByProduct = openExposureRows
             .GroupBy(e => e.SoftwareProductId)
@@ -139,38 +334,6 @@ public class RemediationDecisionQueryService(
             vulnerabilityIdsByProduct,
             ct
         );
-
-        var activeWorkflowRows = await dbContext.RemediationWorkflows.AsNoTracking()
-            .Where(w => w.TenantId == tenantId
-                && caseIds.Contains(w.RemediationCaseId)
-                && w.Status == RemediationWorkflowStatus.Active)
-            .Select(w => new { w.Id, w.RemediationCaseId, w.CurrentStage, w.UpdatedAt })
-            .ToListAsync(ct);
-        var activeWorkflowsByCase = activeWorkflowRows
-            .GroupBy(w => w.RemediationCaseId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(w => w.UpdatedAt).First());
-        var activeWorkflowStages = activeWorkflowsByCase
-            .ToDictionary(pair => pair.Key, pair => pair.Value.CurrentStage);
-        var activeWorkflowIds = activeWorkflowsByCase.Values.Select(w => w.Id).ToHashSet();
-        var workflowsWithRecommendations = activeWorkflowIds.Count == 0
-            ? []
-            : await dbContext.AnalystRecommendations.AsNoTracking()
-                .Where(r => r.TenantId == tenantId
-                    && r.RemediationWorkflowId != null
-                    && activeWorkflowIds.Contains(r.RemediationWorkflowId.Value))
-                .Select(r => r.RemediationWorkflowId!.Value)
-                .Distinct()
-                .ToListAsync(ct);
-        var workflowRecommendationSet = workflowsWithRecommendations.ToHashSet();
-        var activeWorkflowOwnerTeams = await dbContext.RemediationWorkflows.AsNoTracking()
-            .Where(w => w.TenantId == tenantId
-                && caseIds.Contains(w.RemediationCaseId)
-                && w.Status == RemediationWorkflowStatus.Active)
-            .Select(w => new { w.RemediationCaseId, w.SoftwareOwnerTeamId, w.UpdatedAt })
-            .ToListAsync(ct);
-        var activeWorkflowOwnerTeamIds = activeWorkflowOwnerTeams
-            .GroupBy(w => w.RemediationCaseId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(w => w.UpdatedAt).First().SoftwareOwnerTeamId);
 
         var tenantSoftwareRows = await dbContext.SoftwareTenantRecords.AsNoTracking()
             .Where(item => item.TenantId == tenantId && productIds.Contains(item.SoftwareProductId))
@@ -192,30 +355,16 @@ public class RemediationDecisionQueryService(
                     .ThenByDescending(item => item.UpdatedAt)
                     .First());
 
-        var ownerTeamIds = activeWorkflowOwnerTeamIds.Values.ToHashSet();
+        var ownerTeamIds = caseRows
+            .Select(row => row.ActiveWorkflowOwnerTeamId)
+            .Where(teamId => teamId.HasValue)
+            .Select(teamId => teamId!.Value)
+            .ToHashSet();
         var ownerTeamNames = ownerTeamIds.Count == 0
             ? new Dictionary<Guid, string>()
             : await dbContext.Teams.AsNoTracking()
                 .Where(team => ownerTeamIds.Contains(team.Id))
                 .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
-
-        // Build vulnCounts and riskScoresByCaseId keyed by RemediationCaseId.
-        var vulnCounts = new Dictionary<Guid, (int Total, int Critical, int High, DateTimeOffset EarliestFirstSeen, Severity HighestSeverity)>();
-        var riskScoresByCaseId = new Dictionary<Guid, (decimal OverallScore, DateTimeOffset CalculatedAt)>();
-        foreach (var (caseId, productId) in caseToProduct)
-        {
-            if (softwareRiskScores.TryGetValue(productId, out var srs))
-            {
-                riskScoresByCaseId[caseId] = (srs.OverallScore, srs.CalculatedAt);
-            }
-            if (exposureSummaryByProduct.TryGetValue(productId, out var expSummary))
-            {
-                var critical = softwareRiskScores.TryGetValue(productId, out var srs2) ? srs2.CriticalExposureCount : 0;
-                var high = softwareRiskScores.TryGetValue(productId, out var srs3) ? srs3.HighExposureCount : 0;
-                var total = softwareRiskScores.TryGetValue(productId, out var srs4) ? srs4.OpenExposureCount : 0;
-                vulnCounts[caseId] = (total, critical, high, expSummary.EarliestFirstSeen, expSummary.HighestSeverity);
-            }
-        }
 
         var tenantSla = await dbContext.TenantSlaConfigurations.AsNoTracking()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
@@ -223,163 +372,70 @@ public class RemediationDecisionQueryService(
         var items = new List<RemediationDecisionListItemDto>();
         foreach (var rc in caseRows)
         {
-            vulnCounts.TryGetValue(rc.Id, out var vc);
-            var activeVulnerabilityCount = vc.Total;
-
-            var productId = caseToProduct.TryGetValue(rc.Id, out var pid) ? pid : Guid.Empty;
-            criticalityByProduct.TryGetValue(productId, out var critEntry);
-            var criticality = critEntry?.MaxCriticality ?? Criticality.Low;
-
-            if (!string.IsNullOrWhiteSpace(filter.Criticality)
-                && Enum.TryParse<Criticality>(filter.Criticality, true, out var crit)
-                && criticality != crit)
-            {
-                continue;
-            }
-
-            decisionsLookup.TryGetValue(rc.Id, out var decision);
-            if (string.Equals(filter.DecisionState, "WithDecision", StringComparison.OrdinalIgnoreCase)
-                && decision is null)
-            {
-                continue;
-            }
-
-            if (string.Equals(filter.DecisionState, "NoDecision", StringComparison.OrdinalIgnoreCase)
-                && decision is not null)
-            {
-                continue;
-            }
-
-            if (!string.IsNullOrWhiteSpace(filter.Outcome)
-                && !string.Equals(decision?.Outcome.ToString(), filter.Outcome, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (!string.IsNullOrWhiteSpace(filter.ApprovalStatus)
-                && !string.Equals(decision?.ApprovalStatus.ToString(), filter.ApprovalStatus, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (filter.MissedMaintenanceWindow == true)
-            {
-                if (decision?.MaintenanceWindowDate is not DateTimeOffset maintenanceWindowDate
-                    || maintenanceWindowDate >= DateTimeOffset.UtcNow)
-                {
-                    continue;
-                }
-            }
-
-            if (filter.NeedsAnalystRecommendation == true)
-            {
-                // A case needs analyst attention when:
-                //   * it has no active workflow yet (workflows are bootstrapped lazily on first
-                //     recommendation/decision, so brand-new cases would otherwise be invisible), OR
-                //   * its active workflow is parked at SecurityAnalysis without a recommendation.
-                // Any later stage (RemediationDecision, Approval, Execution, Closure) means analyst
-                // input has already happened.
-                if (activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow))
-                {
-                    if (activeWorkflow.CurrentStage != RemediationWorkflowStage.SecurityAnalysis
-                        || workflowRecommendationSet.Contains(activeWorkflow.Id))
-                    {
-                        continue;
-                    }
-                }
-            }
-
-            if (filter.NeedsRemediationDecision == true)
-            {
-                if (!activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow)
-                    || activeWorkflow.CurrentStage != RemediationWorkflowStage.RemediationDecision
-                    || decision is not null)
-                {
-                    continue;
-                }
-            }
-
-            if (filter.NeedsApproval == true)
-            {
-                if (!activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow)
-                    || activeWorkflow.CurrentStage != RemediationWorkflowStage.Approval
-                    || decision?.ApprovalStatus != DecisionApprovalStatus.PendingApproval)
-                {
-                    continue;
-                }
-            }
-
             string? riskBand = null;
             double? riskScore = null;
-            if (riskScoresByCaseId.TryGetValue(rc.Id, out var risk))
+            if (rc.RiskScore is decimal risk)
             {
-                riskScore = (double)risk.OverallScore;
-                riskBand = RiskBand.FromScore(risk.OverallScore);
+                riskScore = (double)risk;
+                riskBand = RiskBand.FromScore(risk);
             }
 
             string? slaStatus = null;
             DateTimeOffset? slaDueDate = null;
-            if (tenantSla is not null && vulnCounts.TryGetValue(rc.Id, out var vcForSla) && vcForSla.HighestSeverity != default)
+            if (tenantSla is not null
+                && rc.EarliestFirstSeen is DateTimeOffset earliestFirstSeen
+                && rc.HighestSeverityRank > 0)
             {
-                slaDueDate = slaService.CalculateDueDate(vcForSla.HighestSeverity, vcForSla.EarliestFirstSeen, tenantSla);
-                slaStatus = slaService.GetSlaStatus(vcForSla.EarliestFirstSeen, slaDueDate.Value, DateTimeOffset.UtcNow).ToString();
+                var highestSeverity = SeverityFromRank(rc.HighestSeverityRank);
+                slaDueDate = slaService.CalculateDueDate(highestSeverity, earliestFirstSeen, tenantSla);
+                slaStatus = slaService.GetSlaStatus(earliestFirstSeen, slaDueDate.Value, DateTimeOffset.UtcNow).ToString();
             }
 
-            var workflowStage = activeWorkflowStages.TryGetValue(rc.Id, out var stage) ? stage.ToString() : null;
-            var hasWorkflowOwnerTeam = activeWorkflowOwnerTeamIds.TryGetValue(rc.Id, out var softwareOwnerTeamId);
-            tenantSoftwareByProduct.TryGetValue(productId, out var tenantSoftware);
+            var workflowStage = rc.ActiveWorkflowStage?.ToString();
+            var softwareOwnerTeamId = rc.ActiveWorkflowOwnerTeamId;
+            var hasWorkflowOwnerTeam = softwareOwnerTeamId.HasValue;
+            tenantSoftwareByProduct.TryGetValue(rc.SoftwareProductId, out var tenantSoftware);
             var softwareOwnerAssignmentSource = !hasWorkflowOwnerTeam
                 ? "Default"
                 : tenantSoftware?.OwnerTeamRuleId != null
                     ? "Rule"
                     : "Manual";
             var softwareOwnerTeamName = hasWorkflowOwnerTeam
-                && ownerTeamNames.TryGetValue(softwareOwnerTeamId, out var resolvedSoftwareOwnerTeamName)
+                && ownerTeamNames.TryGetValue(softwareOwnerTeamId!.Value, out var resolvedSoftwareOwnerTeamName)
                     ? resolvedSoftwareOwnerTeamName
                     : null;
+            var affectedDeviceCount = rc.RiskAffectedDeviceCount > 0
+                ? rc.RiskAffectedDeviceCount
+                : rc.OpenAffectedDeviceCount > 0
+                    ? rc.OpenAffectedDeviceCount
+                    : rc.InstalledDeviceCount;
 
             items.Add(new RemediationDecisionListItemDto(
                 rc.Id,
                 ResolveDisplaySoftwareName(rc.Name, null),
                 softwareOwnerTeamName,
                 softwareOwnerAssignmentSource,
-                criticality.ToString(),
-                decision?.Outcome.ToString(),
-                decision?.ApprovalStatus.ToString(),
-                decision?.DecidedAt,
-                decision?.MaintenanceWindowDate,
-                decision?.ExpiryDate,
-                activeVulnerabilityCount,
-                vulnCounts.GetValueOrDefault(rc.Id).Critical,
-                vulnCounts.GetValueOrDefault(rc.Id).High,
+                CriticalityFromRank(rc.CriticalityRank).ToString(),
+                rc.LatestOutcome?.ToString(),
+                rc.LatestApprovalStatus?.ToString(),
+                rc.LatestDecidedAt,
+                rc.LatestMaintenanceWindowDate,
+                rc.LatestExpiryDate,
+                rc.OpenExposureCount,
+                rc.CriticalExposureCount,
+                rc.HighExposureCount,
                 riskScore,
                 riskBand,
                 slaStatus,
                 slaDueDate,
-                softwareRiskScores.TryGetValue(productId, out var srsForCount) ? srsForCount.AffectedDeviceCount : 0,
-                trendsByProduct.TryGetValue(productId, out var trend) ? trend : BuildEmptyTrend(),
+                affectedDeviceCount,
+                trendsByProduct.TryGetValue(rc.SoftwareProductId, out var trend) ? trend : BuildEmptyTrend(),
                 workflowStage
             ));
         }
 
-        var totalCount = items.Count;
-        var summary = new RemediationDecisionListSummaryDto(
-            totalCount,
-            items.Count(item => item.Outcome is not null),
-            items.Count(item => string.Equals(item.ApprovalStatus, DecisionApprovalStatus.PendingApproval.ToString(), StringComparison.OrdinalIgnoreCase)),
-            items.Count(item => item.Outcome is null)
-        );
-        var paged = items
-            .Skip(pagination.Skip)
-            .Take(pagination.BoundedPageSize)
-            .ToList();
-
-        var boundedPage = Math.Max(pagination.Page, 1);
-        var boundedPageSize = Math.Max(pagination.BoundedPageSize, 1);
-        var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)boundedPageSize);
-
         return new RemediationDecisionListPageDto(
-            paged,
+            items,
             totalCount,
             boundedPage,
             boundedPageSize,
@@ -1166,6 +1222,43 @@ public class RemediationDecisionQueryService(
 
         return "Unknown software";
     }
+
+    private static bool TryGetCriticalityRank(string value, out int rank)
+    {
+        if (Enum.TryParse<Criticality>(value, true, out var criticality))
+        {
+            rank = criticality switch
+            {
+                Criticality.Critical => 4,
+                Criticality.High => 3,
+                Criticality.Medium => 2,
+                Criticality.Low => 1,
+                _ => 0,
+            };
+            return true;
+        }
+
+        rank = 0;
+        return false;
+    }
+
+    private static Criticality CriticalityFromRank(int rank) =>
+        rank switch
+        {
+            >= 4 => Criticality.Critical,
+            3 => Criticality.High,
+            2 => Criticality.Medium,
+            _ => Criticality.Low,
+        };
+
+    private static Severity SeverityFromRank(int rank) =>
+        rank switch
+        {
+            >= 4 => Severity.Critical,
+            3 => Severity.High,
+            2 => Severity.Medium,
+            _ => Severity.Low,
+        };
 
     private async Task<Dictionary<Guid, List<OpenEpisodeTrendPointDto>>> BuildOpenEpisodeTrendsBySoftwareAsync(
         Guid tenantId,

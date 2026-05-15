@@ -63,6 +63,7 @@ describe('RemediationWorkbench', () => {
         }}
         onFiltersChange={() => {}}
         onPageChange={() => {}}
+        onPageSizeChange={() => {}}
       />,
     )
 

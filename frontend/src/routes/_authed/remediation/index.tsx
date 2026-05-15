@@ -83,6 +83,15 @@ function RemediationRoute() {
           }),
         })
       }}
+      onPageSizeChange={(pageSize) => {
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            page: 1,
+            pageSize,
+          }),
+        })
+      }}
     />
   )
 }

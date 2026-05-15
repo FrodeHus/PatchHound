@@ -546,6 +546,126 @@ public class RemediationDecisionListTests : IDisposable
         item.WorkflowStage.Should().Be(nameof(RemediationWorkflowStage.Approval));
     }
 
+    [Fact]
+    public async Task ListAsync_OrdersByCriticalityThenAffectedDeviceCountBeforePaging()
+    {
+        var criticalSmall = await SeedPrioritizedCaseAsync(
+            "Critical Small Scope",
+            Criticality.Critical,
+            Severity.Critical,
+            affectedDeviceCount: 1
+        );
+        var criticalLarge = await SeedPrioritizedCaseAsync(
+            "Critical Large Scope",
+            Criticality.Critical,
+            Severity.High,
+            affectedDeviceCount: 3
+        );
+        await SeedPrioritizedCaseAsync(
+            "High Large Scope",
+            Criticality.High,
+            Severity.Critical,
+            affectedDeviceCount: 6
+        );
+        await SeedPrioritizedCaseAsync(
+            "Medium Wide Scope",
+            Criticality.Medium,
+            Severity.Critical,
+            affectedDeviceCount: 10
+        );
+
+        var result = await _service.ListAsync(
+            _tenantId,
+            new PatchHound.Api.Models.Decisions.RemediationDecisionFilterQuery(),
+            new PaginationQuery(Page: 1, PageSize: 2),
+            CancellationToken.None
+        );
+
+        result.TotalCount.Should().Be(4);
+        result.TotalPages.Should().Be(2);
+        result.Items.Select(item => item.RemediationCaseId)
+            .Should()
+            .Equal(criticalLarge.Id, criticalSmall.Id);
+        result.Items.Select(item => item.AffectedDeviceCount)
+            .Should()
+            .Equal(3, 1);
+    }
+
+    private async Task<RemediationCase> SeedPrioritizedCaseAsync(
+        string productName,
+        Criticality criticality,
+        Severity severity,
+        int affectedDeviceCount
+    )
+    {
+        var product = SoftwareProduct.Create("Contoso", productName, null);
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var vulnerability = Vulnerability.Create(
+            "nvd",
+            $"CVE-2026-{Random.Shared.Next(1000, 9999)}",
+            $"{productName} vulnerability",
+            "Test vulnerability.",
+            severity,
+            severity == Severity.Critical ? 9.8m : 8.2m,
+            null,
+            DateTimeOffset.UtcNow.AddDays(-7)
+        );
+        var entities = new List<object> { product, remediationCase, vulnerability };
+
+        for (var index = 0; index < affectedDeviceCount; index++)
+        {
+            var sourceSystemId = Guid.NewGuid();
+            var device = Device.Create(
+                _tenantId,
+                sourceSystemId,
+                $"device-{Guid.NewGuid():N}",
+                $"{productName} device {index}",
+                criticality
+            );
+            var installedSoftware = InstalledSoftware.Observe(
+                _tenantId,
+                device.Id,
+                product.Id,
+                sourceSystemId,
+                "1.0.0",
+                DateTimeOffset.UtcNow.AddDays(-2)
+            );
+            var exposure = DeviceVulnerabilityExposure.Observe(
+                _tenantId,
+                device.Id,
+                vulnerability.Id,
+                product.Id,
+                installedSoftware.Id,
+                installedSoftware.Version,
+                ExposureMatchSource.Product,
+                DateTimeOffset.UtcNow.AddDays(-2)
+            );
+
+            entities.Add(device);
+            entities.Add(installedSoftware);
+            entities.Add(exposure);
+        }
+
+        entities.Add(SoftwareRiskScore.Create(
+            _tenantId,
+            product.Id,
+            overallScore: severity == Severity.Critical ? 90m : 70m,
+            maxExposureScore: severity == Severity.Critical ? 90m : 70m,
+            criticalExposureCount: severity == Severity.Critical ? affectedDeviceCount : 0,
+            highExposureCount: severity == Severity.High ? affectedDeviceCount : 0,
+            mediumExposureCount: severity == Severity.Medium ? affectedDeviceCount : 0,
+            lowExposureCount: severity == Severity.Low ? affectedDeviceCount : 0,
+            affectedDeviceCount,
+            openExposureCount: affectedDeviceCount,
+            factorsJson: "[]",
+            calculationVersion: "test"
+        ));
+
+        await _dbContext.AddRangeAsync(entities);
+        await _dbContext.SaveChangesAsync();
+        return remediationCase;
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

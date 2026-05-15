@@ -31,6 +31,7 @@ type Props = {
   filters: Filters
   onFiltersChange: (filters: Filters) => void
   onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
 }
 
 export function RemediationWorkbench({
@@ -38,8 +39,12 @@ export function RemediationWorkbench({
   filters,
   onFiltersChange,
   onPageChange,
+  onPageSizeChange,
 }: Props) {
   const [renderedAt] = useState(() => Date.now())
+  const firstVisible = data.totalCount === 0 ? 0 : (data.page - 1) * data.pageSize + 1
+  const lastVisible = Math.min(data.page * data.pageSize, data.totalCount)
+  const hasMore = data.page < Math.max(data.totalPages, 1)
   const quickFilterLabel = filters.approvalStatus === 'PendingApproval'
     ? 'Pending approval'
     : filters.missedMaintenanceWindow
@@ -207,10 +212,45 @@ export function RemediationWorkbench({
           </div>
         ) : null}
 
+        <div className="mt-5 flex flex-col gap-3 border-y border-border/60 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Priority queue
+            </p>
+            <p className="text-sm text-foreground">
+              Sorted by priority: criticality, affected devices, critical exposure count.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <p className="text-sm text-muted-foreground">
+              Showing {firstVisible}-{lastVisible} of {data.totalCount} cases
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                Page size
+              </span>
+              <Select
+                value={String(data.pageSize)}
+                onValueChange={(value) => onPageSizeChange(Number(value))}
+              >
+                <SelectTrigger className="h-9 w-[92px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-5 overflow-hidden rounded-xl border border-border/70">
           <table className="min-w-full divide-y divide-border/70 text-sm">
             <thead className="bg-muted/30 text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
               <tr>
+                <th className="px-4 py-3">Priority</th>
                 <th className="px-4 py-3">Software</th>
                 <th className="px-4 py-3">State</th>
                 <th className="px-4 py-3">Vulnerabilities</th>
@@ -224,14 +264,26 @@ export function RemediationWorkbench({
                 <tr>
                   <td
                     className="px-4 py-6 text-sm text-muted-foreground"
-                    colSpan={6}
+                    colSpan={7}
                   >
                     No software matches the current filters.
                   </td>
                 </tr>
               ) : (
-                data.items.map((item) => (
+                data.items.map((item, index) => (
                   <tr key={item.remediationCaseId} className="align-top">
+                    <td className="px-4 py-3">
+                      <div className="space-y-1">
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(severityTone(item.criticality))}`}
+                        >
+                          #{firstVisible + index}
+                        </span>
+                        <p className="text-[10px] text-muted-foreground">
+                          {item.criticality} · {item.affectedDeviceCount} devices
+                        </p>
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="space-y-1">
                         {item.remediationCaseId ? (
@@ -406,26 +458,17 @@ export function RemediationWorkbench({
           </table>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Page {data.page} of {Math.max(data.totalPages, 1)}
           </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              disabled={data.page <= 1}
-              onClick={() => onPageChange(data.page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              disabled={data.page >= Math.max(data.totalPages, 1)}
-              onClick={() => onPageChange(data.page + 1)}
-            >
-              Next
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            disabled={!hasMore}
+            onClick={() => onPageChange(data.page + 1)}
+          >
+            {hasMore ? `Load next ${data.pageSize}` : 'All cases loaded'}
+          </Button>
         </div>
       </section>
     </section>
