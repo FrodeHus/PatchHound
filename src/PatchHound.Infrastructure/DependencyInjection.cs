@@ -130,6 +130,7 @@ public static class DependencyInjection
         services.AddScoped<ExposureAssessmentService>();
         services.AddScoped<RiskScoreService>();
         services.AddScoped<RiskRefreshService>();
+        services.AddScoped<MaterializedViewRefreshService>();
         services.AddScoped<AuditLogWriter>();
         services.AddScoped<AdvancedToolExecutionService>();
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ConnectionProfileSecretWriter>();
