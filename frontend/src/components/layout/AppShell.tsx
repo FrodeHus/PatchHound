@@ -34,13 +34,21 @@ const sidebarStorageKey = "patchhound:sidebar-collapsed";
 
 function getInitialSidebarCollapsed(): boolean {
   if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(sidebarStorageKey) === "true";
+  try {
+    return window.sessionStorage.getItem(sidebarStorageKey) === "true";
+  } catch {
+    return false;
+  }
 }
 
 function isGlassTheme(): boolean {
   if (typeof window === "undefined") return false;
-  const stored = window.localStorage.getItem(themeStorageKey) ?? "";
-  return stored.startsWith("liquid-glass");
+  try {
+    const stored = window.localStorage.getItem(themeStorageKey) ?? "";
+    return stored.startsWith("liquid-glass");
+  } catch {
+    return false;
+  }
 }
 
 type AppShellProps = {
