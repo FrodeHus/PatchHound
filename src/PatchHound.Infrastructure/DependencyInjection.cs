@@ -12,6 +12,7 @@ using PatchHound.Infrastructure.Options;
 using PatchHound.Infrastructure.Repositories;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Services.Bulk;
 using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Infrastructure.Services.Workflows;
 using PatchHound.Infrastructure.Tenants;
@@ -61,6 +62,9 @@ public static class DependencyInjection
 
         // Unit of Work
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PatchHoundDbContext>());
+
+        // Bulk writers (Postgres-native)
+        services.AddScoped<IBulkExposureWriter, PostgresBulkExposureWriter>();
 
         // Repositories
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
