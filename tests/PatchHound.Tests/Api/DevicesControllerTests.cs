@@ -59,7 +59,8 @@ public class DevicesControllerTests : IDisposable
             new RiskScoreService(
                 _dbContext,
                 Substitute.For<Microsoft.Extensions.Logging.ILogger<RiskScoreService>>()
-            )
+            ),
+            Substitute.For<MaterializedViewRefreshService>(_dbContext)
         );
         var workflowService = new RemediationWorkflowService(_dbContext);
         var notificationService = Substitute.For<INotificationService>();

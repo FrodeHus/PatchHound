@@ -59,7 +59,8 @@ public class DeviceRulesControllerTests : IDisposable
             new RiskScoreService(
                 _dbContext,
                 Substitute.For<Microsoft.Extensions.Logging.ILogger<RiskScoreService>>()
-            )
+            ),
+            Substitute.For<MaterializedViewRefreshService>(_dbContext)
         );
         var filterBuilder = new DeviceRuleFilterBuilder(_dbContext);
         var evaluationService = new DeviceRuleEvaluationService(
