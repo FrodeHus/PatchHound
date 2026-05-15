@@ -455,13 +455,19 @@ public class RiskScoreService(
             .Select(d => d.SoftwareProductId)
             .ToHashSet();
 
-        var exposureRows = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.Status == ExposureStatus.Open)
-            .Where(item => !dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
-                remediation.TenantId == tenantId
-                && remediation.Outcome == RemediationOutcome.AlternateMitigation
-                && remediation.VulnerabilityId == item.VulnerabilityId))
-            .Select(item => new
+        var exposureRows = await (
+            from item in dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            join assessment in dbContext.ExposureLatestAssessments
+                on item.Id equals assessment.DeviceVulnerabilityExposureId into assessmentJoin
+            from assessment in assessmentJoin.DefaultIfEmpty()
+            join mitigated in dbContext.AlternateMitigationVulnIds
+                    .Where(m => m.TenantId == tenantId)
+                on item.VulnerabilityId equals mitigated.VulnerabilityId into mitigatedJoin
+            from mitigated in mitigatedJoin.DefaultIfEmpty()
+            where item.TenantId == tenantId
+                && item.Status == ExposureStatus.Open
+                && mitigated == null
+            select new
             {
                 item.DeviceId,
                 item.VulnerabilityId,
@@ -469,12 +475,9 @@ public class RiskScoreService(
                 DeviceCriticality = item.Device.Criticality,
                 VendorSeverity = item.Vulnerability.VendorSeverity,
                 VulnerabilityCvss = item.Vulnerability.CvssScore,
-                AssessmentScore = dbContext.ExposureAssessments
-                    .Where(assessment => assessment.DeviceVulnerabilityExposureId == item.Id)
-                    .Select(assessment => (decimal?)assessment.EnvironmentalCvss)
-                    .FirstOrDefault(),
-            })
-            .ToListAsync(ct);
+                AssessmentScore = (decimal?)assessment.EnvironmentalCvss,
+            }
+        ).ToListAsync(ct);
 
         var vulnerabilityIds = exposureRows.Select(item => item.VulnerabilityId).Distinct().ToList();
         var threatAssessments = await LoadThreatAssessmentsAsync(vulnerabilityIds, ct);
@@ -554,15 +557,20 @@ public class RiskScoreService(
             .Select(d => d.SoftwareProductId)
             .ToHashSet();
 
-        var exposures = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
-            .Where(item => item.TenantId == tenantId
+        var exposures = await (
+            from item in dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            join assessment in dbContext.ExposureLatestAssessments
+                on item.Id equals assessment.DeviceVulnerabilityExposureId into assessmentJoin
+            from assessment in assessmentJoin.DefaultIfEmpty()
+            join mitigated in dbContext.AlternateMitigationVulnIds
+                    .Where(m => m.TenantId == tenantId)
+                on item.VulnerabilityId equals mitigated.VulnerabilityId into mitigatedJoin
+            from mitigated in mitigatedJoin.DefaultIfEmpty()
+            where item.TenantId == tenantId
                 && item.SoftwareProductId != null
-                && item.Status == ExposureStatus.Open)
-            .Where(item => !dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
-                remediation.TenantId == tenantId
-                && remediation.Outcome == RemediationOutcome.AlternateMitigation
-                && remediation.VulnerabilityId == item.VulnerabilityId))
-            .Select(item => new
+                && item.Status == ExposureStatus.Open
+                && mitigated == null
+            select new
             {
                 item.Id,
                 item.DeviceId,
@@ -571,12 +579,9 @@ public class RiskScoreService(
                 DeviceCriticality = item.Device.Criticality,
                 VendorSeverity = item.Vulnerability.VendorSeverity,
                 VulnerabilityCvss = item.Vulnerability.CvssScore,
-                AssessmentScore = dbContext.ExposureAssessments
-                    .Where(assessment => assessment.DeviceVulnerabilityExposureId == item.Id)
-                    .Select(assessment => (decimal?)assessment.EnvironmentalCvss)
-                    .FirstOrDefault(),
-            })
-            .ToListAsync(ct);
+                AssessmentScore = (decimal?)assessment.EnvironmentalCvss,
+            }
+        ).ToListAsync(ct);
 
         var vulnerabilityIds = exposures.Select(item => item.VulnerabilityId).Distinct().ToList();
         var threatAssessments = await LoadThreatAssessmentsAsync(vulnerabilityIds, ct);
