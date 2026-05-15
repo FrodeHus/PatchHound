@@ -17,13 +17,8 @@ public class MyTasksQueryService(
         Guid Id,
         Guid SoftwareProductId,
         string Name,
-        Guid? LatestDecisionId,
-        RemediationOutcome? LatestOutcome,
-        DecisionApprovalStatus? LatestApprovalStatus,
-        Guid? ActiveWorkflowId,
         RemediationWorkflowStage? ActiveWorkflowStage,
         Guid? ActiveWorkflowOwnerTeamId,
-        bool HasAnalystRecommendation,
         int CriticalityRank,
         int HighestSeverityRank,
         DateTimeOffset? EarliestFirstSeen,
@@ -34,6 +29,24 @@ public class MyTasksQueryService(
         int OpenExposureCount,
         int CriticalExposureCount,
         int HighExposureCount
+    );
+
+    private sealed record MyTaskSortRow(
+        Guid Id,
+        Guid SoftwareProductId,
+        string Name,
+        decimal? RiskScore,
+        int RiskAffectedDeviceCount,
+        int OpenExposureCount,
+        int CriticalExposureCount,
+        int HighExposureCount
+    );
+
+    private sealed record MyTaskDecisionRow(
+        Guid RemediationCaseId,
+        RemediationOutcome Outcome,
+        DecisionApprovalStatus ApprovalStatus,
+        DateTimeOffset CreatedAt
     );
 
     public async Task<MyTasksPageDto> ListAsync(
@@ -66,23 +79,27 @@ public class MyTasksQueryService(
         var page = query.PageFor(bucket);
         var pageSize = query.BoundedPageSize;
         var skip = (page - 1) * pageSize;
-        var rows = await ApplyBucketFilter(BuildBaseQuery(tenantId), bucket, roles)
-            .OrderByDescending(c => c.CriticalityRank)
-            .ThenByDescending(c => c.RiskAffectedDeviceCount > 0
-                ? c.RiskAffectedDeviceCount
-                : c.OpenAffectedDeviceCount > 0
-                    ? c.OpenAffectedDeviceCount
-                    : c.InstalledDeviceCount)
-            .ThenByDescending(c => c.CriticalExposureCount)
-            .ThenByDescending(c => c.HighestSeverityRank)
-            .ThenBy(c => c.Name)
+        var sortedRows = await BuildSortedRowsQuery(
+                ApplyBucketFilter(BuildBaseCasesQuery(tenantId), tenantId, bucket, roles),
+                tenantId)
             .Skip(skip)
             .Take(pageSize + 1)
             .ToListAsync(ct);
 
-        var hasMore = rows.Count > pageSize;
-        var pageRows = rows.Take(pageSize).ToList();
+        var hasMore = sortedRows.Count > pageSize;
+        var pageSortRows = sortedRows.Take(pageSize).ToList();
+        var caseIds = pageSortRows.Select(row => row.Id).ToList();
+        var rowLookup = caseIds.Count == 0
+            ? new Dictionary<Guid, MyTaskCaseRow>()
+            : await ProjectCaseRows(
+                    BuildBaseCasesQuery(tenantId).Where(c => caseIds.Contains(c.Id)),
+                    tenantId)
+                .ToDictionaryAsync(row => row.Id, ct);
+        var pageRows = pageSortRows
+            .Select(row => rowLookup[row.Id])
+            .ToList();
         var productIds = pageRows.Select(row => row.SoftwareProductId).Distinct().ToList();
+        var latestDecisionsByCase = await LoadLatestDecisionsAsync(tenantId, caseIds, ct);
 
         var tenantSoftwareRows = productIds.Count == 0
             ? []
@@ -153,13 +170,18 @@ public class MyTasksQueryService(
                 : row.OpenAffectedDeviceCount > 0
                     ? row.OpenAffectedDeviceCount
                     : row.InstalledDeviceCount;
+            latestDecisionsByCase.TryGetValue(row.Id, out var latestDecision);
 
             return new MyTaskListItemDto(
                 row.Id,
                 row.Name,
                 CriticalityFromRank(row.CriticalityRank).ToString(),
-                row.LatestOutcome?.ToString(),
-                row.LatestApprovalStatus?.ToString(),
+                latestDecision is not null
+                    ? latestDecision.Outcome.ToString()
+                    : null,
+                latestDecision is not null
+                    ? latestDecision.ApprovalStatus.ToString()
+                    : null,
                 row.OpenExposureCount,
                 row.CriticalExposureCount,
                 row.HighExposureCount,
@@ -177,9 +199,8 @@ public class MyTasksQueryService(
         return new MyTaskBucketDto(bucket, items, page, pageSize, hasMore);
     }
 
-    private IQueryable<MyTaskCaseRow> BuildBaseQuery(Guid tenantId)
-    {
-        var casesQuery = dbContext.RemediationCases.AsNoTracking()
+    private IQueryable<RemediationCase> BuildBaseCasesQuery(Guid tenantId) =>
+        dbContext.RemediationCases.AsNoTracking()
             .Where(c => c.TenantId == tenantId)
             .Where(c =>
                 dbContext.DeviceVulnerabilityExposures.Any(e =>
@@ -190,41 +211,62 @@ public class MyTasksQueryService(
                     i.TenantId == tenantId
                     && i.SoftwareProductId == c.SoftwareProductId));
 
-        return casesQuery.Select(c => new MyTaskCaseRow(
+    private IQueryable<MyTaskSortRow> BuildSortedRowsQuery(IQueryable<RemediationCase> casesQuery, Guid tenantId) =>
+        casesQuery
+            .Select(c => new
+            {
+                c.Id,
+                c.SoftwareProductId,
+                Name = c.SoftwareProduct.Name,
+                RiskScore = dbContext.SoftwareRiskScores.AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
+                    .Select(s => (decimal?)s.OverallScore)
+                    .FirstOrDefault(),
+                RiskAffectedDeviceCount = dbContext.SoftwareRiskScores.AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
+                    .Select(s => s.AffectedDeviceCount)
+                    .FirstOrDefault(),
+                OpenExposureCount = dbContext.SoftwareRiskScores.AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
+                    .Select(s => s.OpenExposureCount)
+                    .FirstOrDefault(),
+                CriticalExposureCount = dbContext.SoftwareRiskScores.AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
+                    .Select(s => s.CriticalExposureCount)
+                    .FirstOrDefault(),
+                HighExposureCount = dbContext.SoftwareRiskScores.AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
+                    .Select(s => s.HighExposureCount)
+                    .FirstOrDefault(),
+            })
+            .OrderByDescending(row => row.CriticalExposureCount > 0
+                ? 4
+                : row.HighExposureCount > 0
+                    ? 3
+                    : row.OpenExposureCount > 0
+                        ? 2
+                        : 0)
+            .ThenByDescending(row => row.CriticalExposureCount)
+            .ThenByDescending(row => row.HighExposureCount)
+            .ThenByDescending(row => row.RiskAffectedDeviceCount)
+            .ThenByDescending(row => row.RiskScore ?? 0)
+            .ThenBy(row => row.Name)
+            .Select(row => new MyTaskSortRow(
+                row.Id,
+                row.SoftwareProductId,
+                row.Name,
+                row.RiskScore,
+                row.RiskAffectedDeviceCount,
+                row.OpenExposureCount,
+                row.CriticalExposureCount,
+                row.HighExposureCount
+            ));
+
+    private IQueryable<MyTaskCaseRow> ProjectCaseRows(IQueryable<RemediationCase> casesQuery, Guid tenantId) =>
+        casesQuery.Select(c => new MyTaskCaseRow(
             c.Id,
             c.SoftwareProductId,
             c.SoftwareProduct.Name,
-            dbContext.RemediationDecisions.AsNoTracking()
-                .Where(d => d.TenantId == tenantId
-                    && d.RemediationCaseId == c.Id
-                    && d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                    && d.ApprovalStatus != DecisionApprovalStatus.Expired)
-                .OrderByDescending(d => d.CreatedAt)
-                .Select(d => (Guid?)d.Id)
-                .FirstOrDefault(),
-            dbContext.RemediationDecisions.AsNoTracking()
-                .Where(d => d.TenantId == tenantId
-                    && d.RemediationCaseId == c.Id
-                    && d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                    && d.ApprovalStatus != DecisionApprovalStatus.Expired)
-                .OrderByDescending(d => d.CreatedAt)
-                .Select(d => (RemediationOutcome?)d.Outcome)
-                .FirstOrDefault(),
-            dbContext.RemediationDecisions.AsNoTracking()
-                .Where(d => d.TenantId == tenantId
-                    && d.RemediationCaseId == c.Id
-                    && d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                    && d.ApprovalStatus != DecisionApprovalStatus.Expired)
-                .OrderByDescending(d => d.CreatedAt)
-                .Select(d => (DecisionApprovalStatus?)d.ApprovalStatus)
-                .FirstOrDefault(),
-            dbContext.RemediationWorkflows.AsNoTracking()
-                .Where(w => w.TenantId == tenantId
-                    && w.RemediationCaseId == c.Id
-                    && w.Status == RemediationWorkflowStatus.Active)
-                .OrderByDescending(w => w.UpdatedAt)
-                .Select(w => (Guid?)w.Id)
-                .FirstOrDefault(),
             dbContext.RemediationWorkflows.AsNoTracking()
                 .Where(w => w.TenantId == tenantId
                     && w.RemediationCaseId == c.Id
@@ -239,14 +281,6 @@ public class MyTasksQueryService(
                 .OrderByDescending(w => w.UpdatedAt)
                 .Select(w => w.SoftwareOwnerTeamId)
                 .FirstOrDefault(),
-            dbContext.RemediationWorkflows.AsNoTracking()
-                .Where(w => w.TenantId == tenantId
-                    && w.RemediationCaseId == c.Id
-                    && w.Status == RemediationWorkflowStatus.Active)
-                .OrderByDescending(w => w.UpdatedAt)
-                .Take(1)
-                .Any(w => dbContext.AnalystRecommendations.AsNoTracking()
-                    .Any(r => r.TenantId == tenantId && r.RemediationWorkflowId == w.Id)),
             dbContext.DeviceVulnerabilityExposures.AsNoTracking()
                 .Where(e => e.TenantId == tenantId
                     && e.SoftwareProductId == c.SoftwareProductId
@@ -306,29 +340,92 @@ public class MyTasksQueryService(
                 .Select(s => s.HighExposureCount)
                 .FirstOrDefault()
         ));
+
+    private async Task<Dictionary<Guid, MyTaskDecisionRow>> LoadLatestDecisionsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> caseIds,
+        CancellationToken ct
+    )
+    {
+        if (caseIds.Count == 0)
+        {
+            return [];
+        }
+
+        var decisions = await dbContext.RemediationDecisions.AsNoTracking()
+            .Where(d => d.TenantId == tenantId
+                && caseIds.Contains(d.RemediationCaseId)
+                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+            .Select(d => new MyTaskDecisionRow(
+                d.RemediationCaseId,
+                d.Outcome,
+                d.ApprovalStatus,
+                d.CreatedAt
+            ))
+            .ToListAsync(ct);
+
+        return decisions
+            .GroupBy(decision => decision.RemediationCaseId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(decision => decision.CreatedAt)
+                    .First());
     }
 
-    private static IQueryable<MyTaskCaseRow> ApplyBucketFilter(
-        IQueryable<MyTaskCaseRow> query,
+    private IQueryable<RemediationCase> ApplyBucketFilter(
+        IQueryable<RemediationCase> query,
+        Guid tenantId,
         string bucket,
         IReadOnlySet<RoleName> roles
     ) =>
         bucket switch
         {
             MyTaskBuckets.Recommendation => query.Where(c =>
-                c.ActiveWorkflowId == null
-                || (c.ActiveWorkflowStage == RemediationWorkflowStage.SecurityAnalysis && !c.HasAnalystRecommendation)),
+                !dbContext.RemediationWorkflows.Any(w =>
+                    w.TenantId == tenantId
+                    && w.RemediationCaseId == c.Id
+                    && w.Status == RemediationWorkflowStatus.Active)
+                || dbContext.RemediationWorkflows.Any(w =>
+                    w.TenantId == tenantId
+                    && w.RemediationCaseId == c.Id
+                    && w.Status == RemediationWorkflowStatus.Active
+                    && w.CurrentStage == RemediationWorkflowStage.SecurityAnalysis
+                    && !dbContext.AnalystRecommendations.Any(r =>
+                        r.TenantId == tenantId
+                        && r.RemediationWorkflowId == w.Id))),
             MyTaskBuckets.Decision => query.Where(c =>
-                c.ActiveWorkflowStage == RemediationWorkflowStage.RemediationDecision
-                && c.LatestDecisionId == null),
+                dbContext.RemediationWorkflows.Any(w =>
+                    w.TenantId == tenantId
+                    && w.RemediationCaseId == c.Id
+                    && w.Status == RemediationWorkflowStatus.Active
+                    && w.CurrentStage == RemediationWorkflowStage.RemediationDecision)
+                && !dbContext.RemediationDecisions.Any(d =>
+                    d.TenantId == tenantId
+                    && d.RemediationCaseId == c.Id
+                    && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                    && d.ApprovalStatus != DecisionApprovalStatus.Expired)),
             MyTaskBuckets.Approval => ApplyApprovalRoleFilter(query.Where(c =>
-                c.ActiveWorkflowStage == RemediationWorkflowStage.Approval
-                && c.LatestApprovalStatus == DecisionApprovalStatus.PendingApproval), roles),
+                dbContext.RemediationWorkflows.Any(w =>
+                    w.TenantId == tenantId
+                    && w.RemediationCaseId == c.Id
+                    && w.Status == RemediationWorkflowStatus.Active
+                    && w.CurrentStage == RemediationWorkflowStage.Approval)
+                && dbContext.RemediationDecisions
+                    .Where(d => d.TenantId == tenantId
+                        && d.RemediationCaseId == c.Id
+                        && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                        && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .Select(d => (DecisionApprovalStatus?)d.ApprovalStatus)
+                    .FirstOrDefault() == DecisionApprovalStatus.PendingApproval), tenantId, roles),
             _ => query.Where(_ => false),
         };
 
-    private static IQueryable<MyTaskCaseRow> ApplyApprovalRoleFilter(
-        IQueryable<MyTaskCaseRow> query,
+    private IQueryable<RemediationCase> ApplyApprovalRoleFilter(
+        IQueryable<RemediationCase> query,
+        Guid tenantId,
         IReadOnlySet<RoleName> roles
     )
     {
@@ -340,13 +437,27 @@ public class MyTasksQueryService(
         var canSecurityApprove = roles.Contains(RoleName.SecurityManager);
         var canTechnicalApprove = roles.Contains(RoleName.TechnicalManager);
 
-        return query.Where(c =>
-            (canSecurityApprove
-                && (c.LatestOutcome == RemediationOutcome.RiskAcceptance
-                    || c.LatestOutcome == RemediationOutcome.AlternateMitigation))
-            || (canTechnicalApprove
-                && (c.LatestOutcome == RemediationOutcome.ApprovedForPatching
-                    || c.LatestOutcome == RemediationOutcome.PatchingDeferred)));
+        return query
+            .Select(c => new
+            {
+                Case = c,
+                LatestOutcome = dbContext.RemediationDecisions
+                    .Where(d => d.TenantId == tenantId
+                        && d.RemediationCaseId == c.Id
+                        && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                        && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .Select(d => (RemediationOutcome?)d.Outcome)
+                    .FirstOrDefault(),
+            })
+            .Where(c =>
+                (canSecurityApprove
+                    && (c.LatestOutcome == RemediationOutcome.RiskAcceptance
+                        || c.LatestOutcome == RemediationOutcome.AlternateMitigation))
+                || (canTechnicalApprove
+                    && (c.LatestOutcome == RemediationOutcome.ApprovedForPatching
+                        || c.LatestOutcome == RemediationOutcome.PatchingDeferred)))
+            .Select(c => c.Case);
     }
 
     private static List<string> BucketsForRoles(IReadOnlySet<RoleName> roles)

@@ -27,32 +27,6 @@ public class RemediationDecisionQueryService(
         DateTimeOffset? ResolvedAt
     );
 
-    private sealed record DecisionListCaseRow(
-        Guid Id,
-        Guid SoftwareProductId,
-        string Name,
-        Guid? LatestDecisionId,
-        RemediationOutcome? LatestOutcome,
-        DecisionApprovalStatus? LatestApprovalStatus,
-        DateTimeOffset? LatestDecidedAt,
-        DateTimeOffset? LatestMaintenanceWindowDate,
-        DateTimeOffset? LatestExpiryDate,
-        Guid? ActiveWorkflowId,
-        RemediationWorkflowStage? ActiveWorkflowStage,
-        Guid? ActiveWorkflowOwnerTeamId,
-        bool HasAnalystRecommendation,
-        int CriticalityRank,
-        int HighestSeverityRank,
-        DateTimeOffset? EarliestFirstSeen,
-        int OpenAffectedDeviceCount,
-        int InstalledDeviceCount,
-        decimal? RiskScore,
-        int RiskAffectedDeviceCount,
-        int OpenExposureCount,
-        int CriticalExposureCount,
-        int HighExposureCount
-    );
-
     public async Task<RemediationDecisionListPageDto> ListAsync(
         Guid tenantId,
         RemediationDecisionFilterQuery filter,
@@ -81,11 +55,12 @@ public class RemediationDecisionQueryService(
 
         var now = DateTimeOffset.UtcNow;
         var caseMetricsQuery = casesQuery
-            .Select(c => new DecisionListCaseRow(
+            .Select(c => new
+            {
                 c.Id,
                 c.SoftwareProductId,
-                c.SoftwareProduct.Name,
-                dbContext.RemediationDecisions.AsNoTracking()
+                Name = c.SoftwareProduct.Name,
+                LatestDecisionId = dbContext.RemediationDecisions.AsNoTracking()
                     .Where(d => d.TenantId == tenantId
                         && d.RemediationCaseId == c.Id
                         && d.ApprovalStatus != DecisionApprovalStatus.Rejected
@@ -93,7 +68,7 @@ public class RemediationDecisionQueryService(
                     .OrderByDescending(d => d.CreatedAt)
                     .Select(d => (Guid?)d.Id)
                     .FirstOrDefault(),
-                dbContext.RemediationDecisions.AsNoTracking()
+                LatestOutcome = dbContext.RemediationDecisions.AsNoTracking()
                     .Where(d => d.TenantId == tenantId
                         && d.RemediationCaseId == c.Id
                         && d.ApprovalStatus != DecisionApprovalStatus.Rejected
@@ -101,7 +76,7 @@ public class RemediationDecisionQueryService(
                     .OrderByDescending(d => d.CreatedAt)
                     .Select(d => (RemediationOutcome?)d.Outcome)
                     .FirstOrDefault(),
-                dbContext.RemediationDecisions.AsNoTracking()
+                LatestApprovalStatus = dbContext.RemediationDecisions.AsNoTracking()
                     .Where(d => d.TenantId == tenantId
                         && d.RemediationCaseId == c.Id
                         && d.ApprovalStatus != DecisionApprovalStatus.Rejected
@@ -109,7 +84,7 @@ public class RemediationDecisionQueryService(
                     .OrderByDescending(d => d.CreatedAt)
                     .Select(d => (DecisionApprovalStatus?)d.ApprovalStatus)
                     .FirstOrDefault(),
-                dbContext.RemediationDecisions.AsNoTracking()
+                LatestDecidedAt = dbContext.RemediationDecisions.AsNoTracking()
                     .Where(d => d.TenantId == tenantId
                         && d.RemediationCaseId == c.Id
                         && d.ApprovalStatus != DecisionApprovalStatus.Rejected
@@ -117,7 +92,7 @@ public class RemediationDecisionQueryService(
                     .OrderByDescending(d => d.CreatedAt)
                     .Select(d => (DateTimeOffset?)d.DecidedAt)
                     .FirstOrDefault(),
-                dbContext.RemediationDecisions.AsNoTracking()
+                LatestMaintenanceWindowDate = dbContext.RemediationDecisions.AsNoTracking()
                     .Where(d => d.TenantId == tenantId
                         && d.RemediationCaseId == c.Id
                         && d.ApprovalStatus != DecisionApprovalStatus.Rejected
@@ -125,7 +100,7 @@ public class RemediationDecisionQueryService(
                     .OrderByDescending(d => d.CreatedAt)
                     .Select(d => d.MaintenanceWindowDate)
                     .FirstOrDefault(),
-                dbContext.RemediationDecisions.AsNoTracking()
+                LatestExpiryDate = dbContext.RemediationDecisions.AsNoTracking()
                     .Where(d => d.TenantId == tenantId
                         && d.RemediationCaseId == c.Id
                         && d.ApprovalStatus != DecisionApprovalStatus.Rejected
@@ -133,28 +108,28 @@ public class RemediationDecisionQueryService(
                     .OrderByDescending(d => d.CreatedAt)
                     .Select(d => d.ExpiryDate)
                     .FirstOrDefault(),
-                dbContext.RemediationWorkflows.AsNoTracking()
+                ActiveWorkflowId = dbContext.RemediationWorkflows.AsNoTracking()
                     .Where(w => w.TenantId == tenantId
                         && w.RemediationCaseId == c.Id
                         && w.Status == RemediationWorkflowStatus.Active)
                     .OrderByDescending(w => w.UpdatedAt)
                     .Select(w => (Guid?)w.Id)
                     .FirstOrDefault(),
-                dbContext.RemediationWorkflows.AsNoTracking()
+                ActiveWorkflowStage = dbContext.RemediationWorkflows.AsNoTracking()
                     .Where(w => w.TenantId == tenantId
                         && w.RemediationCaseId == c.Id
                         && w.Status == RemediationWorkflowStatus.Active)
                     .OrderByDescending(w => w.UpdatedAt)
                     .Select(w => (RemediationWorkflowStage?)w.CurrentStage)
                     .FirstOrDefault(),
-                dbContext.RemediationWorkflows.AsNoTracking()
+                ActiveWorkflowOwnerTeamId = dbContext.RemediationWorkflows.AsNoTracking()
                     .Where(w => w.TenantId == tenantId
                         && w.RemediationCaseId == c.Id
                         && w.Status == RemediationWorkflowStatus.Active)
                     .OrderByDescending(w => w.UpdatedAt)
-                    .Select(w => w.SoftwareOwnerTeamId)
+                    .Select(w => (Guid?)w.SoftwareOwnerTeamId)
                     .FirstOrDefault(),
-                dbContext.RemediationWorkflows.AsNoTracking()
+                HasAnalystRecommendation = dbContext.RemediationWorkflows.AsNoTracking()
                     .Where(w => w.TenantId == tenantId
                         && w.RemediationCaseId == c.Id
                         && w.Status == RemediationWorkflowStatus.Active)
@@ -162,7 +137,7 @@ public class RemediationDecisionQueryService(
                     .Take(1)
                     .Any(w => dbContext.AnalystRecommendations.AsNoTracking()
                         .Any(r => r.TenantId == tenantId && r.RemediationWorkflowId == w.Id)),
-                dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                CriticalityRank = dbContext.DeviceVulnerabilityExposures.AsNoTracking()
                     .Where(e => e.TenantId == tenantId
                         && e.SoftwareProductId == c.SoftwareProductId
                         && e.Status == ExposureStatus.Open)
@@ -172,7 +147,7 @@ public class RemediationDecisionQueryService(
                         e.Device.Criticality == Criticality.Medium ? 2 :
                         e.Device.Criticality == Criticality.Low ? 1 : 0))
                     .Max() ?? 0,
-                dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                HighestSeverityRank = dbContext.DeviceVulnerabilityExposures.AsNoTracking()
                     .Where(e => e.TenantId == tenantId
                         && e.SoftwareProductId == c.SoftwareProductId
                         && e.Status == ExposureStatus.Open)
@@ -182,45 +157,45 @@ public class RemediationDecisionQueryService(
                         e.Vulnerability.VendorSeverity == Severity.Medium ? 2 :
                         e.Vulnerability.VendorSeverity == Severity.Low ? 1 : 0))
                     .Max() ?? 0,
-                dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                EarliestFirstSeen = dbContext.DeviceVulnerabilityExposures.AsNoTracking()
                     .Where(e => e.TenantId == tenantId
                         && e.SoftwareProductId == c.SoftwareProductId
                         && e.Status == ExposureStatus.Open)
                     .Select(e => (DateTimeOffset?)e.FirstObservedAt)
                     .Min(),
-                dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                OpenAffectedDeviceCount = dbContext.DeviceVulnerabilityExposures.AsNoTracking()
                     .Where(e => e.TenantId == tenantId
                         && e.SoftwareProductId == c.SoftwareProductId
                         && e.Status == ExposureStatus.Open)
                     .Select(e => e.DeviceId)
                     .Distinct()
                     .Count(),
-                dbContext.InstalledSoftware.AsNoTracking()
+                InstalledDeviceCount = dbContext.InstalledSoftware.AsNoTracking()
                     .Where(i => i.TenantId == tenantId && i.SoftwareProductId == c.SoftwareProductId)
                     .Select(i => i.DeviceId)
                     .Distinct()
                     .Count(),
-                dbContext.SoftwareRiskScores.AsNoTracking()
+                RiskScore = dbContext.SoftwareRiskScores.AsNoTracking()
                     .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
                     .Select(s => (decimal?)s.OverallScore)
                     .FirstOrDefault(),
-                dbContext.SoftwareRiskScores.AsNoTracking()
+                RiskAffectedDeviceCount = dbContext.SoftwareRiskScores.AsNoTracking()
                     .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
                     .Select(s => s.AffectedDeviceCount)
                     .FirstOrDefault(),
-                dbContext.SoftwareRiskScores.AsNoTracking()
+                OpenExposureCount = dbContext.SoftwareRiskScores.AsNoTracking()
                     .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
                     .Select(s => s.OpenExposureCount)
                     .FirstOrDefault(),
-                dbContext.SoftwareRiskScores.AsNoTracking()
+                CriticalExposureCount = dbContext.SoftwareRiskScores.AsNoTracking()
                     .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
                     .Select(s => s.CriticalExposureCount)
                     .FirstOrDefault(),
-                dbContext.SoftwareRiskScores.AsNoTracking()
+                HighExposureCount = dbContext.SoftwareRiskScores.AsNoTracking()
                     .Where(s => s.TenantId == tenantId && s.SoftwareProductId == c.SoftwareProductId)
                     .Select(s => s.HighExposureCount)
                     .FirstOrDefault()
-            ));
+            });
 
         if (!string.IsNullOrWhiteSpace(filter.Criticality)
             && TryGetCriticalityRank(filter.Criticality, out var criticalityRank))
