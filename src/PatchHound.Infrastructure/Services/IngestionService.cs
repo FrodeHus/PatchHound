@@ -40,6 +40,7 @@ public class IngestionService
     private readonly IngestionStagingPipeline _stagingPipeline;
     private readonly IngestionSnapshotLifecycle _snapshotLifecycle;
     private readonly IIngestionBulkWriter _bulkWriter;
+    private readonly MaterializedViewRefreshService? _materializedViewRefreshService;
     private readonly ILogger<IngestionService> _logger;
 
     [ActivatorUtilitiesConstructor]
@@ -64,6 +65,7 @@ public class IngestionService
         IngestionStagingPipeline stagingPipeline,
         IngestionSnapshotLifecycle snapshotLifecycle,
         IIngestionBulkWriter bulkWriter,
+        MaterializedViewRefreshService? materializedViewRefreshService,
         ILogger<IngestionService> logger
     )
     {
@@ -87,6 +89,7 @@ public class IngestionService
         _stagingPipeline = stagingPipeline;
         _snapshotLifecycle = snapshotLifecycle;
         _bulkWriter = bulkWriter;
+        _materializedViewRefreshService = materializedViewRefreshService;
         _logger = logger;
     }
 
@@ -647,6 +650,8 @@ public class IngestionService
                                 async () =>
                                 {
                                     await RunExposureDerivationAsync(tenantId, ct);
+                                    if (_materializedViewRefreshService is not null)
+                                        await _materializedViewRefreshService.RefreshOpenExposureVulnSummaryAsync(ct);
                                     return true;
                                 },
                                 source.SourceName,
@@ -688,6 +693,8 @@ public class IngestionService
                                 async () =>
                                 {
                                     await RunExposureDerivationAsync(tenantId, ct);
+                                    if (_materializedViewRefreshService is not null)
+                                        await _materializedViewRefreshService.RefreshOpenExposureVulnSummaryAsync(ct);
                                     return true;
                                 },
                                 source.SourceName,
