@@ -227,8 +227,8 @@ public class RemediationDecisionsControllerTests : IDisposable
             installedSoftware.Id,
             "1.2.3",
             ExposureMatchSource.Product,
-            DateTimeOffset.UtcNow.AddDays(-2)
-        );
+            DateTimeOffset.UtcNow.AddDays(-2),
+            runId: Guid.NewGuid());
         var profile = TenantAiProfileFactory.Create(_tenantId, name: "Threat profile");
         var provider = Substitute.For<IAiReportProvider>();
         provider.ProviderType.Returns(TenantAiProviderType.OpenAi);

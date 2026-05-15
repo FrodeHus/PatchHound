@@ -15,6 +15,7 @@ public class ExposureDerivationService(
     public async Task<ExposureDerivationResult> DeriveForTenantAsync(
         Guid tenantId,
         DateTimeOffset observedAt,
+        Guid runId,
         CancellationToken ct)
     {
         var installs = await db.InstalledSoftware.AsNoTracking()
@@ -73,7 +74,7 @@ public class ExposureDerivationService(
                         // Adding to activePairs prevents the bottom loop from re-resolving.
                         if (exposure.Status != ExposureStatus.Resolved)
                         {
-                            exposure.Reobserve(observedAt);
+                            exposure.Reobserve(observedAt, runId);
                             reobserved++;
                         }
                         continue;
@@ -91,7 +92,8 @@ public class ExposureDerivationService(
                         install.Id,
                         install.MatchedVersion,
                         matchSource,
-                        observedAt);
+                        observedAt,
+                        runId);
 
                     db.DeviceVulnerabilityExposures.Add(fresh);
                     existingByPair[pair] = fresh;

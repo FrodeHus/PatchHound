@@ -139,8 +139,8 @@ public class MyTasksQueryServiceTests : IDisposable
             installedSoftware.Id,
             installedSoftware.Version,
             ExposureMatchSource.Product,
-            DateTimeOffset.UtcNow.AddDays(-2)
-        );
+            DateTimeOffset.UtcNow.AddDays(-2),
+            runId: Guid.NewGuid());
         var riskScore = SoftwareRiskScore.Create(
             _tenantId,
             product.Id,

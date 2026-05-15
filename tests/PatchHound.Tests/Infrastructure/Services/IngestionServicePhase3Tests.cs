@@ -71,7 +71,7 @@ public class IngestionServicePhase3Tests
             materializedViewRefreshService: null,
             NullLogger<IngestionService>.Instance);
 
-        await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);
+        await ingestion.RunExposureDerivationAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
 
         (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().NotBeEmpty();
         (await db.ExposureEpisodes.ToListAsync()).Should().NotBeEmpty();
@@ -291,7 +291,7 @@ public class IngestionServicePhase3Tests
         apps[0].VersionEndIncluding.Should().Be("120.0",
             "applicability should carry the observed product version as the end-including predicate");
 
-        await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);
+        await ingestion.RunExposureDerivationAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
 
         var exposures = await db.DeviceVulnerabilityExposures
             .Where(e => e.Status != ExposureStatus.Resolved)
@@ -325,7 +325,7 @@ public class IngestionServicePhase3Tests
         await db.SaveChangesAsync();
 
         var ingestion = CreateIngestionService(db);
-        await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);
+        await ingestion.RunExposureDerivationAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
 
         var cases = await db.RemediationCases.ToListAsync();
         cases.Should().ContainSingle("an open exposure on the product must auto-create a remediation case");
@@ -333,7 +333,7 @@ public class IngestionServicePhase3Tests
         cases[0].SoftwareProductId.Should().Be(product.Id);
 
         // Running twice must not duplicate.
-        await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);
+        await ingestion.RunExposureDerivationAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
         (await db.RemediationCases.ToListAsync()).Should().ContainSingle(
             "re-running derivation must be idempotent for case creation");
     }

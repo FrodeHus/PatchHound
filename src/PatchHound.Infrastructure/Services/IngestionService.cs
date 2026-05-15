@@ -93,10 +93,10 @@ public class IngestionService
         _logger = logger;
     }
 
-    public async Task RunExposureDerivationAsync(Guid tenantId, CancellationToken ct)
+    public async Task RunExposureDerivationAsync(Guid tenantId, Guid runId, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
-        await _exposureDerivationService.DeriveForTenantAsync(tenantId, now, ct);
+        await _exposureDerivationService.DeriveForTenantAsync(tenantId, now, runId, ct);
         await _dbContext.SaveChangesAsync(ct);
         await _exposureEpisodeService.SyncEpisodesForTenantAsync(tenantId, now, ct);
         await _dbContext.SaveChangesAsync(ct);
@@ -649,7 +649,7 @@ public class IngestionService
                             await ExecuteWithConcurrencyRetryAsync(
                                 async () =>
                                 {
-                                    await RunExposureDerivationAsync(tenantId, ct);
+                                    await RunExposureDerivationAsync(tenantId, run.Id, ct);
                                     if (_materializedViewRefreshService is not null)
                                         await _materializedViewRefreshService.RefreshOpenExposureVulnSummaryAsync(ct);
                                     return true;
@@ -692,7 +692,7 @@ public class IngestionService
                             await ExecuteWithConcurrencyRetryAsync(
                                 async () =>
                                 {
-                                    await RunExposureDerivationAsync(tenantId, ct);
+                                    await RunExposureDerivationAsync(tenantId, run.Id, ct);
                                     if (_materializedViewRefreshService is not null)
                                         await _materializedViewRefreshService.RefreshOpenExposureVulnSummaryAsync(ct);
                                     return true;
@@ -1050,12 +1050,12 @@ public class IngestionService
                 {
                     if (existingExposure.Status == ExposureStatus.Resolved)
                     {
-                        existingExposure.Reopen(now);
+                        existingExposure.Reopen(now, ingestionRunId);
                         openedCount++;
                     }
                     else
                     {
-                        existingExposure.Reobserve(now);
+                        existingExposure.Reobserve(now, ingestionRunId);
                     }
                 }
                 else
@@ -1093,7 +1093,8 @@ public class IngestionService
                         installedSoftwareId: installedSoftwareId,
                         matchedVersion: string.Empty,
                         ExposureMatchSource.Product,
-                        now);
+                        now,
+                        ingestionRunId);
 
                     _dbContext.DeviceVulnerabilityExposures.Add(fresh);
                     existingByPair[pair] = fresh;

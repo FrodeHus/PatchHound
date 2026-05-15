@@ -35,7 +35,7 @@ public class ExposureDerivationServiceTests
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
-        var result = await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        var result = await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
         var exposures = await db.DeviceVulnerabilityExposures.ToListAsync();
@@ -58,9 +58,9 @@ public class ExposureDerivationServiceTests
         await SeedProductKeyedExposureAsync(db, tenantId);
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(5), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(5), Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
         var exposures = await db.DeviceVulnerabilityExposures.ToListAsync();
@@ -76,14 +76,14 @@ public class ExposureDerivationServiceTests
         var (_, _, _, installed) = await SeedProductKeyedExposureAsync(db, tenantId);
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
         db.InstalledSoftware.Remove(installed);
         await db.SaveChangesAsync();
 
         var resolvedAt = DateTimeOffset.UtcNow.AddHours(1);
-        await svc.DeriveForTenantAsync(tenantId, resolvedAt, CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, resolvedAt, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
         var exposures = await db.DeviceVulnerabilityExposures.ToListAsync();
@@ -112,7 +112,7 @@ public class ExposureDerivationServiceTests
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
         var exposure = await db.DeviceVulnerabilityExposures.SingleAsync();
@@ -128,11 +128,11 @@ public class ExposureDerivationServiceTests
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
 
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(1), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(1), Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(2), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(2), Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
         (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().HaveCount(1);
@@ -163,7 +163,7 @@ public class ExposureDerivationServiceTests
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
         var exposures = await db.DeviceVulnerabilityExposures.ToListAsync();
@@ -194,7 +194,7 @@ public class ExposureDerivationServiceTests
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
         (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().BeEmpty(
@@ -223,7 +223,7 @@ public class ExposureDerivationServiceTests
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
         (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().ContainSingle();

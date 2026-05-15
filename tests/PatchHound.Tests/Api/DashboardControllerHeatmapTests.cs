@@ -74,7 +74,8 @@ public class DashboardControllerHeatmapTests : IDisposable
             seed.InstallB.Id,
             "2.0.0",
             ExposureMatchSource.Product,
-            DateTimeOffset.UtcNow));
+            DateTimeOffset.UtcNow,
+            runId: Guid.NewGuid()));
         await _dbContext.SaveChangesAsync();
 
         var action = await _controller.GetHeatmap(new DashboardFilterQuery(), "deviceGroup", CancellationToken.None);

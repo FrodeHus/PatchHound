@@ -69,7 +69,7 @@ public class ExposureEpisodeServiceTests
         await svc.SyncEpisodesForTenantAsync(tenantId, new DateTimeOffset(2026, 4, 5, 0, 0, 0, TimeSpan.Zero), CancellationToken.None);
         await db.SaveChangesAsync();
 
-        exposure.Reobserve(new DateTimeOffset(2026, 4, 20, 0, 0, 0, TimeSpan.Zero));
+        exposure.Reobserve(new DateTimeOffset(2026, 4, 20, 0, 0, 0, TimeSpan.Zero), Guid.NewGuid());
         await db.SaveChangesAsync();
         await svc.SyncEpisodesForTenantAsync(tenantId, new DateTimeOffset(2026, 4, 20, 0, 0, 0, TimeSpan.Zero), CancellationToken.None);
         await db.SaveChangesAsync();
@@ -107,7 +107,8 @@ public class ExposureEpisodeServiceTests
             installed.Id,
             installed.Version,
             ExposureMatchSource.Product,
-            observedAt);
+            observedAt,
+            runId: Guid.NewGuid());
         db.DeviceVulnerabilityExposures.Add(exposure);
         await db.SaveChangesAsync();
         return exposure;
