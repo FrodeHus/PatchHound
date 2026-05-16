@@ -114,22 +114,25 @@ public class PostgresBulkDeviceMergeWriterTests
         await db.SaveChangesAsync();
 
         var observed = DateTimeOffset.UtcNow;
+        var firstRun = Guid.NewGuid();
         var first = await writer.UpsertInstalledSoftwareAsync(new[]
         {
-            new InstalledSoftwareMergeRow(TenantId, deviceId, product.Id, sourceSystemId, "1.0.0", observed),
+            new InstalledSoftwareMergeRow(TenantId, deviceId, product.Id, sourceSystemId, "1.0.0", observed, firstRun),
         }, CancellationToken.None);
         first.Should().Be(1);
 
         var laterObserved = observed.AddMinutes(5);
+        var secondRun = Guid.NewGuid();
         var second = await writer.UpsertInstalledSoftwareAsync(new[]
         {
-            new InstalledSoftwareMergeRow(TenantId, deviceId, product.Id, sourceSystemId, "1.0.0", laterObserved),
+            new InstalledSoftwareMergeRow(TenantId, deviceId, product.Id, sourceSystemId, "1.0.0", laterObserved, secondRun),
         }, CancellationToken.None);
         second.Should().Be(1);
 
         (await db.InstalledSoftware.IgnoreQueryFilters().CountAsync()).Should().Be(1);
         var stored = await db.InstalledSoftware.IgnoreQueryFilters().AsNoTracking().SingleAsync();
         stored.LastSeenAt.Should().BeCloseTo(laterObserved, TimeSpan.FromSeconds(1));
+        stored.LastSeenRunId.Should().Be(secondRun);
     }
 
     private static async Task<Guid> SeedSourceSystem(PatchHoundDbContext db, string key)

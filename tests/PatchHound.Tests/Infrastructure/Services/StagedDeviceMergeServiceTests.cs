@@ -124,6 +124,43 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Merge_resolves_each_staged_software_asset_once()
+    {
+        var runId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        const string softwareExternalId = "defender-sw::contoso_agent::1.2.3";
+
+        var product = SoftwareProduct.Create("Contoso", "Agent", null);
+        _db.SoftwareProducts.Add(product);
+        await _db.SaveChangesAsync();
+
+        var resolver = new CountingSoftwareProductResolver(product);
+        var sut = new StagedDeviceMergeService(
+            _db,
+            resolver,
+            new InMemoryBulkDeviceMergeWriter(_db));
+
+        for (var i = 1; i <= 3; i++)
+        {
+            await SeedStagedDeviceWithSoftwareAsync(
+                runId: runId,
+                tenantId: tenantId,
+                deviceExternalId: $"dev-resolve-00{i}",
+                deviceName: $"resolve-host-0{i}",
+                softwareExternalId: softwareExternalId,
+                softwareAssetName: "Contoso Agent 1.2.3",
+                vendor: "Contoso",
+                productName: "Agent",
+                version: "1.2.3"
+            );
+        }
+
+        await sut.MergeAsync(runId, tenantId, CancellationToken.None);
+
+        resolver.CallCount.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Merge_is_idempotent_on_repeated_run()
     {
         var tenantId = Guid.NewGuid();
@@ -510,5 +547,16 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
         _db.StagedDeviceSoftwareInstallations.Add(stagedLink);
 
         await _db.SaveChangesAsync();
+    }
+
+    private sealed class CountingSoftwareProductResolver(SoftwareProduct product) : ISoftwareProductResolver
+    {
+        public int CallCount { get; private set; }
+
+        public Task<SoftwareProduct> ResolveAsync(SoftwareObservation observation, CancellationToken ct)
+        {
+            CallCount++;
+            return Task.FromResult(product);
+        }
     }
 }

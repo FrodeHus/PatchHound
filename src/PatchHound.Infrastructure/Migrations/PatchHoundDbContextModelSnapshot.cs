@@ -2132,6 +2132,9 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("LastSeenAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("LastSeenRunId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("SoftwareProductId")
                         .HasColumnType("uuid");
 
@@ -2155,6 +2158,8 @@ namespace PatchHound.Infrastructure.Migrations
                     b.HasIndex("SourceSystemId");
 
                     b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "LastSeenRunId");
 
                     b.HasIndex("TenantId", "SoftwareProductId");
 

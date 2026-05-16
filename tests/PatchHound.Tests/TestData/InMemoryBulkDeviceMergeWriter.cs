@@ -115,7 +115,7 @@ internal sealed class InMemoryBulkDeviceMergeWriter(PatchHoundDbContext db) : IB
             var key = (r.TenantId, r.DeviceId, r.SoftwareProductId, r.SourceSystemId, version);
             if (byKey.TryGetValue(key, out var hit))
             {
-                hit.Touch(r.ObservedAt);
+                hit.Touch(r.ObservedAt, r.RunId);
             }
             else
             {
@@ -125,7 +125,8 @@ internal sealed class InMemoryBulkDeviceMergeWriter(PatchHoundDbContext db) : IB
                     softwareProductId: r.SoftwareProductId,
                     sourceSystemId: r.SourceSystemId,
                     version: version,
-                    at: r.ObservedAt == default ? DateTimeOffset.UtcNow : r.ObservedAt);
+                    at: r.ObservedAt == default ? DateTimeOffset.UtcNow : r.ObservedAt,
+                    runId: r.RunId);
                 db.InstalledSoftware.Add(fresh);
                 byKey[key] = fresh;
             }

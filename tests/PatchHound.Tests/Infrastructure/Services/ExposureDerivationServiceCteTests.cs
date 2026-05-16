@@ -45,12 +45,12 @@ public class ExposureDerivationServiceCteTests
         var deviceA = Device.Create(TenantId, source.Id, "dev-a", "Device A", Criticality.Medium);
         var deviceB = Device.Create(TenantId, source.Id, "dev-b", "Device B", Criticality.Medium);
         db.Devices.AddRange(deviceA, deviceB);
+        var runId = Guid.NewGuid();
         db.InstalledSoftware.AddRange(
-            InstalledSoftware.Observe(TenantId, deviceA.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow),
-            InstalledSoftware.Observe(TenantId, deviceB.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow));
+            InstalledSoftware.Observe(TenantId, deviceA.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow, runId),
+            InstalledSoftware.Observe(TenantId, deviceB.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow, runId));
         await db.SaveChangesAsync();
 
-        var runId = Guid.NewGuid();
         var observedAt = DateTimeOffset.UtcNow;
         var svc = new ExposureDerivationService(
             db, NullLogger<ExposureDerivationService>.Instance, new PostgresBulkExposureWriter(db));
@@ -85,7 +85,8 @@ public class ExposureDerivationServiceCteTests
         db.SourceSystems.Add(source);
         var device = Device.Create(TenantId, source.Id, "dev-1", "Device 1", Criticality.Medium);
         db.Devices.Add(device);
-        var installed = InstalledSoftware.Observe(TenantId, device.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow);
+        var firstRun = Guid.NewGuid();
+        var installed = InstalledSoftware.Observe(TenantId, device.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow, firstRun);
         db.InstalledSoftware.Add(installed);
         await db.SaveChangesAsync();
 
@@ -93,7 +94,6 @@ public class ExposureDerivationServiceCteTests
             db, NullLogger<ExposureDerivationService>.Instance, new PostgresBulkExposureWriter(db));
 
         // First run — install present, exposure inserted
-        var firstRun = Guid.NewGuid();
         await svc.DeriveForTenantAsync(TenantId, DateTimeOffset.UtcNow, firstRun, CancellationToken.None);
 
         // Remove the install so the next derive yields zero active pairs for this tenant
@@ -133,13 +133,14 @@ public class ExposureDerivationServiceCteTests
         db.SourceSystems.Add(source);
         var device = Device.Create(TenantId, source.Id, "dev-1", "Device", Criticality.Medium);
         db.Devices.Add(device);
-        db.InstalledSoftware.Add(InstalledSoftware.Observe(TenantId, device.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow));
+        var runId = Guid.NewGuid();
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(TenantId, device.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow, runId));
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(
             db, NullLogger<ExposureDerivationService>.Instance, new PostgresBulkExposureWriter(db));
 
-        var result = await svc.DeriveForTenantAsync(TenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+        var result = await svc.DeriveForTenantAsync(TenantId, DateTimeOffset.UtcNow, runId, CancellationToken.None);
 
         result.Inserted.Should().Be(1);
         var exposure = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().SingleAsync();
@@ -174,16 +175,54 @@ public class ExposureDerivationServiceCteTests
         db.SourceSystems.Add(source);
         var device = Device.Create(TenantId, source.Id, "dev-1", "Device", Criticality.Medium);
         db.Devices.Add(device);
+        var runId = Guid.NewGuid();
         db.InstalledSoftware.Add(InstalledSoftware.Observe(
-            TenantId, device.Id, product.Id, source.Id, "2.0", DateTimeOffset.UtcNow));
+            TenantId, device.Id, product.Id, source.Id, "2.0", DateTimeOffset.UtcNow, runId));
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(
             db, NullLogger<ExposureDerivationService>.Instance, new PostgresBulkExposureWriter(db));
 
-        var result = await svc.DeriveForTenantAsync(TenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+        var result = await svc.DeriveForTenantAsync(TenantId, DateTimeOffset.UtcNow, runId, CancellationToken.None);
 
         result.Inserted.Should().Be(0);
         (await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DeriveForTenantAsync_only_derives_from_installs_seen_in_current_run()
+    {
+        await _fx.ResetAsync();
+        await using var db = _fx.CreateDbContext();
+
+        var product = SoftwareProduct.Create("Acme", "Widget", "cpe:2.3:a:acme:widget:*:*:*:*:*:*:*:*");
+        var vuln = Vulnerability.Create("nvd", "CVE-2026-CTE5", "t", "d", Severity.High, 7.5m, "v", DateTimeOffset.UtcNow);
+        db.SoftwareProducts.Add(product);
+        db.Vulnerabilities.Add(vuln);
+        db.VulnerabilityApplicabilities.Add(VulnerabilityApplicability.Create(
+            vuln.Id, product.Id, null, true, null, null, null, null));
+
+        var source = SourceSystem.Create("test", "Test");
+        db.SourceSystems.Add(source);
+        var staleDevice = Device.Create(TenantId, source.Id, "dev-old", "Old Device", Criticality.Medium);
+        var currentDevice = Device.Create(TenantId, source.Id, "dev-current", "Current Device", Criticality.Medium);
+        db.Devices.AddRange(staleDevice, currentDevice);
+
+        var oldRun = Guid.NewGuid();
+        var currentRun = Guid.NewGuid();
+        db.InstalledSoftware.AddRange(
+            InstalledSoftware.Observe(TenantId, staleDevice.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow.AddHours(-1), oldRun),
+            InstalledSoftware.Observe(TenantId, currentDevice.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow, currentRun));
+        await db.SaveChangesAsync();
+
+        var svc = new ExposureDerivationService(
+            db, NullLogger<ExposureDerivationService>.Instance, new PostgresBulkExposureWriter(db));
+
+        var result = await svc.DeriveForTenantAsync(TenantId, DateTimeOffset.UtcNow, currentRun, CancellationToken.None);
+
+        result.Inserted.Should().Be(1);
+        var exposure = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().SingleAsync();
+        exposure.DeviceId.Should().Be(currentDevice.Id);
+        exposure.LastSeenRunId.Should().Be(currentRun);
     }
 }

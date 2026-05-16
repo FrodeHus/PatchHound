@@ -52,6 +52,37 @@ public class PostgresBulkExposureWriterTests
     }
 
     [Fact]
+    public async Task UpsertAsync_reopens_resolved_exposure_when_reobserved()
+    {
+        await _fx.ResetAsync();
+        await using var db = _fx.CreateDbContext();
+        var (deviceId, vulnId) = await SeedDeviceAndVuln(db);
+        var writer = new PostgresBulkExposureWriter(db);
+
+        var run1 = Guid.NewGuid();
+        await writer.UpsertAsync(new[]
+        {
+            new ExposureUpsertRow(TenantId, deviceId, vulnId, null, null, "1.0", "Cpe", DateTimeOffset.UtcNow, run1),
+        }, CancellationToken.None);
+
+        var run2 = Guid.NewGuid();
+        await writer.ResolveStaleAsync(TenantId, run2, DateTimeOffset.UtcNow.AddMinutes(5), CancellationToken.None);
+
+        var run3 = Guid.NewGuid();
+        var reobservedAt = DateTimeOffset.UtcNow.AddMinutes(10);
+        await writer.UpsertAsync(new[]
+        {
+            new ExposureUpsertRow(TenantId, deviceId, vulnId, null, null, "1.0", "Cpe", reobservedAt, run3),
+        }, CancellationToken.None);
+
+        var stored = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().SingleAsync();
+        stored.Status.Should().Be(ExposureStatus.Open);
+        stored.ResolvedAt.Should().BeNull();
+        stored.LastSeenRunId.Should().Be(run3);
+        stored.LastObservedAt.Should().BeCloseTo(reobservedAt, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
     public async Task ResolveStaleAsync_resolves_only_exposures_not_seen_in_current_run()
     {
         await _fx.ResetAsync();

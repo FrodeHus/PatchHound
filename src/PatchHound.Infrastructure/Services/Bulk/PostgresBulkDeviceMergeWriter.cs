@@ -187,7 +187,8 @@ public sealed class PostgresBulkDeviceMergeWriter(PatchHoundDbContext db) : IBul
                         software_product_id uuid,
                         source_system_id uuid,
                         version text,
-                        observed_at timestamptz
+                        observed_at timestamptz,
+                        run_id uuid
                     ) ON COMMIT DROP;
                     TRUNCATE _installed_software_upsert;
                     """, connection, tx))
@@ -196,7 +197,7 @@ public sealed class PostgresBulkDeviceMergeWriter(PatchHoundDbContext db) : IBul
                 }
 
                 await using (var copy = await connection.BeginBinaryImportAsync(
-                    "COPY _installed_software_upsert (id, tenant_id, device_id, software_product_id, source_system_id, version, observed_at) FROM STDIN (FORMAT BINARY)", ct))
+                    "COPY _installed_software_upsert (id, tenant_id, device_id, software_product_id, source_system_id, version, observed_at, run_id) FROM STDIN (FORMAT BINARY)", ct))
                 {
                     foreach (var r in rows)
                     {
@@ -208,6 +209,7 @@ public sealed class PostgresBulkDeviceMergeWriter(PatchHoundDbContext db) : IBul
                         await copy.WriteAsync(r.SourceSystemId, NpgsqlDbType.Uuid, ct);
                         await copy.WriteAsync(r.Version ?? string.Empty, NpgsqlDbType.Text, ct);
                         await copy.WriteAsync(r.ObservedAt, NpgsqlDbType.TimestampTz, ct);
+                        await copy.WriteAsync(r.RunId, NpgsqlDbType.Uuid, ct);
                     }
                     await copy.CompleteAsync(ct);
                 }
@@ -217,13 +219,14 @@ public sealed class PostgresBulkDeviceMergeWriter(PatchHoundDbContext db) : IBul
                     WITH upsert AS (
                         INSERT INTO "InstalledSoftware"
                             ("Id", "TenantId", "DeviceId", "SoftwareProductId", "SourceSystemId",
-                             "Version", "FirstSeenAt", "LastSeenAt")
+                             "Version", "FirstSeenAt", "LastSeenAt", "LastSeenRunId")
                         SELECT id, tenant_id, device_id, software_product_id, source_system_id,
-                               version, observed_at, observed_at
+                               version, observed_at, observed_at, run_id
                         FROM _installed_software_upsert
                         ON CONFLICT ("TenantId", "DeviceId", "SoftwareProductId", "SourceSystemId", "Version")
                         DO UPDATE SET
-                            "LastSeenAt" = GREATEST(EXCLUDED."LastSeenAt", "InstalledSoftware"."LastSeenAt")
+                            "LastSeenAt" = GREATEST(EXCLUDED."LastSeenAt", "InstalledSoftware"."LastSeenAt"),
+                            "LastSeenRunId" = EXCLUDED."LastSeenRunId"
                         RETURNING 1
                     )
                     SELECT COUNT(*) FROM upsert;
@@ -285,6 +288,10 @@ public sealed class PostgresBulkDeviceMergeWriter(PatchHoundDbContext db) : IBul
             if (r.Version?.Length > 128)
                 throw new ArgumentException(
                     $"InstalledSoftware.Version exceeds 128 chars ({r.Version.Length}) for device {r.DeviceId}.",
+                    nameof(rows));
+            if (r.RunId == Guid.Empty)
+                throw new ArgumentException(
+                    $"InstalledSoftware.RunId is required for device {r.DeviceId}.",
                     nameof(rows));
         }
     }

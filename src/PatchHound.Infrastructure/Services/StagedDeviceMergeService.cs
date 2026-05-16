@@ -81,6 +81,29 @@ public class StagedDeviceMergeService(
         var sourceSystems = await db
             .SourceSystems.ToDictionaryAsync(s => s.Key, StringComparer.Ordinal, ct);
 
+        var softwareProductsByExternalId = new Dictionary<string, SoftwareProduct>(StringComparer.OrdinalIgnoreCase);
+        foreach (var stagedSoftwareAsset in stagedSoftwareByExternalId.Values)
+        {
+            var normalizedSourceKey = stagedSoftwareAsset.SourceKey.Trim().ToLowerInvariant();
+            if (!sourceSystems.TryGetValue(normalizedSourceKey, out var sourceSystem))
+            {
+                throw new InvalidOperationException(
+                    $"Unknown source system key '{stagedSoftwareAsset.SourceKey}'. Seed it before ingesting."
+                );
+            }
+
+            var (vendor, productName, _) = ExtractSoftwareIdentity(stagedSoftwareAsset);
+            softwareProductsByExternalId[stagedSoftwareAsset.ExternalId] = await softwareResolver.ResolveAsync(
+                new SoftwareObservation(
+                    SourceSystemId: sourceSystem.Id,
+                    ExternalId: stagedSoftwareAsset.ExternalId,
+                    Vendor: vendor,
+                    Name: productName
+                ),
+                ct
+            );
+        }
+
         // 5. Pre-load all existing devices for the staged external IDs to avoid N+1 SELECTs.
         //    Key: (SourceSystemId, ExternalId) — handles runs that span multiple source systems.
         //    Use AsNoTracking — the bulk writer is the persistence boundary, not EF change tracking.
@@ -194,17 +217,8 @@ public class StagedDeviceMergeService(
                     continue;
                 }
 
-                var (vendor, productName, version) = ExtractSoftwareIdentity(stagedSoftwareAsset);
-
-                var product = await softwareResolver.ResolveAsync(
-                    new SoftwareObservation(
-                        SourceSystemId: sourceSystem.Id,
-                        ExternalId: stagedSoftwareAsset.ExternalId,
-                        Vendor: vendor,
-                        Name: productName
-                    ),
-                    ct
-                );
+                var (_, _, version) = ExtractSoftwareIdentity(stagedSoftwareAsset);
+                var product = softwareProductsByExternalId[stagedSoftwareAsset.ExternalId];
 
                 var normalizedVersion = version?.Trim() ?? string.Empty;
                 var key = (canonicalDeviceId, product.Id, sourceSystem.Id, normalizedVersion);
@@ -222,7 +236,8 @@ public class StagedDeviceMergeService(
                     SoftwareProductId: product.Id,
                     SourceSystemId: sourceSystem.Id,
                     Version: normalizedVersion,
-                    ObservedAt: observedAt));
+                    ObservedAt: observedAt,
+                    RunId: ingestionRunId));
 
                 if (existingInstalledKeys.Contains(key))
                 {

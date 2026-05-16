@@ -82,12 +82,8 @@ public sealed class PostgresBulkExposureWriter(PatchHoundDbContext db) : IBulkEx
                         ON CONFLICT ("TenantId", "DeviceId", "VulnerabilityId")
                         DO UPDATE SET
                             "LastObservedAt" = GREATEST(EXCLUDED."LastObservedAt", "DeviceVulnerabilityExposures"."LastObservedAt"),
-                            "Status"         = CASE WHEN "DeviceVulnerabilityExposures"."Status" = 'Resolved'
-                                                    THEN 'Resolved'
-                                                    ELSE 'Open' END,
-                            "ResolvedAt"     = CASE WHEN "DeviceVulnerabilityExposures"."Status" = 'Resolved'
-                                                    THEN "DeviceVulnerabilityExposures"."ResolvedAt"
-                                                    ELSE NULL END,
+                            "Status"         = 'Open',
+                            "ResolvedAt"     = NULL,
                             "LastSeenRunId"  = EXCLUDED."LastSeenRunId"
                         RETURNING (xmax = 0) AS inserted
                     )

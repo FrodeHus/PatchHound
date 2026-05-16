@@ -6,4 +6,5 @@ public sealed record InstalledSoftwareMergeRow(
     Guid SoftwareProductId,
     Guid SourceSystemId,
     string Version,
-    DateTimeOffset ObservedAt);
+    DateTimeOffset ObservedAt,
+    Guid RunId);

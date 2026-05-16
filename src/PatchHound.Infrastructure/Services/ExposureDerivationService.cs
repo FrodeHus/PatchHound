@@ -39,7 +39,7 @@ public class ExposureDerivationService(
         Guid runId,
         CancellationToken ct)
     {
-        var derived = await LoadDerivedExposuresAsync(tenantId, ct);
+        var derived = await LoadDerivedExposuresAsync(tenantId, runId, ct);
 
         var rows = new List<ExposureUpsertRow>(derived.Count);
         foreach (var d in derived)
@@ -88,18 +88,18 @@ public class ExposureDerivationService(
     /// PostgreSQL. Falls back to a LINQ-shaped equivalent for the EF Core InMemory
     /// provider (used by legacy InMemory tests). Both paths emit the same row shape.
     /// </summary>
-    private async Task<List<DerivedExposureRow>> LoadDerivedExposuresAsync(Guid tenantId, CancellationToken ct)
+    private async Task<List<DerivedExposureRow>> LoadDerivedExposuresAsync(Guid tenantId, Guid runId, CancellationToken ct)
     {
         var provider = db.Database.ProviderName;
         if (provider == "Microsoft.EntityFrameworkCore.InMemory")
         {
-            return await LoadDerivedExposuresInMemoryAsync(tenantId, ct);
+            return await LoadDerivedExposuresInMemoryAsync(tenantId, runId, ct);
         }
 
-        return await LoadDerivedExposuresPostgresAsync(tenantId, ct);
+        return await LoadDerivedExposuresPostgresAsync(tenantId, runId, ct);
     }
 
-    private async Task<List<DerivedExposureRow>> LoadDerivedExposuresPostgresAsync(Guid tenantId, CancellationToken ct)
+    private async Task<List<DerivedExposureRow>> LoadDerivedExposuresPostgresAsync(Guid tenantId, Guid runId, CancellationToken ct)
     {
         // Single CTE — joins active installs to applicabilities by SoftwareProductId
         // first, with a CPE-equality fallback when the applicability has no product
@@ -124,6 +124,7 @@ public class ExposureDerivationService(
                 FROM "InstalledSoftware" i
                 LEFT JOIN "SoftwareProducts" p ON p."Id" = i."SoftwareProductId"
                 WHERE i."TenantId" = @tenantId
+                  AND i."LastSeenRunId" = @runId
             ),
             applicable AS (
                 SELECT a."Id" AS applicability_id,
@@ -172,6 +173,7 @@ public class ExposureDerivationService(
             // explicit transaction because temp tables and atomicity require it.
             await using var cmd = new NpgsqlCommand(sql, connection);
             cmd.Parameters.AddWithValue("tenantId", tenantId);
+            cmd.Parameters.AddWithValue("runId", runId);
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
@@ -201,10 +203,10 @@ public class ExposureDerivationService(
     /// equality when the applicability has no product key. Range predicates are
     /// applied later by the caller via <see cref="VersionMatches"/>.
     /// </summary>
-    private async Task<List<DerivedExposureRow>> LoadDerivedExposuresInMemoryAsync(Guid tenantId, CancellationToken ct)
+    private async Task<List<DerivedExposureRow>> LoadDerivedExposuresInMemoryAsync(Guid tenantId, Guid runId, CancellationToken ct)
     {
         var installs = await db.InstalledSoftware.AsNoTracking()
-            .Where(i => i.TenantId == tenantId)
+            .Where(i => i.TenantId == tenantId && i.LastSeenRunId == runId)
             .Select(i => new
             {
                 i.Id,

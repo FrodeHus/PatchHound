@@ -18,6 +18,7 @@ public class InstalledSoftwareConfiguration : IEntityTypeConfiguration<Installed
             i.Version
         }).IsUnique();
         builder.HasIndex(i => new { i.TenantId, i.SoftwareProductId });
+        builder.HasIndex(i => new { i.TenantId, i.LastSeenRunId });
         builder.HasIndex(i => i.TenantId);
         builder.Property(i => i.Version).HasMaxLength(128).IsRequired();
 

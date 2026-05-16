@@ -30,12 +30,13 @@ public class ExposureDerivationServiceTests
         db.SourceSystems.Add(sourceSystem);
         var device = Device.Create(tenantId, sourceSystem.Id, "dev-1", "Device 1", Criticality.Medium);
         db.Devices.Add(device);
-        var installed = InstalledSoftware.Observe(tenantId, device.Id, product.Id, sourceSystem.Id, "1.2.3", DateTimeOffset.UtcNow);
+        var runId = Guid.NewGuid();
+        var installed = InstalledSoftware.Observe(tenantId, device.Id, product.Id, sourceSystem.Id, "1.2.3", DateTimeOffset.UtcNow, runId);
         db.InstalledSoftware.Add(installed);
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
-        var result = await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+        var result = await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, runId, CancellationToken.None);
         await db.SaveChangesAsync();
 
         var exposures = await db.DeviceVulnerabilityExposures.ToListAsync();
@@ -55,12 +56,13 @@ public class ExposureDerivationServiceTests
     {
         var tenantId = Guid.NewGuid();
         await using var db = await CreateTenantDbAsync(tenantId);
-        await SeedProductKeyedExposureAsync(db, tenantId);
+        var runId = Guid.NewGuid();
+        await SeedProductKeyedExposureAsync(db, tenantId, runId);
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, runId, CancellationToken.None);
         await db.SaveChangesAsync();
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(5), Guid.NewGuid(), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(5), runId, CancellationToken.None);
         await db.SaveChangesAsync();
 
         var exposures = await db.DeviceVulnerabilityExposures.ToListAsync();
@@ -73,10 +75,11 @@ public class ExposureDerivationServiceTests
     {
         var tenantId = Guid.NewGuid();
         await using var db = await CreateTenantDbAsync(tenantId);
-        var (_, _, _, installed) = await SeedProductKeyedExposureAsync(db, tenantId);
+        var firstRun = Guid.NewGuid();
+        var (_, _, _, installed) = await SeedProductKeyedExposureAsync(db, tenantId, firstRun);
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, firstRun, CancellationToken.None);
         await db.SaveChangesAsync();
 
         db.InstalledSoftware.Remove(installed);
@@ -108,11 +111,12 @@ public class ExposureDerivationServiceTests
         db.SourceSystems.Add(src);
         var device = Device.Create(tenantId, src.Id, "dev-1", "Device", Criticality.Medium);
         db.Devices.Add(device);
-        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "1.0", DateTimeOffset.UtcNow));
+        var runId = Guid.NewGuid();
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "1.0", DateTimeOffset.UtcNow, runId));
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, runId, CancellationToken.None);
         await db.SaveChangesAsync();
 
         var exposure = await db.DeviceVulnerabilityExposures.SingleAsync();
@@ -124,15 +128,16 @@ public class ExposureDerivationServiceTests
     {
         var tenantId = Guid.NewGuid();
         await using var db = await CreateTenantDbAsync(tenantId);
-        await SeedProductKeyedExposureAsync(db, tenantId);
+        var runId = Guid.NewGuid();
+        await SeedProductKeyedExposureAsync(db, tenantId, runId);
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
 
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, runId, CancellationToken.None);
         await db.SaveChangesAsync();
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(1), Guid.NewGuid(), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(1), runId, CancellationToken.None);
         await db.SaveChangesAsync();
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(2), Guid.NewGuid(), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(2), runId, CancellationToken.None);
         await db.SaveChangesAsync();
 
         (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().HaveCount(1);
@@ -158,12 +163,13 @@ public class ExposureDerivationServiceTests
         db.Vulnerabilities.Add(vuln);
         db.VulnerabilityApplicabilities.Add(VulnerabilityApplicability.Create(vuln.Id, product.Id, null, true, null, null, null, null));
 
-        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, deviceA.Id, product.Id, srcA.Id, "1.0", DateTimeOffset.UtcNow));
-        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, deviceB.Id, product.Id, srcB.Id, "1.0", DateTimeOffset.UtcNow));
+        var runId = Guid.NewGuid();
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, deviceA.Id, product.Id, srcA.Id, "1.0", DateTimeOffset.UtcNow, runId));
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, deviceB.Id, product.Id, srcB.Id, "1.0", DateTimeOffset.UtcNow, runId));
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, runId, CancellationToken.None);
         await db.SaveChangesAsync();
 
         var exposures = await db.DeviceVulnerabilityExposures.ToListAsync();
@@ -190,11 +196,12 @@ public class ExposureDerivationServiceTests
         var device = Device.Create(tenantId, src.Id, "dev-1", "Device", Criticality.Medium);
         db.Devices.Add(device);
         // Installed 121.0 is NEWER than end-including predicate, so must not match
-        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "121.0", DateTimeOffset.UtcNow));
+        var runId = Guid.NewGuid();
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "121.0", DateTimeOffset.UtcNow, runId));
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, runId, CancellationToken.None);
         await db.SaveChangesAsync();
 
         (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().BeEmpty(
@@ -219,11 +226,12 @@ public class ExposureDerivationServiceTests
         db.SourceSystems.Add(src);
         var device = Device.Create(tenantId, src.Id, "dev-1", "Device", Criticality.Medium);
         db.Devices.Add(device);
-        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "1.7", DateTimeOffset.UtcNow));
+        var runId = Guid.NewGuid();
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "1.7", DateTimeOffset.UtcNow, runId));
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
-        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, runId, CancellationToken.None);
         await db.SaveChangesAsync();
 
         (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().ContainSingle();
@@ -231,7 +239,8 @@ public class ExposureDerivationServiceTests
 
     private static async Task<(SoftwareProduct Product, Vulnerability Vulnerability, Device Device, InstalledSoftware InstalledSoftware)> SeedProductKeyedExposureAsync(
         PatchHoundDbContext db,
-        Guid tenantId)
+        Guid tenantId,
+        Guid runId)
     {
         var product = SoftwareProduct.Create("Acme", "Widget", "cpe:2.3:a:acme:widget:*:*:*:*:*:*:*:*");
         var vuln = Vulnerability.Create("nvd", "CVE-2026-SEED", "t", "d", Severity.High, 7m, "v", DateTimeOffset.UtcNow);
@@ -244,7 +253,7 @@ public class ExposureDerivationServiceTests
         db.SourceSystems.Add(src);
         var device = Device.Create(tenantId, src.Id, "dev-seed", "Seed", Criticality.Medium);
         db.Devices.Add(device);
-        var installed = InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "1.2.3", DateTimeOffset.UtcNow);
+        var installed = InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "1.2.3", DateTimeOffset.UtcNow, runId);
         db.InstalledSoftware.Add(installed);
         await db.SaveChangesAsync();
         return (product, vuln, device, installed);

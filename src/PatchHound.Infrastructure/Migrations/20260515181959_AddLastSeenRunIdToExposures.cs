@@ -17,9 +17,20 @@ namespace PatchHound.Infrastructure.Migrations
                 type: "uuid",
                 nullable: true);
 
+            migrationBuilder.AddColumn<Guid>(
+                name: "LastSeenRunId",
+                table: "InstalledSoftware",
+                type: "uuid",
+                nullable: true);
+
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceVulnerabilityExposures_TenantId_LastSeenRunId",
                 table: "DeviceVulnerabilityExposures",
+                columns: new[] { "TenantId", "LastSeenRunId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_InstalledSoftware_TenantId_LastSeenRunId",
+                table: "InstalledSoftware",
                 columns: new[] { "TenantId", "LastSeenRunId" });
         }
 
@@ -30,9 +41,17 @@ namespace PatchHound.Infrastructure.Migrations
                 name: "IX_DeviceVulnerabilityExposures_TenantId_LastSeenRunId",
                 table: "DeviceVulnerabilityExposures");
 
+            migrationBuilder.DropIndex(
+                name: "IX_InstalledSoftware_TenantId_LastSeenRunId",
+                table: "InstalledSoftware");
+
             migrationBuilder.DropColumn(
                 name: "LastSeenRunId",
                 table: "DeviceVulnerabilityExposures");
+
+            migrationBuilder.DropColumn(
+                name: "LastSeenRunId",
+                table: "InstalledSoftware");
         }
     }
 }
