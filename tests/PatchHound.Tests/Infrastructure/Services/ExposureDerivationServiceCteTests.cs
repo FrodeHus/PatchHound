@@ -145,4 +145,45 @@ public class ExposureDerivationServiceCteTests
         var exposure = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().SingleAsync();
         exposure.MatchSource.Should().Be(ExposureMatchSource.Cpe);
     }
+
+    /// <summary>
+    /// Proves <see cref="ExposureDerivationService.VersionMatches"/> runs over the
+    /// Postgres CTE output: the CTE itself does not encode version ranges (no semver
+    /// in pure SQL), so any filtering at this layer must happen client-side after the
+    /// reader yields rows. Without that, the installed version "2.0" would falsely
+    /// produce an exposure against an applicability capped at VersionEndIncluding="1.5".
+    /// </summary>
+    [Fact]
+    public async Task DeriveForTenantAsync_skips_exposure_when_installed_version_is_above_VersionEndIncluding()
+    {
+        await _fx.ResetAsync();
+        await using var db = _fx.CreateDbContext();
+
+        var product = SoftwareProduct.Create("Acme", "Widget", "cpe:2.3:a:acme:widget:*:*:*:*:*:*:*:*");
+        var vuln = Vulnerability.Create("nvd", "CVE-2026-CTE4", "t", "d", Severity.High, 7.5m, "v", DateTimeOffset.UtcNow);
+        db.SoftwareProducts.Add(product);
+        db.Vulnerabilities.Add(vuln);
+        db.VulnerabilityApplicabilities.Add(VulnerabilityApplicability.Create(
+            vuln.Id, product.Id, null, vulnerable: true,
+            versionStartIncluding: null,
+            versionStartExcluding: null,
+            versionEndIncluding: "1.5",
+            versionEndExcluding: null));
+
+        var source = SourceSystem.Create("test", "Test");
+        db.SourceSystems.Add(source);
+        var device = Device.Create(TenantId, source.Id, "dev-1", "Device", Criticality.Medium);
+        db.Devices.Add(device);
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(
+            TenantId, device.Id, product.Id, source.Id, "2.0", DateTimeOffset.UtcNow));
+        await db.SaveChangesAsync();
+
+        var svc = new ExposureDerivationService(
+            db, NullLogger<ExposureDerivationService>.Instance, new PostgresBulkExposureWriter(db));
+
+        var result = await svc.DeriveForTenantAsync(TenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
+
+        result.Inserted.Should().Be(0);
+        (await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().CountAsync()).Should().Be(0);
+    }
 }

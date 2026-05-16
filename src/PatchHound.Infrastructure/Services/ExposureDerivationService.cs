@@ -106,6 +106,14 @@ public class ExposureDerivationService(
         // key. Range predicates and Version.TryParse can't be expressed in pure SQL
         // (we'd need a semver parser) so VersionMatches stays client-side and runs
         // over this already-narrowed output.
+        //
+        // EF global query filter audit (raw SQL bypasses HasQueryFilter):
+        //   - InstalledSoftware: filter is `IsSystemContext || AccessibleTenantIds.Contains(TenantId)`.
+        //     Covered by the explicit `i."TenantId" = @tenantId` predicate below — this method
+        //     is invoked per-tenant by the caller (which itself has authority to resolve tenantId).
+        //   - SoftwareProducts: no global query filter (canonical/shared catalog entity).
+        //   - VulnerabilityApplicabilities: no global query filter (canonical/shared catalog entity).
+        // No additional predicates are needed.
         const string sql = """
             WITH active_installs AS (
                 SELECT i."Id" AS installed_software_id,
@@ -134,6 +142,9 @@ public class ExposureDerivationService(
                    ai.software_product_id,
                    ai.installed_software_id,
                    ai.matched_version,
+                   -- match_source string values MUST match nameof(ExposureMatchSource.Product)
+                   -- and nameof(ExposureMatchSource.Cpe); kept in sync with the LINQ fallback
+                   -- which uses nameof(...) directly.
                    CASE WHEN app.software_product_id IS NOT NULL THEN 'Product' ELSE 'Cpe' END AS match_source,
                    app.version_start_including,
                    app.version_start_excluding,
@@ -154,8 +165,13 @@ public class ExposureDerivationService(
         if (!wasOpen) await connection.OpenAsync(ct);
         try
         {
+            // Intentional: no explicit transaction. This is a single SELECT statement;
+            // PostgreSQL's default READ COMMITTED isolation provides a consistent
+            // snapshot within the statement. Contrast with PostgresBulkExposureWriter,
+            // which wraps multiple statements (temp table + insert/update) in an
+            // explicit transaction because temp tables and atomicity require it.
             await using var cmd = new NpgsqlCommand(sql, connection);
-            cmd.Parameters.AddWithValue("@tenantId", tenantId);
+            cmd.Parameters.AddWithValue("tenantId", tenantId);
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
