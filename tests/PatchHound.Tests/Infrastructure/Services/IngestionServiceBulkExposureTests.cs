@@ -87,7 +87,7 @@ public class IngestionServiceBulkExposureTests
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IStagedCloudApplicationMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
-            new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance),
+            new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, bulkExposureWriter),
             new ExposureEpisodeService(db),
             new ExposureAssessmentService(db, new EnvironmentalSeverityCalculator()),
             new RiskScoreService(db, NullLogger<RiskScoreService>.Instance),

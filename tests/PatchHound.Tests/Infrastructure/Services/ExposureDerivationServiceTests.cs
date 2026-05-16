@@ -34,7 +34,7 @@ public class ExposureDerivationServiceTests
         db.InstalledSoftware.Add(installed);
         await db.SaveChangesAsync();
 
-        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
         var result = await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
@@ -57,7 +57,7 @@ public class ExposureDerivationServiceTests
         await using var db = await CreateTenantDbAsync(tenantId);
         await SeedProductKeyedExposureAsync(db, tenantId);
 
-        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
         await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
         await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(5), Guid.NewGuid(), CancellationToken.None);
@@ -75,7 +75,7 @@ public class ExposureDerivationServiceTests
         await using var db = await CreateTenantDbAsync(tenantId);
         var (_, _, _, installed) = await SeedProductKeyedExposureAsync(db, tenantId);
 
-        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
         await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
@@ -111,7 +111,7 @@ public class ExposureDerivationServiceTests
         db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "1.0", DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
 
-        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
         await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
@@ -126,7 +126,7 @@ public class ExposureDerivationServiceTests
         await using var db = await CreateTenantDbAsync(tenantId);
         await SeedProductKeyedExposureAsync(db, tenantId);
 
-        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
 
         await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
@@ -162,7 +162,7 @@ public class ExposureDerivationServiceTests
         db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, deviceB.Id, product.Id, srcB.Id, "1.0", DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
 
-        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
         await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
@@ -193,7 +193,7 @@ public class ExposureDerivationServiceTests
         db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "121.0", DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
 
-        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
         await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
@@ -222,7 +222,7 @@ public class ExposureDerivationServiceTests
         db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "1.7", DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
 
-        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance, new InMemoryBulkExposureWriter(db));
         await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
 
