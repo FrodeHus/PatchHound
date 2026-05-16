@@ -82,9 +82,11 @@ internal sealed class CanonicalSeed
 
         var now = DateTimeOffset.UtcNow;
         var exposureA = DeviceVulnerabilityExposure.Observe(tenantId, deviceA.Id, vuln1.Id,
-            productA.Id, installA.Id, "1.0.0", ExposureMatchSource.Product, now);
+            productA.Id, installA.Id, "1.0.0", ExposureMatchSource.Product, now,
+            runId: Guid.NewGuid());
         var exposureB = DeviceVulnerabilityExposure.Observe(tenantId, deviceB.Id, vuln2.Id,
-            productB.Id, installB.Id, "2.0.0", ExposureMatchSource.Product, now);
+            productB.Id, installB.Id, "2.0.0", ExposureMatchSource.Product, now,
+            runId: Guid.NewGuid());
         db.DeviceVulnerabilityExposures.AddRange(exposureA, exposureB);
         await db.SaveChangesAsync();
 

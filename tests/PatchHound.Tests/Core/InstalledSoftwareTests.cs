@@ -13,8 +13,9 @@ public class InstalledSoftwareTests
         var productId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
         var at = DateTimeOffset.UtcNow;
+        var runId = Guid.NewGuid();
 
-        var i = InstalledSoftware.Observe(tenantId, deviceId, productId, sourceId, version: "1.2.3", at);
+        var i = InstalledSoftware.Observe(tenantId, deviceId, productId, sourceId, version: "1.2.3", at, runId);
 
         Assert.Equal(tenantId, i.TenantId);
         Assert.Equal(deviceId, i.DeviceId);
@@ -23,6 +24,7 @@ public class InstalledSoftwareTests
         Assert.Equal("1.2.3", i.Version);
         Assert.Equal(at, i.FirstSeenAt);
         Assert.Equal(at, i.LastSeenAt);
+        Assert.Equal(runId, i.LastSeenRunId);
     }
 
     [Fact]
@@ -38,9 +40,11 @@ public class InstalledSoftwareTests
         var first = DateTimeOffset.UtcNow.AddDays(-1);
         var i = InstalledSoftware.Observe(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "1.0", first);
         var next = DateTimeOffset.UtcNow;
-        i.Touch(next);
+        var runId = Guid.NewGuid();
+        i.Touch(next, runId);
         Assert.Equal(first, i.FirstSeenAt);
         Assert.Equal(next, i.LastSeenAt);
+        Assert.Equal(runId, i.LastSeenRunId);
     }
 
     [Fact]

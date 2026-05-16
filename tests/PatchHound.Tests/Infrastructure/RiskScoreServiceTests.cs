@@ -54,8 +54,8 @@ public class RiskScoreServiceTests : IDisposable
         await _dbContext.AddRangeAsync(installA, installB);
         await _dbContext.SaveChangesAsync();
 
-        var exposureA = DeviceVulnerabilityExposure.Observe(_tenantId, deviceA.Id, vulnA.Id, installA.SoftwareProductId, installA.Id, installA.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow);
-        var exposureB = DeviceVulnerabilityExposure.Observe(_tenantId, deviceB.Id, vulnB.Id, installB.SoftwareProductId, installB.Id, installB.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow);
+        var exposureA = DeviceVulnerabilityExposure.Observe(_tenantId, deviceA.Id, vulnA.Id, installA.SoftwareProductId, installA.Id, installA.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow, Guid.NewGuid());
+        var exposureB = DeviceVulnerabilityExposure.Observe(_tenantId, deviceB.Id, vulnB.Id, installB.SoftwareProductId, installB.Id, installB.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow, Guid.NewGuid());
         await _dbContext.AddRangeAsync(exposureA, exposureB);
         await _dbContext.SaveChangesAsync();
 

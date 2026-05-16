@@ -6,14 +6,21 @@ namespace PatchHound.Infrastructure.Services;
 public class MaterializedViewRefreshService(PatchHoundDbContext dbContext)
 {
     public Task RefreshExposureLatestAssessmentAsync(CancellationToken ct) =>
-        dbContext.Database.ExecuteSqlRawAsync(
-            "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_exposure_latest_assessment", ct);
+        RefreshAsync("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_exposure_latest_assessment", ct);
 
     public Task RefreshAlternateMitigationVulnIdsAsync(CancellationToken ct) =>
-        dbContext.Database.ExecuteSqlRawAsync(
-            "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_alternate_mitigation_vuln_ids", ct);
+        RefreshAsync("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_alternate_mitigation_vuln_ids", ct);
 
     public Task RefreshOpenExposureVulnSummaryAsync(CancellationToken ct) =>
-        dbContext.Database.ExecuteSqlRawAsync(
-            "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_open_exposure_vuln_summary", ct);
+        RefreshAsync("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_open_exposure_vuln_summary", ct);
+
+    private Task RefreshAsync(string sql, CancellationToken ct)
+    {
+        if (dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            return Task.CompletedTask;
+        }
+
+        return dbContext.Database.ExecuteSqlRawAsync(sql, ct);
+    }
 }

@@ -8,6 +8,7 @@ using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Services.Inventory;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Infrastructure.Services;
 
@@ -26,8 +27,8 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
 
         _sut = new StagedDeviceMergeService(
             _db,
-            new DeviceResolver(_db),
-            new SoftwareProductResolver(_db)
+            new SoftwareProductResolver(_db),
+            new InMemoryBulkDeviceMergeWriter(_db)
         );
     }
 
@@ -120,6 +121,83 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
         installed.Select(item => item.DeviceId).Should().BeEquivalentTo(devices.Select(device => device.Id));
         installed.Select(item => item.SoftwareProductId).Distinct().Should().ContainSingle().Which.Should().Be(products[0].Id);
         installed.Should().OnlyContain(item => item.Version == "1.2.3");
+    }
+
+    [Fact]
+    public async Task Merge_resolves_each_staged_software_asset_once()
+    {
+        var runId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        const string softwareExternalId = "defender-sw::contoso_agent::1.2.3";
+
+        var product = SoftwareProduct.Create("Contoso", "Agent", null);
+        _db.SoftwareProducts.Add(product);
+        await _db.SaveChangesAsync();
+
+        var resolver = new CountingSoftwareProductResolver(product);
+        var sut = new StagedDeviceMergeService(
+            _db,
+            resolver,
+            new InMemoryBulkDeviceMergeWriter(_db));
+
+        for (var i = 1; i <= 3; i++)
+        {
+            await SeedStagedDeviceWithSoftwareAsync(
+                runId: runId,
+                tenantId: tenantId,
+                deviceExternalId: $"dev-resolve-00{i}",
+                deviceName: $"resolve-host-0{i}",
+                softwareExternalId: softwareExternalId,
+                softwareAssetName: "Contoso Agent 1.2.3",
+                vendor: "Contoso",
+                productName: "Agent",
+                version: "1.2.3"
+            );
+        }
+
+        await sut.MergeAsync(runId, tenantId, CancellationToken.None);
+
+        resolver.CallCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Merge_does_not_resolve_unlinked_staged_software_assets()
+    {
+        var runId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+
+        var product = SoftwareProduct.Create("Contoso", "Agent", null);
+        _db.SoftwareProducts.Add(product);
+        await _db.SaveChangesAsync();
+
+        var resolver = new CountingSoftwareProductResolver(product);
+        var sut = new StagedDeviceMergeService(
+            _db,
+            resolver,
+            new InMemoryBulkDeviceMergeWriter(_db));
+
+        await SeedStagedDeviceWithSoftwareAsync(
+            runId: runId,
+            tenantId: tenantId,
+            deviceExternalId: "dev-linked",
+            deviceName: "linked-host",
+            softwareExternalId: "defender-sw::contoso_agent::1.2.3",
+            softwareAssetName: "Contoso Agent 1.2.3",
+            vendor: "Contoso",
+            productName: "Agent",
+            version: "1.2.3");
+        await SeedStagedSoftwareOnlyAsync(
+            runId,
+            tenantId,
+            softwareExternalId: "defender-sw::unlinked_tool::9.9.9",
+            softwareAssetName: "Unlinked Tool",
+            vendor: "Contoso",
+            productName: "Unlinked Tool",
+            version: "9.9.9");
+
+        await sut.MergeAsync(runId, tenantId, CancellationToken.None);
+
+        resolver.CallCount.Should().Be(1);
     }
 
     [Fact]
@@ -509,5 +587,56 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
         _db.StagedDeviceSoftwareInstallations.Add(stagedLink);
 
         await _db.SaveChangesAsync();
+    }
+
+    private async Task SeedStagedSoftwareOnlyAsync(
+        Guid runId,
+        Guid tenantId,
+        string softwareExternalId,
+        string softwareAssetName,
+        string vendor,
+        string productName,
+        string version)
+    {
+        var softwareMetadata = JsonSerializer.Serialize(
+            new
+            {
+                softwareId = softwareExternalId,
+                name = productName,
+                vendor = vendor,
+                version = version,
+                derivedFromSoftwareInventory = true,
+            }
+        );
+        var softwareAsset = new IngestionAsset(
+            ExternalId: softwareExternalId,
+            Name: softwareAssetName,
+            AssetType: AssetType.Software,
+            Description: softwareAssetName,
+            Metadata: softwareMetadata
+        );
+        var stagedSoftware = StagedDevice.Create(
+            ingestionRunId: runId,
+            tenantId: tenantId,
+            sourceKey: "defender",
+            externalId: softwareExternalId,
+            name: softwareAssetName,
+            assetType: AssetType.Software,
+            payloadJson: JsonSerializer.Serialize(softwareAsset),
+            stagedAt: DateTimeOffset.UtcNow
+        );
+        _db.StagedDevices.Add(stagedSoftware);
+        await _db.SaveChangesAsync();
+    }
+
+    private sealed class CountingSoftwareProductResolver(SoftwareProduct product) : ISoftwareProductResolver
+    {
+        public int CallCount { get; private set; }
+
+        public Task<SoftwareProduct> ResolveAsync(SoftwareObservation observation, CancellationToken ct)
+        {
+            CallCount++;
+            return Task.FromResult(product);
+        }
     }
 }

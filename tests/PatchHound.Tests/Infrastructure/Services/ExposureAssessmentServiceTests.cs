@@ -50,7 +50,8 @@ public class ExposureAssessmentServiceTests
         var installed = InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "1.0", DateTimeOffset.UtcNow);
         db.InstalledSoftware.Add(installed);
         var exposure = DeviceVulnerabilityExposure.Observe(
-            tenantId, device.Id, vuln.Id, product.Id, installed.Id, "1.0", ExposureMatchSource.Product, DateTimeOffset.UtcNow);
+            tenantId, device.Id, vuln.Id, product.Id, installed.Id, "1.0", ExposureMatchSource.Product, DateTimeOffset.UtcNow,
+            runId: Guid.NewGuid());
         db.DeviceVulnerabilityExposures.Add(exposure);
         await db.SaveChangesAsync();
 

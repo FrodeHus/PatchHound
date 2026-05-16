@@ -163,7 +163,8 @@ public class ApprovalTaskServiceTests : IDisposable
             installedSoftware.Id,
             "1.0",
             ExposureMatchSource.Product,
-            DateTimeOffset.UtcNow));
+            DateTimeOffset.UtcNow,
+            runId: Guid.NewGuid()));
         var decision = RemediationDecision.Create(
             _tenantId,
             remediationCase.Id,

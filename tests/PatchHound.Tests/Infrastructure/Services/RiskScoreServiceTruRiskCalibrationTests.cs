@@ -207,7 +207,8 @@ public class RiskScoreServiceTruRiskCalibrationTests : IAsyncDisposable
             installedSoftware.Id,
             "1.0.0",
             ExposureMatchSource.Product,
-            now);
+            now,
+            runId: Guid.NewGuid());
         _db.DeviceVulnerabilityExposures.Add(exposure);
         await _db.SaveChangesAsync();
 
