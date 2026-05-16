@@ -69,6 +69,7 @@ public class IngestionServicePhase3Tests
             new IngestionSnapshotLifecycle(db, new InMemoryIngestionBulkWriter(db)),
             new InMemoryIngestionBulkWriter(db),
             new InMemoryBulkExposureWriter(db),
+            new InMemoryBulkVulnerabilityReferenceWriter(db),
             materializedViewRefreshService: null,
             NullLogger<IngestionService>.Instance);
 
@@ -362,6 +363,7 @@ public class IngestionServicePhase3Tests
             new IngestionSnapshotLifecycle(db, new InMemoryIngestionBulkWriter(db)),
             new InMemoryIngestionBulkWriter(db),
             new InMemoryBulkExposureWriter(db),
+            new InMemoryBulkVulnerabilityReferenceWriter(db),
             materializedViewRefreshService: null,
             NullLogger<IngestionService>.Instance);
 

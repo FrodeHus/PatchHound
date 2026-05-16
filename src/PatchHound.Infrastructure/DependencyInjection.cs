@@ -66,6 +66,7 @@ public static class DependencyInjection
         // Bulk writers (Postgres-native)
         services.AddScoped<IBulkExposureWriter, PostgresBulkExposureWriter>();
         services.AddScoped<IBulkDeviceMergeWriter, PostgresBulkDeviceMergeWriter>();
+        services.AddScoped<IBulkVulnerabilityReferenceWriter, PostgresBulkVulnerabilityReferenceWriter>();
 
         // Repositories
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
@@ -262,6 +263,7 @@ public static class DependencyInjection
             sp.GetRequiredService<IngestionSnapshotLifecycle>(),
             sp.GetRequiredService<IIngestionBulkWriter>(),
             sp.GetRequiredService<IBulkExposureWriter>(),
+            sp.GetRequiredService<IBulkVulnerabilityReferenceWriter>(),
             sp.GetService<MaterializedViewRefreshService>(),
             sp.GetRequiredService<ILogger<IngestionService>>()
         ));

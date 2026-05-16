@@ -102,6 +102,7 @@ public class IngestionServiceBulkExposureTests
             new IngestionSnapshotLifecycle(db, new InMemoryIngestionBulkWriter(db)),
             new InMemoryIngestionBulkWriter(db),
             bulkExposureWriter,
+            new InMemoryBulkVulnerabilityReferenceWriter(db),
             materializedViewRefreshService: null,
             NullLogger<IngestionService>.Instance);
 
