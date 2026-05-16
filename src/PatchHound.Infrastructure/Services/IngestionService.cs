@@ -101,7 +101,7 @@ public class IngestionService
         var now = DateTimeOffset.UtcNow;
         await _exposureDerivationService.DeriveForTenantAsync(tenantId, now, runId, ct);
         await _dbContext.SaveChangesAsync(ct);
-        await _exposureEpisodeService.SyncEpisodesForTenantAsync(tenantId, now, ct);
+        await _exposureEpisodeService.SyncEpisodesForTenantAsync(tenantId, runId, now, ct);
         await _dbContext.SaveChangesAsync(ct);
         await _exposureAssessmentService.AssessForTenantAsync(tenantId, now, ct);
         await _dbContext.SaveChangesAsync(ct);
