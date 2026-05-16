@@ -219,7 +219,6 @@ public static class DependencyInjection
 
         // Inventory resolvers & staged-device merge (needed by IngestionService + AuthenticatedScanIngestionService)
         services.AddScoped<ISoftwareProductResolver, PatchHound.Infrastructure.Services.Inventory.SoftwareProductResolver>();
-        services.AddScoped<IDeviceResolver, PatchHound.Infrastructure.Services.Inventory.DeviceResolver>();
         services.AddScoped<IStagedDeviceMergeService, StagedDeviceMergeService>();
         services.AddScoped<IStagedCloudApplicationMergeService, StagedCloudApplicationMergeService>();
 
