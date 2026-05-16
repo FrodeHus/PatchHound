@@ -2163,6 +2163,9 @@ namespace PatchHound.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "SoftwareProductId");
 
+                    b.HasIndex("TenantId", "LastSeenRunId", "SoftwareProductId")
+                        .HasDatabaseName("IX_InstalledSoftware_TenantId_LastSeenRunId_SoftwareProductId");
+
                     b.HasIndex("TenantId", "DeviceId", "SoftwareProductId", "SourceSystemId", "Version")
                         .IsUnique();
 
@@ -4558,6 +4561,9 @@ namespace PatchHound.Infrastructure.Migrations
                     b.HasIndex("VulnerabilityId", "SoftwareProductId");
 
                     b.HasIndex("VulnerabilityId", "Source");
+
+                    b.HasIndex("Vulnerable", "SoftwareProductId")
+                        .HasDatabaseName("IX_VulnerabilityApplicabilities_Vulnerable_SoftwareProductId");
 
                     b.ToTable("VulnerabilityApplicabilities");
                 });

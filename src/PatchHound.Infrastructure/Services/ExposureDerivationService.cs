@@ -126,38 +126,64 @@ public class ExposureDerivationService(
                 WHERE i."TenantId" = @tenantId
                   AND i."LastSeenRunId" = @runId
             ),
-            applicable AS (
-                SELECT a."Id" AS applicability_id,
+            product_matches AS (
+                SELECT ai.device_id,
                        a."VulnerabilityId" AS vulnerability_id,
-                       a."SoftwareProductId" AS software_product_id,
-                       a."CpeCriteria" AS cpe_criteria,
+                       ai.software_product_id,
+                       ai.installed_software_id,
+                       ai.matched_version,
+                       'Product' AS match_source,
                        a."VersionStartIncluding" AS version_start_including,
                        a."VersionStartExcluding" AS version_start_excluding,
                        a."VersionEndIncluding" AS version_end_including,
                        a."VersionEndExcluding" AS version_end_excluding
-                FROM "VulnerabilityApplicabilities" a
+                FROM active_installs ai
+                JOIN "VulnerabilityApplicabilities" a
+                  ON a."SoftwareProductId" = ai.software_product_id
+                WHERE a."Vulnerable" = TRUE
+            ),
+            cpe_matches AS (
+                SELECT ai.device_id,
+                       a."VulnerabilityId" AS vulnerability_id,
+                       ai.software_product_id,
+                       ai.installed_software_id,
+                       ai.matched_version,
+                       'Cpe' AS match_source,
+                       a."VersionStartIncluding" AS version_start_including,
+                       a."VersionStartExcluding" AS version_start_excluding,
+                       a."VersionEndIncluding" AS version_end_including,
+                       a."VersionEndExcluding" AS version_end_excluding
+                FROM active_installs ai
+                JOIN "VulnerabilityApplicabilities" a
+                  ON a."SoftwareProductId" IS NULL
+                 AND a."CpeCriteria" IS NOT NULL
+                 AND ai.product_cpe IS NOT NULL
+                 AND lower(a."CpeCriteria") = lower(ai.product_cpe)
                 WHERE a."Vulnerable" = TRUE
             )
             SELECT ai.device_id,
-                   app.vulnerability_id,
+                   ai.vulnerability_id,
                    ai.software_product_id,
                    ai.installed_software_id,
                    ai.matched_version,
-                   -- match_source string values MUST match nameof(ExposureMatchSource.Product)
-                   -- and nameof(ExposureMatchSource.Cpe); kept in sync with the LINQ fallback
-                   -- which uses nameof(...) directly.
-                   CASE WHEN app.software_product_id IS NOT NULL THEN 'Product' ELSE 'Cpe' END AS match_source,
-                   app.version_start_including,
-                   app.version_start_excluding,
-                   app.version_end_including,
-                   app.version_end_excluding
-            FROM active_installs ai
-            JOIN applicable app
-              ON (app.software_product_id = ai.software_product_id)
-              OR (app.software_product_id IS NULL
-                  AND app.cpe_criteria IS NOT NULL
-                  AND ai.product_cpe IS NOT NULL
-                  AND lower(app.cpe_criteria) = lower(ai.product_cpe));
+                   ai.match_source,
+                   ai.version_start_including,
+                   ai.version_start_excluding,
+                   ai.version_end_including,
+                   ai.version_end_excluding
+            FROM product_matches ai
+            UNION ALL
+            SELECT ai.device_id,
+                   ai.vulnerability_id,
+                   ai.software_product_id,
+                   ai.installed_software_id,
+                   ai.matched_version,
+                   ai.match_source,
+                   ai.version_start_including,
+                   ai.version_start_excluding,
+                   ai.version_end_including,
+                   ai.version_end_excluding
+            FROM cpe_matches ai;
             """;
 
         var rows = new List<DerivedExposureRow>();

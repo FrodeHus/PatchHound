@@ -25,6 +25,24 @@ public class ExposureDerivationServiceCteTests
     public ExposureDerivationServiceCteTests(PostgresFixture fx) => _fx = fx;
 
     [Fact]
+    public async Task Derivation_indexes_support_current_run_product_and_cpe_matches()
+    {
+        await _fx.ResetAsync();
+        await using var db = _fx.CreateDbContext();
+
+        var indexes = await db.Database.SqlQueryRaw<string>("""
+            SELECT indexname
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND tablename IN ('InstalledSoftware', 'VulnerabilityApplicabilities')
+            """).ToListAsync();
+
+        indexes.Should().Contain("IX_InstalledSoftware_TenantId_LastSeenRunId_SoftwareProductId");
+        indexes.Should().Contain("IX_VulnerabilityApplicabilities_Vulnerable_SoftwareProductId");
+        indexes.Should().Contain("IX_VulnerabilityApplicabilities_Vulnerable_CpeCriteria_Lower");
+    }
+
+    [Fact]
     public async Task DeriveForTenantAsync_inserts_one_exposure_per_installed_product()
     {
         await _fx.ResetAsync();
