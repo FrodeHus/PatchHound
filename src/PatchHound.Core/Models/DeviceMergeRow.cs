@@ -20,5 +20,3 @@ public sealed record DeviceMergeRow(
     string? OnboardingStatus,
     string? DeviceValue,
     bool IsActive);
-
-public sealed record BulkDeviceMergeResult(int DevicesUpserted, int InstalledSoftwareUpserted);

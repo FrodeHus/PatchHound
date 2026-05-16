@@ -73,6 +73,25 @@ public class PostgresBulkDeviceMergeWriterTests
     }
 
     [Fact]
+    public async Task UpsertDevicesAsync_updates_name_on_conflict()
+    {
+        await _fx.ResetAsync();
+        await using var db = _fx.CreateDbContext();
+        var sourceSystemId = await SeedSourceSystem(db, "defender");
+        var writer = new PostgresBulkDeviceMergeWriter(db);
+
+        var initial = new DeviceMergeRow(TenantId, sourceSystemId, "ext-rename", "old-name",
+            null, "Active", "Windows", "10", null, DateTimeOffset.UtcNow, null, null, null, null, null, null, null, null, true);
+        await writer.UpsertDevicesAsync(new[] { initial }, CancellationToken.None);
+
+        var renamed = initial with { Name = "new-name" };
+        await writer.UpsertDevicesAsync(new[] { renamed }, CancellationToken.None);
+
+        var stored = await db.Devices.IgnoreQueryFilters().AsNoTracking().SingleAsync(d => d.ExternalId == "ext-rename");
+        stored.Name.Should().Be("new-name");
+    }
+
+    [Fact]
     public async Task UpsertInstalledSoftwareAsync_inserts_and_updates_last_seen_at()
     {
         await _fx.ResetAsync();

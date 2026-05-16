@@ -120,6 +120,7 @@ public sealed class PostgresBulkDeviceMergeWriter(PatchHoundDbContext db) : IBul
                         onboarding_status, device_value
                     FROM _device_upsert
                     ON CONFLICT ("TenantId", "SourceSystemId", "ExternalId") DO UPDATE SET
+                        "Name"              = EXCLUDED."Name",
                         "ComputerDnsName"   = EXCLUDED."ComputerDnsName",
                         "HealthStatus"      = EXCLUDED."HealthStatus",
                         "OsPlatform"        = EXCLUDED."OsPlatform",

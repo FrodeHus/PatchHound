@@ -40,6 +40,7 @@ internal sealed class InMemoryBulkDeviceMergeWriter(PatchHoundDbContext db) : IB
         {
             if (existingByKey.TryGetValue((r.TenantId, r.SourceSystemId, r.ExternalId), out var device))
             {
+                device.Rename(r.Name);
                 device.UpdateInventoryDetails(
                     computerDnsName: r.ComputerDnsName,
                     healthStatus: r.HealthStatus,
