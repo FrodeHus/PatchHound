@@ -8,6 +8,7 @@ using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Tests.Infrastructure;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Infrastructure.Services;
 
@@ -38,7 +39,7 @@ public class NvdCacheBackfillServiceTests
         await db.SaveChangesAsync();
 
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
-        var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
+        var svc = new NvdCacheBackfillService(db, resolver, new InMemoryBulkVulnerabilityReferenceWriter(db), NullLogger<NvdCacheBackfillService>.Instance);
 
         var stats = await svc.RunAsync();
 
@@ -69,7 +70,7 @@ public class NvdCacheBackfillServiceTests
         await db.SaveChangesAsync();
 
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
-        var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
+        var svc = new NvdCacheBackfillService(db, resolver, new InMemoryBulkVulnerabilityReferenceWriter(db), NullLogger<NvdCacheBackfillService>.Instance);
 
         var stats = await svc.RunAsync();
 
@@ -100,7 +101,7 @@ public class NvdCacheBackfillServiceTests
         await db.SaveChangesAsync();
 
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
-        var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
+        var svc = new NvdCacheBackfillService(db, resolver, new InMemoryBulkVulnerabilityReferenceWriter(db), NullLogger<NvdCacheBackfillService>.Instance);
 
         var stats = await svc.RunAsync();
 
@@ -118,7 +119,7 @@ public class NvdCacheBackfillServiceTests
         await db.SaveChangesAsync();
 
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
-        var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
+        var svc = new NvdCacheBackfillService(db, resolver, new InMemoryBulkVulnerabilityReferenceWriter(db), NullLogger<NvdCacheBackfillService>.Instance);
 
         var stats = await svc.RunAsync();
 
@@ -152,7 +153,7 @@ public class NvdCacheBackfillServiceTests
         await db.SaveChangesAsync();
 
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
-        var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
+        var svc = new NvdCacheBackfillService(db, resolver, new InMemoryBulkVulnerabilityReferenceWriter(db), NullLogger<NvdCacheBackfillService>.Instance);
 
         var stats = await svc.RunAsync();
 
@@ -179,7 +180,7 @@ public class NvdCacheBackfillServiceTests
         await db.SaveChangesAsync();
 
         var resolver = new ThrowOnFirstCallResolver(db);
-        var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
+        var svc = new NvdCacheBackfillService(db, resolver, new InMemoryBulkVulnerabilityReferenceWriter(db), NullLogger<NvdCacheBackfillService>.Instance);
 
         var stats = await svc.RunAsync();
 
@@ -222,7 +223,7 @@ public class NvdCacheBackfillServiceTests
         await db.SaveChangesAsync();
 
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
-        var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
+        var svc = new NvdCacheBackfillService(db, resolver, new InMemoryBulkVulnerabilityReferenceWriter(db), NullLogger<NvdCacheBackfillService>.Instance);
 
         var stats = await svc.RunAsync(batchSize: 3);
 

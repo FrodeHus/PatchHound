@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Tenants;
@@ -12,6 +13,7 @@ namespace PatchHound.Infrastructure.Services;
 public class NvdCacheBackfillService(
     PatchHoundDbContext db,
     VulnerabilityResolver resolver,
+    IBulkVulnerabilityReferenceWriter bulkVulnRefWriter,
     ILogger<NvdCacheBackfillService> logger)
 {
     public const int DefaultBatchSize = 500;
@@ -47,8 +49,40 @@ public class NvdCacheBackfillService(
                 try
                 {
                     var input = BuildResolveInput(item.ExternalId, item.Cache, aliasMap);
-                    await resolver.ResolveAsync(input, ct);
+                    var resolved = await resolver.ResolveAsync(input, ct);
                     await db.SaveChangesAsync(ct);
+
+                    if (input.References is { Count: > 0 })
+                    {
+                        var refRows = input.References
+                            .Where(r => !string.IsNullOrWhiteSpace(r.Url))
+                            .Select(r => new VulnerabilityReferenceUpsertRow(
+                                resolved.Id,
+                                r.Url,
+                                r.Source,
+                                r.Tags is { Count: > 0 } ? string.Join("|", r.Tags) : null))
+                            .ToList();
+                        if (refRows.Count > 0)
+                            await bulkVulnRefWriter.UpsertReferencesAsync(refRows, ct);
+                    }
+
+                    if (input.Applicabilities is { Count: > 0 })
+                    {
+                        var appRows = input.Applicabilities
+                            .Select(a => new ApplicabilityUpsertRow(
+                                resolved.Id,
+                                a.SoftwareProductId,
+                                a.CpeCriteria,
+                                a.VersionStartIncluding,
+                                a.VersionStartExcluding,
+                                a.VersionEndIncluding,
+                                a.VersionEndExcluding,
+                                a.Vulnerable))
+                            .ToList();
+                        if (appRows.Count > 0)
+                            await bulkVulnRefWriter.ReplaceApplicabilitiesAsync(appRows, ct);
+                    }
+
                     succeeded++;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
