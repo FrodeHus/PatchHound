@@ -44,7 +44,8 @@ public class IngestionServicePhase3Tests
         var device = Device.Create(tenantId, source.Id, "dev-1", "Device 1", Criticality.High);
         device.AssignSecurityProfile(profile.Id);
         db.Devices.Add(device);
-        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow));
+        var runId = Guid.NewGuid();
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow, runId));
         await db.SaveChangesAsync();
 
         var ingestion = new IngestionService(
@@ -73,7 +74,7 @@ public class IngestionServicePhase3Tests
             materializedViewRefreshService: null,
             NullLogger<IngestionService>.Instance);
 
-        await ingestion.RunExposureDerivationAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+        await ingestion.RunExposureDerivationAsync(tenantId, runId, CancellationToken.None);
 
         (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().NotBeEmpty();
         (await db.ExposureEpisodes.ToListAsync()).Should().NotBeEmpty();
@@ -254,11 +255,10 @@ public class IngestionServicePhase3Tests
         device.AssignSecurityProfile(profile.Id);
         db.Devices.Add(device);
 
-        db.InstalledSoftware.Add(InstalledSoftware.Observe(
-            tenantId, device.Id, product.Id, sourceSystem.Id, "120.0", DateTimeOffset.UtcNow));
-
         var run = IngestionRun.Start(tenantId, "microsoft-defender", DateTimeOffset.UtcNow);
         db.IngestionRuns.Add(run);
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(
+            tenantId, device.Id, product.Id, sourceSystem.Id, "120.0", DateTimeOffset.UtcNow, run.Id));
 
         db.StagedVulnerabilities.Add(StagedVulnerability.Create(
             run.Id, tenantId, "microsoft-defender",
@@ -293,7 +293,7 @@ public class IngestionServicePhase3Tests
         apps[0].VersionEndIncluding.Should().Be("120.0",
             "applicability should carry the observed product version as the end-including predicate");
 
-        await ingestion.RunExposureDerivationAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+        await ingestion.RunExposureDerivationAsync(tenantId, run.Id, CancellationToken.None);
 
         var exposures = await db.DeviceVulnerabilityExposures
             .Where(e => e.Status != ExposureStatus.Resolved)
@@ -322,12 +322,13 @@ public class IngestionServicePhase3Tests
         db.SourceSystems.Add(sourceSystem);
         var device = Device.Create(tenantId, sourceSystem.Id, "dev-1", "Device 1", Criticality.Medium);
         db.Devices.Add(device);
+        var runId = Guid.NewGuid();
         db.InstalledSoftware.Add(InstalledSoftware.Observe(
-            tenantId, device.Id, product.Id, sourceSystem.Id, "1.0", DateTimeOffset.UtcNow));
+            tenantId, device.Id, product.Id, sourceSystem.Id, "1.0", DateTimeOffset.UtcNow, runId));
         await db.SaveChangesAsync();
 
         var ingestion = CreateIngestionService(db);
-        await ingestion.RunExposureDerivationAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+        await ingestion.RunExposureDerivationAsync(tenantId, runId, CancellationToken.None);
 
         var cases = await db.RemediationCases.ToListAsync();
         cases.Should().ContainSingle("an open exposure on the product must auto-create a remediation case");
@@ -335,7 +336,7 @@ public class IngestionServicePhase3Tests
         cases[0].SoftwareProductId.Should().Be(product.Id);
 
         // Running twice must not duplicate.
-        await ingestion.RunExposureDerivationAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+        await ingestion.RunExposureDerivationAsync(tenantId, runId, CancellationToken.None);
         (await db.RemediationCases.ToListAsync()).Should().ContainSingle(
             "re-running derivation must be idempotent for case creation");
     }

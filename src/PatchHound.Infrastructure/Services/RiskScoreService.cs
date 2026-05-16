@@ -455,18 +455,19 @@ public class RiskScoreService(
             .Select(d => d.SoftwareProductId)
             .ToHashSet();
 
+        var mitigatedVulnerabilityIds = MitigatedVulnerabilityIds(tenantId);
+
         var exposureRows = await (
             from item in dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             join assessment in dbContext.ExposureLatestAssessments
                 on item.Id equals assessment.DeviceVulnerabilityExposureId into assessmentJoin
             from assessment in assessmentJoin.DefaultIfEmpty()
-            join mitigated in dbContext.AlternateMitigationVulnIds
-                    .Where(m => m.TenantId == tenantId)
-                on item.VulnerabilityId equals mitigated.VulnerabilityId into mitigatedJoin
-            from mitigated in mitigatedJoin.DefaultIfEmpty()
+            join mitigatedVulnerabilityId in mitigatedVulnerabilityIds
+                on (Guid?)item.VulnerabilityId equals mitigatedVulnerabilityId into mitigatedJoin
+            from mitigatedVulnerabilityId in mitigatedJoin.DefaultIfEmpty()
             where item.TenantId == tenantId
                 && item.Status == ExposureStatus.Open
-                && mitigated == null
+                && mitigatedVulnerabilityId == null
             select new
             {
                 item.DeviceId,
@@ -557,19 +558,20 @@ public class RiskScoreService(
             .Select(d => d.SoftwareProductId)
             .ToHashSet();
 
+        var mitigatedVulnerabilityIds = MitigatedVulnerabilityIds(tenantId);
+
         var exposures = await (
             from item in dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             join assessment in dbContext.ExposureLatestAssessments
                 on item.Id equals assessment.DeviceVulnerabilityExposureId into assessmentJoin
             from assessment in assessmentJoin.DefaultIfEmpty()
-            join mitigated in dbContext.AlternateMitigationVulnIds
-                    .Where(m => m.TenantId == tenantId)
-                on item.VulnerabilityId equals mitigated.VulnerabilityId into mitigatedJoin
-            from mitigated in mitigatedJoin.DefaultIfEmpty()
+            join mitigatedVulnerabilityId in mitigatedVulnerabilityIds
+                on (Guid?)item.VulnerabilityId equals mitigatedVulnerabilityId into mitigatedJoin
+            from mitigatedVulnerabilityId in mitigatedJoin.DefaultIfEmpty()
             where item.TenantId == tenantId
                 && item.SoftwareProductId != null
                 && item.Status == ExposureStatus.Open
-                && mitigated == null
+                && mitigatedVulnerabilityId == null
             select new
             {
                 item.Id,
@@ -888,5 +890,19 @@ public class RiskScoreService(
         }
 
         await dbContext.SaveChangesAsync(ct);
+    }
+
+    private IQueryable<Guid?> MitigatedVulnerabilityIds(Guid tenantId)
+    {
+        if (dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            return dbContext.ApprovedVulnerabilityRemediations.AsNoTracking()
+                .Where(item => item.TenantId == tenantId && item.Outcome == RemediationOutcome.AlternateMitigation)
+                .Select(item => (Guid?)item.VulnerabilityId);
+        }
+
+        return dbContext.AlternateMitigationVulnIds.AsNoTracking()
+            .Where(item => item.TenantId == tenantId)
+            .Select(item => (Guid?)item.VulnerabilityId);
     }
 }

@@ -76,13 +76,17 @@ public class StagedDeviceMergeService(
         var linksByDeviceExternalId = stagedLinks
             .GroupBy(l => l.DeviceExternalId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+        var linkedSoftwareExternalIds = stagedLinks
+            .Select(l => l.SoftwareExternalId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // 4. Source system key -> entity lookup. Keys are normalized lowercase.
         var sourceSystems = await db
             .SourceSystems.ToDictionaryAsync(s => s.Key, StringComparer.Ordinal, ct);
 
         var softwareProductsByExternalId = new Dictionary<string, SoftwareProduct>(StringComparer.OrdinalIgnoreCase);
-        foreach (var stagedSoftwareAsset in stagedSoftwareByExternalId.Values)
+        foreach (var stagedSoftwareAsset in stagedSoftwareByExternalId.Values
+            .Where(asset => linkedSoftwareExternalIds.Contains(asset.ExternalId)))
         {
             var normalizedSourceKey = stagedSoftwareAsset.SourceKey.Trim().ToLowerInvariant();
             if (!sourceSystems.TryGetValue(normalizedSourceKey, out var sourceSystem))

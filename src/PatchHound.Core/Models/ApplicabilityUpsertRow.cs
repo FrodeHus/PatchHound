@@ -8,4 +8,5 @@ public sealed record ApplicabilityUpsertRow(
     string? VersionStartExcluding,
     string? VersionEndIncluding,
     string? VersionEndExcluding,
-    bool Vulnerable);
+    bool Vulnerable,
+    string? Source = null);

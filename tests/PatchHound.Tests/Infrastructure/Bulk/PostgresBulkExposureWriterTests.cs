@@ -83,6 +83,31 @@ public class PostgresBulkExposureWriterTests
     }
 
     [Fact]
+    public async Task UpsertAsync_deduplicates_duplicate_input_conflict_keys()
+    {
+        await _fx.ResetAsync();
+        await using var db = _fx.CreateDbContext();
+        var (deviceId, vulnId) = await SeedDeviceAndVuln(db);
+        var writer = new PostgresBulkExposureWriter(db);
+
+        var observed = DateTimeOffset.UtcNow;
+        var run1 = Guid.NewGuid();
+        var run2 = Guid.NewGuid();
+        var result = await writer.UpsertAsync(new[]
+        {
+            new ExposureUpsertRow(TenantId, deviceId, vulnId, null, null, "1.0", "Cpe", observed, run1),
+            new ExposureUpsertRow(TenantId, deviceId, vulnId, null, null, "1.0", "Cpe", observed.AddMinutes(5), run2),
+        }, CancellationToken.None);
+
+        result.Inserted.Should().Be(1);
+        result.Reobserved.Should().Be(0);
+
+        var stored = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().SingleAsync();
+        stored.LastSeenRunId.Should().Be(run2);
+        stored.LastObservedAt.Should().BeCloseTo(observed.AddMinutes(5), TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
     public async Task ResolveStaleAsync_resolves_only_exposures_not_seen_in_current_run()
     {
         await _fx.ResetAsync();

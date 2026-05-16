@@ -68,7 +68,15 @@ public sealed class PostgresBulkExposureWriter(PatchHoundDbContext db) : IBulkEx
                 }
 
                 await using var merge = new NpgsqlCommand(transaction: tx, connection: connection, cmdText: """
-                    WITH upsert AS (
+                    WITH deduped AS (
+                        SELECT DISTINCT ON (tenant_id, device_id, vulnerability_id)
+                               id, tenant_id, device_id, vulnerability_id,
+                               software_product_id, installed_software_id,
+                               matched_version, match_source, observed_at, run_id
+                        FROM _exposure_upsert
+                        ORDER BY tenant_id, device_id, vulnerability_id, observed_at DESC
+                    ),
+                    upsert AS (
                         INSERT INTO "DeviceVulnerabilityExposures"
                             ("Id", "TenantId", "DeviceId", "VulnerabilityId",
                              "SoftwareProductId", "InstalledSoftwareId",
@@ -78,7 +86,7 @@ public sealed class PostgresBulkExposureWriter(PatchHoundDbContext db) : IBulkEx
                                software_product_id, installed_software_id,
                                matched_version, match_source, 'Open',
                                observed_at, observed_at, NULL, run_id
-                        FROM _exposure_upsert
+                        FROM deduped
                         ON CONFLICT ("TenantId", "DeviceId", "VulnerabilityId")
                         DO UPDATE SET
                             "LastObservedAt" = GREATEST(EXCLUDED."LastObservedAt", "DeviceVulnerabilityExposures"."LastObservedAt"),

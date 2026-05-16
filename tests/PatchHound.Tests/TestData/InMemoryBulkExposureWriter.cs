@@ -11,10 +11,8 @@ namespace PatchHound.Tests.TestData;
 /// In-memory replacement for <see cref="IBulkExposureWriter"/> used by Phase-3 tests that
 /// run against the EF Core InMemory provider (which cannot execute the real PostgreSQL UPSERT).
 ///
-/// IMPORTANT: This fake DIVERGES from the production writer in one semantic:
-/// on conflict it calls <c>Reobserve</c> which reopens a previously-Resolved exposure.
-/// The real <see cref="PatchHound.Infrastructure.Services.PostgresBulkExposureWriter"/> preserves <c>Status='Resolved'</c>
-/// on conflict (see <c>ExposureDerivationService.cs:74</c> — "respect direct-report resolution").
+/// This fake mirrors the production writer's current conflict behavior:
+/// on conflict it calls <c>Reobserve</c>, reopening a previously-resolved exposure.
 ///
 /// Do NOT use this fake in tests that seed a pre-existing Resolved exposure and then
 /// verify upsert behavior on it — the fake will return the wrong status. Either use
@@ -61,10 +59,6 @@ internal sealed class InMemoryBulkExposureWriter(PatchHoundDbContext db) : IBulk
             }
             else
             {
-                // The production Postgres UPSERT keeps Status=Resolved when the
-                // existing row is already resolved. This fake intentionally
-                // simplifies to Reobserve (which reopens) because no current
-                // InMemory-backed test depends on that semantic nuance.
                 existing.Reobserve(row.ObservedAt, row.RunId);
                 reobserved++;
             }

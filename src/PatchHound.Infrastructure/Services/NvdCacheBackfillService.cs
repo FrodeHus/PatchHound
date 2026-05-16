@@ -52,36 +52,34 @@ public class NvdCacheBackfillService(
                     var resolved = await resolver.ResolveAsync(input, ct);
                     await db.SaveChangesAsync(ct);
 
-                    if (input.References is { Count: > 0 })
+                    var affectedNvdPair = new[]
                     {
-                        var refRows = input.References
-                            .Where(r => !string.IsNullOrWhiteSpace(r.Url))
-                            .Select(r => new VulnerabilityReferenceUpsertRow(
-                                resolved.Id,
-                                r.Url,
-                                r.Source,
-                                r.Tags is { Count: > 0 } ? string.Join("|", r.Tags) : null))
-                            .ToList();
-                        if (refRows.Count > 0)
-                            await bulkVulnRefWriter.ReplaceReferencesAsync(refRows, ct);
-                    }
+                        new VulnerabilitySourcePair(resolved.Id, EnrichmentSourceCatalog.NvdSourceKey),
+                    };
 
-                    if (input.Applicabilities is { Count: > 0 })
-                    {
-                        var appRows = input.Applicabilities
-                            .Select(a => new ApplicabilityUpsertRow(
-                                resolved.Id,
-                                a.SoftwareProductId,
-                                a.CpeCriteria,
-                                a.VersionStartIncluding,
-                                a.VersionStartExcluding,
-                                a.VersionEndIncluding,
-                                a.VersionEndExcluding,
-                                a.Vulnerable))
-                            .ToList();
-                        if (appRows.Count > 0)
-                            await bulkVulnRefWriter.ReplaceApplicabilitiesAsync(appRows, ct);
-                    }
+                    var refRows = input.References
+                        .Where(r => !string.IsNullOrWhiteSpace(r.Url))
+                        .Select(r => new VulnerabilityReferenceUpsertRow(
+                            resolved.Id,
+                            r.Url,
+                            r.Source,
+                            r.Tags is { Count: > 0 } ? string.Join("|", r.Tags) : null))
+                        .ToList();
+                    await bulkVulnRefWriter.ReplaceReferencesAsync(refRows, affectedNvdPair, ct);
+
+                    var appRows = input.Applicabilities
+                        .Select(a => new ApplicabilityUpsertRow(
+                            resolved.Id,
+                            a.SoftwareProductId,
+                            a.CpeCriteria,
+                            a.VersionStartIncluding,
+                            a.VersionStartExcluding,
+                            a.VersionEndIncluding,
+                            a.VersionEndExcluding,
+                            a.Vulnerable,
+                            EnrichmentSourceCatalog.NvdSourceKey))
+                        .ToList();
+                    await bulkVulnRefWriter.ReplaceApplicabilitiesAsync(appRows, affectedNvdPair, ct);
 
                     succeeded++;
                 }

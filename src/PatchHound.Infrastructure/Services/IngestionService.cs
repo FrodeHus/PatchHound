@@ -920,6 +920,7 @@ public class IngestionService
         // applicabilities are reconciled in bulk below (Task 7, issue #76).
         var vulnExternalIdToId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         var referencesByExternalId = new Dictionary<string, IReadOnlyList<VulnerabilityReferenceInput>>(StringComparer.OrdinalIgnoreCase);
+        var sourceByVulnExternalId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < stagedVulns.Count; i += IngestionStagingPipeline.VulnerabilityBatchSize)
         {
             var batch = stagedVulns.Skip(i).Take(IngestionStagingPipeline.VulnerabilityBatchSize);
@@ -962,10 +963,8 @@ public class IngestionService
 
                 var vuln = await _vulnerabilityResolver.ResolveAsync(input, ct);
                 vulnExternalIdToId[staged.ExternalId] = vuln.Id;
-                if (references.Count > 0)
-                {
-                    referencesByExternalId[staged.ExternalId] = references;
-                }
+                referencesByExternalId[staged.ExternalId] = references;
+                sourceByVulnExternalId[staged.ExternalId] = staged.SourceKey;
                 persistedVulnCount++;
             }
 
@@ -975,7 +974,7 @@ public class IngestionService
 
         // ── Step 1b: Bulk-upsert references and replace applicabilities in one call each.
         await BulkReconcileVulnerabilityRefsAndApplicabilitiesAsync(
-            vulnExternalIdToId, referencesByExternalId, applicabilitiesByVulnExternalId, ct);
+            vulnExternalIdToId, sourceByVulnExternalId, referencesByExternalId, applicabilitiesByVulnExternalId, ct);
 
         // ── Step 2: Build device ExternalId → Id map from the staged exposures loaded in Step 0 ──
         var stagedExposureCount = stagedExposures.Count;
@@ -1380,6 +1379,7 @@ public class IngestionService
     /// </summary>
     private async Task BulkReconcileVulnerabilityRefsAndApplicabilitiesAsync(
         IReadOnlyDictionary<string, Guid> vulnExternalIdToId,
+        IReadOnlyDictionary<string, string> sourceByVulnExternalId,
         IReadOnlyDictionary<string, IReadOnlyList<VulnerabilityReferenceInput>> referencesByExternalId,
         IReadOnlyDictionary<string, IReadOnlyList<VulnerabilityApplicabilityInput>> applicabilitiesByVulnExternalId,
         CancellationToken ct)
@@ -1387,9 +1387,14 @@ public class IngestionService
         if (vulnExternalIdToId.Count == 0) return;
 
         var refRows = new List<VulnerabilityReferenceUpsertRow>();
+        var affectedReferencePairs = new List<VulnerabilitySourcePair>();
         foreach (var (externalId, refs) in referencesByExternalId)
         {
             if (!vulnExternalIdToId.TryGetValue(externalId, out var vulnId)) continue;
+            if (sourceByVulnExternalId.TryGetValue(externalId, out var sourceKey))
+            {
+                affectedReferencePairs.Add(new VulnerabilitySourcePair(vulnId, sourceKey));
+            }
             // Dedupe by URL (trimmed, case-insensitive) within this batch, matching
             // the unique index (VulnerabilityId, Url).
             var seenUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1414,15 +1419,20 @@ public class IngestionService
             }
         }
 
-        if (refRows.Count > 0)
+        if (affectedReferencePairs.Count > 0 || refRows.Count > 0)
         {
-            await _bulkVulnerabilityReferenceWriter.ReplaceReferencesAsync(refRows, ct);
+            await _bulkVulnerabilityReferenceWriter.ReplaceReferencesAsync(refRows, affectedReferencePairs, ct);
         }
 
         var appRows = new List<ApplicabilityUpsertRow>();
-        foreach (var (externalId, apps) in applicabilitiesByVulnExternalId)
+        var affectedApplicabilityPairs = new List<VulnerabilitySourcePair>();
+        foreach (var (externalId, source) in sourceByVulnExternalId)
         {
             if (!vulnExternalIdToId.TryGetValue(externalId, out var vulnId)) continue;
+            affectedApplicabilityPairs.Add(new VulnerabilitySourcePair(vulnId, source));
+            var apps = applicabilitiesByVulnExternalId.TryGetValue(externalId, out var resolvedApps)
+                ? resolvedApps
+                : (IReadOnlyList<VulnerabilityApplicabilityInput>)[];
             foreach (var a in apps)
             {
                 if (a.SoftwareProductId is null && string.IsNullOrWhiteSpace(a.CpeCriteria))
@@ -1435,13 +1445,14 @@ public class IngestionService
                     a.VersionStartExcluding,
                     a.VersionEndIncluding,
                     a.VersionEndExcluding,
-                    a.Vulnerable));
+                    a.Vulnerable,
+                    source));
             }
         }
 
-        if (appRows.Count > 0)
+        if (affectedApplicabilityPairs.Count > 0 || appRows.Count > 0)
         {
-            await _bulkVulnerabilityReferenceWriter.ReplaceApplicabilitiesAsync(appRows, ct);
+            await _bulkVulnerabilityReferenceWriter.ReplaceApplicabilitiesAsync(appRows, affectedApplicabilityPairs, ct);
         }
     }
 

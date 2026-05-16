@@ -4522,6 +4522,11 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<Guid?>("SoftwareProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("VersionEndExcluding")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -4551,6 +4556,8 @@ namespace PatchHound.Infrastructure.Migrations
                     b.HasIndex("VulnerabilityId", "CpeCriteria");
 
                     b.HasIndex("VulnerabilityId", "SoftwareProductId");
+
+                    b.HasIndex("VulnerabilityId", "Source");
 
                     b.ToTable("VulnerabilityApplicabilities");
                 });

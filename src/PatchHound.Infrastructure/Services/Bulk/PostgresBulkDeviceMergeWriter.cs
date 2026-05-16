@@ -102,6 +102,16 @@ public sealed class PostgresBulkDeviceMergeWriter(PatchHoundDbContext db) : IBul
                 // We deliberately do NOT touch Criticality / Owner / SecurityProfile / Description on update
                 // — those are owned by separate services.
                 await using var merge = new NpgsqlCommand(transaction: tx, connection: connection, cmdText: """
+                    WITH deduped AS (
+                        SELECT DISTINCT ON (tenant_id, source_system_id, external_id)
+                            id, tenant_id, source_system_id, external_id, name,
+                            computer_dns_name, health_status, os_platform, os_version,
+                            external_risk_label, last_seen_at, last_ip_address, aad_device_id,
+                            group_id, group_name, exposure_level, is_aad_joined,
+                            onboarding_status, device_value, is_active
+                        FROM _device_upsert
+                        ORDER BY tenant_id, source_system_id, external_id, last_seen_at DESC NULLS LAST
+                    )
                     INSERT INTO "Devices"
                         ("Id", "TenantId", "SourceSystemId", "ExternalId", "Name",
                          "BaselineCriticality", "Criticality", "CriticalitySource", "CriticalityUpdatedAt",
@@ -118,7 +128,7 @@ public sealed class PostgresBulkDeviceMergeWriter(PatchHoundDbContext db) : IBul
                         external_risk_label, last_seen_at, last_ip_address, aad_device_id,
                         group_id, group_name, exposure_level, is_aad_joined,
                         onboarding_status, device_value
-                    FROM _device_upsert
+                    FROM deduped
                     ON CONFLICT ("TenantId", "SourceSystemId", "ExternalId") DO UPDATE SET
                         "Name"              = EXCLUDED."Name",
                         "ComputerDnsName"   = EXCLUDED."ComputerDnsName",
@@ -216,13 +226,20 @@ public sealed class PostgresBulkDeviceMergeWriter(PatchHoundDbContext db) : IBul
 
                 // Unique index: (TenantId, DeviceId, SoftwareProductId, SourceSystemId, Version)
                 await using var merge = new NpgsqlCommand(transaction: tx, connection: connection, cmdText: """
-                    WITH upsert AS (
+                    WITH deduped AS (
+                        SELECT DISTINCT ON (tenant_id, device_id, software_product_id, source_system_id, version)
+                            id, tenant_id, device_id, software_product_id, source_system_id,
+                            version, observed_at, run_id
+                        FROM _installed_software_upsert
+                        ORDER BY tenant_id, device_id, software_product_id, source_system_id, version, observed_at DESC
+                    ),
+                    upsert AS (
                         INSERT INTO "InstalledSoftware"
                             ("Id", "TenantId", "DeviceId", "SoftwareProductId", "SourceSystemId",
                              "Version", "FirstSeenAt", "LastSeenAt", "LastSeenRunId")
                         SELECT id, tenant_id, device_id, software_product_id, source_system_id,
                                version, observed_at, observed_at, run_id
-                        FROM _installed_software_upsert
+                        FROM deduped
                         ON CONFLICT ("TenantId", "DeviceId", "SoftwareProductId", "SourceSystemId", "Version")
                         DO UPDATE SET
                             "LastSeenAt" = GREATEST(EXCLUDED."LastSeenAt", "InstalledSoftware"."LastSeenAt"),

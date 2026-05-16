@@ -92,6 +92,29 @@ public class PostgresBulkDeviceMergeWriterTests
     }
 
     [Fact]
+    public async Task UpsertDevicesAsync_deduplicates_duplicate_input_conflict_keys()
+    {
+        await _fx.ResetAsync();
+        await using var db = _fx.CreateDbContext();
+        var sourceSystemId = await SeedSourceSystem(db, "defender");
+        var writer = new PostgresBulkDeviceMergeWriter(db);
+
+        var observed = DateTimeOffset.UtcNow;
+        var ids = await writer.UpsertDevicesAsync(new[]
+        {
+            new DeviceMergeRow(TenantId, sourceSystemId, "ext-dup", "old-name", null, "Active",
+                "Windows", "10", null, observed, null, null, null, null, null, null, null, null, true),
+            new DeviceMergeRow(TenantId, sourceSystemId, "ext-dup", "new-name", null, "Active",
+                "Windows", "11", null, observed.AddMinutes(5), null, null, null, null, null, null, null, null, true),
+        }, CancellationToken.None);
+
+        ids.Should().ContainSingle();
+        var stored = await db.Devices.IgnoreQueryFilters().AsNoTracking().SingleAsync();
+        stored.Name.Should().Be("new-name");
+        stored.OsVersion.Should().Be("11");
+    }
+
+    [Fact]
     public async Task UpsertInstalledSoftwareAsync_inserts_and_updates_last_seen_at()
     {
         await _fx.ResetAsync();
@@ -133,6 +156,39 @@ public class PostgresBulkDeviceMergeWriterTests
         var stored = await db.InstalledSoftware.IgnoreQueryFilters().AsNoTracking().SingleAsync();
         stored.LastSeenAt.Should().BeCloseTo(laterObserved, TimeSpan.FromSeconds(1));
         stored.LastSeenRunId.Should().Be(secondRun);
+    }
+
+    [Fact]
+    public async Task UpsertInstalledSoftwareAsync_deduplicates_duplicate_input_conflict_keys()
+    {
+        await _fx.ResetAsync();
+        await using var db = _fx.CreateDbContext();
+        var sourceSystemId = await SeedSourceSystem(db, "defender");
+        var writer = new PostgresBulkDeviceMergeWriter(db);
+
+        var deviceMap = await writer.UpsertDevicesAsync(new[]
+        {
+            new DeviceMergeRow(TenantId, sourceSystemId, "ext-isw-dup", "host-isw", null, "Active",
+                "Windows", "10", null, DateTimeOffset.UtcNow, null, null, null, null, null, null, null, null, true),
+        }, CancellationToken.None);
+
+        var product = SoftwareProduct.Create("Acme", "Widget", null);
+        db.SoftwareProducts.Add(product);
+        await db.SaveChangesAsync();
+
+        var observed = DateTimeOffset.UtcNow;
+        var run1 = Guid.NewGuid();
+        var run2 = Guid.NewGuid();
+        var touched = await writer.UpsertInstalledSoftwareAsync(new[]
+        {
+            new InstalledSoftwareMergeRow(TenantId, deviceMap[(sourceSystemId, "ext-isw-dup")], product.Id, sourceSystemId, "1.0.0", observed, run1),
+            new InstalledSoftwareMergeRow(TenantId, deviceMap[(sourceSystemId, "ext-isw-dup")], product.Id, sourceSystemId, "1.0.0", observed.AddMinutes(5), run2),
+        }, CancellationToken.None);
+
+        touched.Should().Be(1);
+        var stored = await db.InstalledSoftware.IgnoreQueryFilters().AsNoTracking().SingleAsync();
+        stored.LastSeenAt.Should().BeCloseTo(observed.AddMinutes(5), TimeSpan.FromSeconds(1));
+        stored.LastSeenRunId.Should().Be(run2);
     }
 
     private static async Task<Guid> SeedSourceSystem(PatchHoundDbContext db, string key)
