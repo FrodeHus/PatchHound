@@ -63,7 +63,7 @@ public class NvdCacheBackfillService(
                                 r.Tags is { Count: > 0 } ? string.Join("|", r.Tags) : null))
                             .ToList();
                         if (refRows.Count > 0)
-                            await bulkVulnRefWriter.UpsertReferencesAsync(refRows, ct);
+                            await bulkVulnRefWriter.ReplaceReferencesAsync(refRows, ct);
                     }
 
                     if (input.Applicabilities is { Count: > 0 })

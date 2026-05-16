@@ -1416,7 +1416,7 @@ public class IngestionService
 
         if (refRows.Count > 0)
         {
-            await _bulkVulnerabilityReferenceWriter.UpsertReferencesAsync(refRows, ct);
+            await _bulkVulnerabilityReferenceWriter.ReplaceReferencesAsync(refRows, ct);
         }
 
         var appRows = new List<ApplicabilityUpsertRow>();
