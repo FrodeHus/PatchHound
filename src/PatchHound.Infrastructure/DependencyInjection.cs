@@ -67,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<IBulkExposureWriter, PostgresBulkExposureWriter>();
         services.AddScoped<IBulkDeviceMergeWriter, PostgresBulkDeviceMergeWriter>();
         services.AddScoped<IBulkVulnerabilityReferenceWriter, PostgresBulkVulnerabilityReferenceWriter>();
+        services.AddScoped<IBulkSoftwareProjectionWriter, PostgresBulkSoftwareProjectionWriter>();
 
         // Repositories
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();

@@ -60,7 +60,7 @@ public class AuthenticatedScanIngestionServiceTests : IAsyncLifetime
             _db,
             new AuthenticatedScanOutputValidator(),
             mergeService,
-            new NormalizedSoftwareProjectionService(_db),
+            new NormalizedSoftwareProjectionService(new InMemoryBulkSoftwareProjectionWriter(_db)),
             bulkWriter);
     }
 
