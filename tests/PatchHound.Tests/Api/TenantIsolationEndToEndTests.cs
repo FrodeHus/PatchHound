@@ -371,8 +371,8 @@ public class TenantIsolationEndToEndTests : IDisposable
             installedSoftwareId: null,
             matchedVersion: string.Empty,
             matchSource: ExposureMatchSource.Product,
-            observedAt: DateTimeOffset.UtcNow
-        );
+            observedAt: DateTimeOffset.UtcNow,
+            runId: Guid.NewGuid());
         _dbContext.DeviceVulnerabilityExposures.Add(dveB);
         await _dbContext.SaveChangesAsync();
 
@@ -496,8 +496,8 @@ public class TenantIsolationEndToEndTests : IDisposable
             installedSoftwareId: installed.Id,
             matchedVersion: installed.Version,
             matchSource: ExposureMatchSource.Product,
-            observedAt: DateTimeOffset.UtcNow
-        );
+            observedAt: DateTimeOffset.UtcNow,
+            runId: Guid.NewGuid());
         _dbContext.DeviceVulnerabilityExposures.Add(exposure);
         _dbContext.SaveChanges();
 

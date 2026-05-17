@@ -17,10 +17,11 @@ public class ExposureEpisodeServiceTests
     {
         var tenantId = Guid.NewGuid();
         await using var db = await CreateTenantDbAsync(tenantId);
-        var exposure = await SeedOpenExposureAsync(db, tenantId, DateTimeOffset.UtcNow);
+        var runId = Guid.NewGuid();
+        var exposure = await SeedOpenExposureAsync(db, tenantId, DateTimeOffset.UtcNow, runId);
 
         var svc = new ExposureEpisodeService(db);
-        await svc.SyncEpisodesForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await svc.SyncEpisodesForTenantAsync(tenantId, runId, DateTimeOffset.UtcNow, CancellationToken.None);
         await db.SaveChangesAsync();
 
         var episodes = await db.ExposureEpisodes.Where(e => e.DeviceVulnerabilityExposureId == exposure.Id).ToListAsync();
@@ -35,17 +36,21 @@ public class ExposureEpisodeServiceTests
         var tenantId = Guid.NewGuid();
         await using var db = await CreateTenantDbAsync(tenantId);
         var openedAt = new DateTimeOffset(2026, 4, 14, 0, 0, 0, TimeSpan.Zero);
-        var exposure = await SeedOpenExposureAsync(db, tenantId, openedAt);
+        var openRunId = Guid.NewGuid();
+        var exposure = await SeedOpenExposureAsync(db, tenantId, openedAt, openRunId);
 
         var svc = new ExposureEpisodeService(db);
-        await svc.SyncEpisodesForTenantAsync(tenantId, openedAt, CancellationToken.None);
+        await svc.SyncEpisodesForTenantAsync(tenantId, openRunId, openedAt, CancellationToken.None);
         await db.SaveChangesAsync();
 
         var resolvedAt = new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero);
         exposure.Resolve(resolvedAt);
         await db.SaveChangesAsync();
 
-        await svc.SyncEpisodesForTenantAsync(tenantId, resolvedAt, CancellationToken.None);
+        // Close the episode in a subsequent run. LastSeenRunId on the exposure still points at openRunId
+        // because Resolve() does not update it; the resolved-recently fallback in the query picks it up.
+        var resolveRunId = Guid.NewGuid();
+        await svc.SyncEpisodesForTenantAsync(tenantId, resolveRunId, resolvedAt, CancellationToken.None);
         await db.SaveChangesAsync();
 
         var episodes = await db.ExposureEpisodes.ToListAsync();
@@ -58,20 +63,25 @@ public class ExposureEpisodeServiceTests
     {
         var tenantId = Guid.NewGuid();
         await using var db = await CreateTenantDbAsync(tenantId);
-        var exposure = await SeedOpenExposureAsync(db, tenantId, new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero));
+        var observedAt = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+        var openRunId = Guid.NewGuid();
+        var exposure = await SeedOpenExposureAsync(db, tenantId, observedAt, openRunId);
 
         var svc = new ExposureEpisodeService(db);
-        await svc.SyncEpisodesForTenantAsync(tenantId, new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero), CancellationToken.None);
+        await svc.SyncEpisodesForTenantAsync(tenantId, openRunId, observedAt, CancellationToken.None);
         await db.SaveChangesAsync();
 
-        exposure.Resolve(new DateTimeOffset(2026, 4, 5, 0, 0, 0, TimeSpan.Zero));
+        var resolvedAt = new DateTimeOffset(2026, 4, 5, 0, 0, 0, TimeSpan.Zero);
+        exposure.Resolve(resolvedAt);
         await db.SaveChangesAsync();
-        await svc.SyncEpisodesForTenantAsync(tenantId, new DateTimeOffset(2026, 4, 5, 0, 0, 0, TimeSpan.Zero), CancellationToken.None);
+        var resolveRunId = Guid.NewGuid();
+        await svc.SyncEpisodesForTenantAsync(tenantId, resolveRunId, resolvedAt, CancellationToken.None);
         await db.SaveChangesAsync();
 
-        exposure.Reobserve(new DateTimeOffset(2026, 4, 20, 0, 0, 0, TimeSpan.Zero));
+        var reobserveRunId = Guid.NewGuid();
+        exposure.Reobserve(new DateTimeOffset(2026, 4, 20, 0, 0, 0, TimeSpan.Zero), reobserveRunId);
         await db.SaveChangesAsync();
-        await svc.SyncEpisodesForTenantAsync(tenantId, new DateTimeOffset(2026, 4, 20, 0, 0, 0, TimeSpan.Zero), CancellationToken.None);
+        await svc.SyncEpisodesForTenantAsync(tenantId, reobserveRunId, new DateTimeOffset(2026, 4, 20, 0, 0, 0, TimeSpan.Zero), CancellationToken.None);
         await db.SaveChangesAsync();
 
         var episodes = await db.ExposureEpisodes.OrderBy(e => e.EpisodeNumber).ToListAsync();
@@ -82,7 +92,7 @@ public class ExposureEpisodeServiceTests
         episodes[1].ClosedAt.Should().BeNull();
     }
 
-    private static async Task<DeviceVulnerabilityExposure> SeedOpenExposureAsync(PatchHoundDbContext db, Guid tenantId, DateTimeOffset observedAt)
+    private static async Task<DeviceVulnerabilityExposure> SeedOpenExposureAsync(PatchHoundDbContext db, Guid tenantId, DateTimeOffset observedAt, Guid runId)
     {
         var sourceSystem = SourceSystem.Create("test", "Test");
         var product = SoftwareProduct.Create("Acme", "Widget", "cpe:2.3:a:acme:widget:*:*:*:*:*:*:*:*");
@@ -107,7 +117,8 @@ public class ExposureEpisodeServiceTests
             installed.Id,
             installed.Version,
             ExposureMatchSource.Product,
-            observedAt);
+            observedAt,
+            runId: runId);
         db.DeviceVulnerabilityExposures.Add(exposure);
         await db.SaveChangesAsync();
         return exposure;

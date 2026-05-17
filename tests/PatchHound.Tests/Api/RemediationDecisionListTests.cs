@@ -144,8 +144,8 @@ public class RemediationDecisionListTests : IDisposable
             installedSoftware.Id,
             "1.2.3",
             ExposureMatchSource.Product,
-            DateTimeOffset.UtcNow.AddDays(-2)
-        );
+            DateTimeOffset.UtcNow.AddDays(-2),
+            runId: Guid.NewGuid());
         var threat = ThreatAssessment.Create(
             vulnerability.Id,
             threatScore: 95m,
@@ -227,8 +227,8 @@ public class RemediationDecisionListTests : IDisposable
             installedSoftware.Id,
             installedSoftware.Version,
             ExposureMatchSource.Product,
-            DateTimeOffset.UtcNow.AddDays(-2)
-        );
+            DateTimeOffset.UtcNow.AddDays(-2),
+            runId: Guid.NewGuid());
         var error = "Malformed AI response: Expected depth to be zero at the end of the JSON payload.";
         var job = VulnerabilityAssessmentJob.Create(vulnerability.Id, _tenantId, DateTimeOffset.UtcNow.AddMinutes(-2));
         job.Start(DateTimeOffset.UtcNow.AddMinutes(-1));
@@ -281,8 +281,8 @@ public class RemediationDecisionListTests : IDisposable
             installedSoftware,
             critical,
             high,
-            DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, critical.Id, product.Id, installedSoftware.Id, installedSoftware.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow),
-            DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, high.Id, product.Id, installedSoftware.Id, installedSoftware.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow),
+            DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, critical.Id, product.Id, installedSoftware.Id, installedSoftware.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow, Guid.NewGuid()),
+            DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, high.Id, product.Id, installedSoftware.Id, installedSoftware.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow, Guid.NewGuid()),
             highAssessment,
             criticalJob);
         await _dbContext.SaveChangesAsync();
@@ -638,8 +638,8 @@ public class RemediationDecisionListTests : IDisposable
                 installedSoftware.Id,
                 installedSoftware.Version,
                 ExposureMatchSource.Product,
-                DateTimeOffset.UtcNow.AddDays(-2)
-            );
+                DateTimeOffset.UtcNow.AddDays(-2),
+                runId: Guid.NewGuid());
 
             entities.Add(device);
             entities.Add(installedSoftware);

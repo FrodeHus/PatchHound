@@ -268,7 +268,8 @@ public class DevicesControllerTests : IDisposable
             install.Id,
             install.Version,
             ExposureMatchSource.Product,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            runId: Guid.NewGuid());
         var resolvedExposure = DeviceVulnerabilityExposure.Observe(
             _tenantId,
             device.Id,
@@ -277,7 +278,8 @@ public class DevicesControllerTests : IDisposable
             install.Id,
             install.Version,
             ExposureMatchSource.Product,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            runId: Guid.NewGuid());
         resolvedExposure.Resolve(DateTimeOffset.UtcNow);
 
         await _dbContext.AddRangeAsync(openExposure, resolvedExposure);
@@ -375,8 +377,8 @@ public class DevicesControllerTests : IDisposable
         await _dbContext.AddRangeAsync(tenantADevice, tenantBDevice, vuln, installA, installB);
         await _dbContext.SaveChangesAsync();
 
-        var exposureA = DeviceVulnerabilityExposure.Observe(_tenantId, tenantADevice.Id, vuln.Id, installA.SoftwareProductId, installA.Id, installA.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow);
-        var exposureB = DeviceVulnerabilityExposure.Observe(tenantB, tenantBDevice.Id, vuln.Id, installB.SoftwareProductId, installB.Id, installB.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow);
+        var exposureA = DeviceVulnerabilityExposure.Observe(_tenantId, tenantADevice.Id, vuln.Id, installA.SoftwareProductId, installA.Id, installA.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow, Guid.NewGuid());
+        var exposureB = DeviceVulnerabilityExposure.Observe(tenantB, tenantBDevice.Id, vuln.Id, installB.SoftwareProductId, installB.Id, installB.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow, Guid.NewGuid());
         await _dbContext.AddRangeAsync(exposureA, exposureB);
         await _dbContext.SaveChangesAsync();
 

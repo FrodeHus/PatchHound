@@ -236,6 +236,22 @@ public class Device
         SecurityProfileRuleId = null;
     }
 
+    public void Rename(string newName)
+    {
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            throw new ArgumentException("Name is required.", nameof(newName));
+        }
+
+        var normalized = newName.Trim();
+        if (normalized.Length > 256)
+        {
+            throw new ArgumentException("Name must be 256 characters or fewer.", nameof(newName));
+        }
+
+        Name = normalized;
+    }
+
     public void UpdateDetails(string name, string? description = null)
     {
         Name = name;

@@ -85,7 +85,8 @@ public class DashboardControllerTrendTests : IDisposable
             seed.InstallB.Id,
             "2.0.0",
             ExposureMatchSource.Product,
-            now);
+            now,
+            runId: Guid.NewGuid());
 
         _dbContext.DeviceVulnerabilityExposures.Add(duplicateExposure);
         await _dbContext.SaveChangesAsync();

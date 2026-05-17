@@ -81,10 +81,9 @@ public class BackendEndToEndTests : IAsyncLifetime
         // Act 2: simulate runner posting results — ingestion service processes them
         var rawOutput = """{"software":[{"name":"nginx","vendor":"nginx","version":"1.24.0"},{"name":"openssl","version":"3.0.2"}]}""";
 
-        var deviceResolver = new DeviceResolver(_db);
         var softwareResolver = new SoftwareProductResolver(_db);
-        var stagedDeviceMerge = new StagedDeviceMergeService(_db, deviceResolver, softwareResolver);
-        var projectionService = new NormalizedSoftwareProjectionService(_db);
+        var stagedDeviceMerge = new StagedDeviceMergeService(_db, softwareResolver, new InMemoryBulkDeviceMergeWriter(_db));
+        var projectionService = new NormalizedSoftwareProjectionService(new InMemoryBulkSoftwareProjectionWriter(_db));
         var validator = new AuthenticatedScanOutputValidator();
         var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedDeviceMerge, projectionService, new InMemoryIngestionBulkWriter(_db));
 

@@ -10,6 +10,7 @@ public class InstalledSoftware
     public string Version { get; private set; } = "";
     public DateTimeOffset FirstSeenAt { get; private set; }
     public DateTimeOffset LastSeenAt { get; private set; }
+    public Guid? LastSeenRunId { get; private set; }
 
     private InstalledSoftware() { }
 
@@ -19,7 +20,8 @@ public class InstalledSoftware
         Guid softwareProductId,
         Guid sourceSystemId,
         string? version,
-        DateTimeOffset at)
+        DateTimeOffset at,
+        Guid? runId = null)
     {
         if (tenantId == Guid.Empty)
         {
@@ -41,6 +43,10 @@ public class InstalledSoftware
         {
             throw new ArgumentException("Observation timestamp is required.", nameof(at));
         }
+        if (runId == Guid.Empty)
+        {
+            throw new ArgumentException("RunId cannot be empty.", nameof(runId));
+        }
 
         var normalizedVersion = version?.Trim() ?? "";
         if (normalizedVersion.Length > 128)
@@ -58,14 +64,25 @@ public class InstalledSoftware
             Version = normalizedVersion,
             FirstSeenAt = at,
             LastSeenAt = at,
+            LastSeenRunId = runId,
         };
     }
 
-    public void Touch(DateTimeOffset at)
+    public void Touch(DateTimeOffset at, Guid? runId = null)
     {
+        if (runId == Guid.Empty)
+        {
+            throw new ArgumentException("RunId cannot be empty.", nameof(runId));
+        }
+
         if (at > LastSeenAt)
         {
             LastSeenAt = at;
+        }
+
+        if (runId.HasValue)
+        {
+            LastSeenRunId = runId;
         }
     }
 }

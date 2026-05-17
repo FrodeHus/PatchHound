@@ -1564,6 +1564,9 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("LastObservedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("LastSeenRunId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("MatchSource")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -1602,6 +1605,8 @@ namespace PatchHound.Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.HasIndex("VulnerabilityId");
+
+                    b.HasIndex("TenantId", "LastSeenRunId");
 
                     b.HasIndex("TenantId", "Status");
 
@@ -2127,6 +2132,9 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("LastSeenAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("LastSeenRunId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("SoftwareProductId")
                         .HasColumnType("uuid");
 
@@ -2151,7 +2159,12 @@ namespace PatchHound.Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
+                    b.HasIndex("TenantId", "LastSeenRunId");
+
                     b.HasIndex("TenantId", "SoftwareProductId");
+
+                    b.HasIndex("TenantId", "LastSeenRunId", "SoftwareProductId")
+                        .HasDatabaseName("IX_InstalledSoftware_TenantId_LastSeenRunId_SoftwareProductId");
 
                     b.HasIndex("TenantId", "DeviceId", "SoftwareProductId", "SourceSystemId", "Version")
                         .IsUnique();
@@ -4512,6 +4525,11 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<Guid?>("SoftwareProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("VersionEndExcluding")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -4541,6 +4559,11 @@ namespace PatchHound.Infrastructure.Migrations
                     b.HasIndex("VulnerabilityId", "CpeCriteria");
 
                     b.HasIndex("VulnerabilityId", "SoftwareProductId");
+
+                    b.HasIndex("VulnerabilityId", "Source");
+
+                    b.HasIndex("Vulnerable", "SoftwareProductId")
+                        .HasDatabaseName("IX_VulnerabilityApplicabilities_Vulnerable_SoftwareProductId");
 
                     b.ToTable("VulnerabilityApplicabilities");
                 });
@@ -4954,7 +4977,7 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal?>("MaxCvss")
-                        .HasColumnType("numeric(5,2)");
+                        .HasColumnType("numeric(4,2)");
 
                     b.Property<DateTimeOffset?>("PublishedDate")
                         .HasColumnType("timestamp with time zone");
@@ -4964,8 +4987,8 @@ namespace PatchHound.Infrastructure.Migrations
 
                     b.Property<string>("VendorSeverity")
                         .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<Guid>("VulnerabilityId")
                         .HasColumnType("uuid");

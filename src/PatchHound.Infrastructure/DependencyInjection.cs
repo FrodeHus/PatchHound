@@ -12,6 +12,7 @@ using PatchHound.Infrastructure.Options;
 using PatchHound.Infrastructure.Repositories;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Services.Bulk;
 using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Infrastructure.Services.Workflows;
 using PatchHound.Infrastructure.Tenants;
@@ -61,6 +62,12 @@ public static class DependencyInjection
 
         // Unit of Work
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PatchHoundDbContext>());
+
+        // Bulk writers (Postgres-native)
+        services.AddScoped<IBulkExposureWriter, PostgresBulkExposureWriter>();
+        services.AddScoped<IBulkDeviceMergeWriter, PostgresBulkDeviceMergeWriter>();
+        services.AddScoped<IBulkVulnerabilityReferenceWriter, PostgresBulkVulnerabilityReferenceWriter>();
+        services.AddScoped<IBulkSoftwareProjectionWriter, PostgresBulkSoftwareProjectionWriter>();
 
         // Repositories
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
@@ -212,7 +219,6 @@ public static class DependencyInjection
 
         // Inventory resolvers & staged-device merge (needed by IngestionService + AuthenticatedScanIngestionService)
         services.AddScoped<ISoftwareProductResolver, PatchHound.Infrastructure.Services.Inventory.SoftwareProductResolver>();
-        services.AddScoped<IDeviceResolver, PatchHound.Infrastructure.Services.Inventory.DeviceResolver>();
         services.AddScoped<IStagedDeviceMergeService, StagedDeviceMergeService>();
         services.AddScoped<IStagedCloudApplicationMergeService, StagedCloudApplicationMergeService>();
 
@@ -256,6 +262,8 @@ public static class DependencyInjection
             sp.GetRequiredService<IngestionStagingPipeline>(),
             sp.GetRequiredService<IngestionSnapshotLifecycle>(),
             sp.GetRequiredService<IIngestionBulkWriter>(),
+            sp.GetRequiredService<IBulkExposureWriter>(),
+            sp.GetRequiredService<IBulkVulnerabilityReferenceWriter>(),
             sp.GetService<MaterializedViewRefreshService>(),
             sp.GetRequiredService<ILogger<IngestionService>>()
         ));

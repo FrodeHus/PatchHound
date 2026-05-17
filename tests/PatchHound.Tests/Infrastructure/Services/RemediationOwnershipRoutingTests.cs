@@ -141,8 +141,8 @@ public class RemediationOwnershipRoutingTests : IDisposable
             null,
             "1.0.0",
             ExposureMatchSource.Product,
-            DateTimeOffset.UtcNow
-        );
+            DateTimeOffset.UtcNow,
+            runId: Guid.NewGuid());
 
         await _dbContext.AddRangeAsync(
             ownerTeam,

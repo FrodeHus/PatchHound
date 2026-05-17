@@ -4,6 +4,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Infrastructure.Services;
 
@@ -19,7 +20,7 @@ public class NormalizedSoftwareProjectionServiceTests : IDisposable
         _sourceSystem = SourceSystem.Create("defender", "Defender");
         _db.SourceSystems.Add(_sourceSystem);
         _db.SaveChanges();
-        _sut = new NormalizedSoftwareProjectionService(_db);
+        _sut = new NormalizedSoftwareProjectionService(new InMemoryBulkSoftwareProjectionWriter(_db));
     }
 
     public void Dispose()

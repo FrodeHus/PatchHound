@@ -157,7 +157,8 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
             null,
             "1.0.0",
             ExposureMatchSource.Product,
-            now.AddHours(-2));
+            now.AddHours(-2),
+            runId: Guid.NewGuid());
         _db.DeviceVulnerabilityExposures.Add(secondExposure);
         await _db.SaveChangesAsync();
 
