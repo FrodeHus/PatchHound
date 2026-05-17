@@ -208,8 +208,13 @@ public class ExposureDerivationServiceCteTests
     }
 
     [Fact]
-    public async Task DeriveForTenantAsync_only_derives_from_installs_seen_in_current_run()
+    public async Task DeriveForTenantAsync_derives_across_installs_from_other_sources_prior_runs()
     {
+        // Regression test: derivation must be source-agnostic. Each ingestion source
+        // acquires its own run id, so filtering installs by "LastSeenRunId == currentRun"
+        // excludes every other source's installs and causes ResolveStaleAsync to mark
+        // their exposures as Resolved — emptying the dashboard. See ExposureDerivationService
+        // for the matching note.
         await _fx.ResetAsync();
         await using var db = _fx.CreateDbContext();
 
@@ -222,15 +227,15 @@ public class ExposureDerivationServiceCteTests
 
         var source = SourceSystem.Create("test", "Test");
         db.SourceSystems.Add(source);
-        var staleDevice = Device.Create(TenantId, source.Id, "dev-old", "Old Device", Criticality.Medium);
-        var currentDevice = Device.Create(TenantId, source.Id, "dev-current", "Current Device", Criticality.Medium);
-        db.Devices.AddRange(staleDevice, currentDevice);
+        var otherSourceDevice = Device.Create(TenantId, source.Id, "dev-other-src", "Other-source Device", Criticality.Medium);
+        var currentSourceDevice = Device.Create(TenantId, source.Id, "dev-current-src", "Current-source Device", Criticality.Medium);
+        db.Devices.AddRange(otherSourceDevice, currentSourceDevice);
 
-        var oldRun = Guid.NewGuid();
+        var otherSourceRun = Guid.NewGuid();  // Stand-in for a prior ingestion of a different source.
         var currentRun = Guid.NewGuid();
         db.InstalledSoftware.AddRange(
-            InstalledSoftware.Observe(TenantId, staleDevice.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow.AddHours(-1), oldRun),
-            InstalledSoftware.Observe(TenantId, currentDevice.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow, currentRun));
+            InstalledSoftware.Observe(TenantId, otherSourceDevice.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow.AddHours(-1), otherSourceRun),
+            InstalledSoftware.Observe(TenantId, currentSourceDevice.Id, product.Id, source.Id, "1.0", DateTimeOffset.UtcNow, currentRun));
         await db.SaveChangesAsync();
 
         var svc = new ExposureDerivationService(
@@ -238,9 +243,11 @@ public class ExposureDerivationServiceCteTests
 
         var result = await svc.DeriveForTenantAsync(TenantId, DateTimeOffset.UtcNow, currentRun, CancellationToken.None);
 
-        result.Inserted.Should().Be(1);
-        var exposure = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().SingleAsync();
-        exposure.DeviceId.Should().Be(currentDevice.Id);
-        exposure.LastSeenRunId.Should().Be(currentRun);
+        result.Inserted.Should().Be(2);
+        var exposures = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters()
+            .ToListAsync();
+        exposures.Should().HaveCount(2);
+        exposures.Select(e => e.DeviceId).Should().BeEquivalentTo(new[] { otherSourceDevice.Id, currentSourceDevice.Id });
+        exposures.Should().OnlyContain(e => e.LastSeenRunId == currentRun);
     }
 }

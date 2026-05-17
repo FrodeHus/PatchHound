@@ -124,7 +124,14 @@ public class ExposureDerivationService(
                 FROM "InstalledSoftware" i
                 LEFT JOIN "SoftwareProducts" p ON p."Id" = i."SoftwareProductId"
                 WHERE i."TenantId" = @tenantId
-                  AND i."LastSeenRunId" = @runId
+                -- Intentionally NOT scoped to "LastSeenRunId" = @runId. Each ingestion
+                -- source acquires its own run id, so a per-run filter would exclude
+                -- installs from every other source's prior run. Derivation then
+                -- produces only the current source's exposures, and ResolveStaleAsync
+                -- marks every other source's exposures as Resolved — emptying the
+                -- "Status = 'Open'" materialized views. Source-agnostic derivation
+                -- is the correct semantic here; staleness of InstalledSoftware rows
+                -- is a separate concern handled elsewhere.
             ),
             product_matches AS (
                 SELECT ai.device_id,
@@ -199,7 +206,8 @@ public class ExposureDerivationService(
             // explicit transaction because temp tables and atomicity require it.
             await using var cmd = new NpgsqlCommand(sql, connection);
             cmd.Parameters.AddWithValue("tenantId", tenantId);
-            cmd.Parameters.AddWithValue("runId", runId);
+            // runId is intentionally not bound — the CTE is source-agnostic and does not filter on it.
+            _ = runId;
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
@@ -231,8 +239,10 @@ public class ExposureDerivationService(
     /// </summary>
     private async Task<List<DerivedExposureRow>> LoadDerivedExposuresInMemoryAsync(Guid tenantId, Guid runId, CancellationToken ct)
     {
+        // See note in LoadDerivedExposuresPostgresAsync: derivation must NOT be
+        // scoped by LastSeenRunId, because each ingestion source uses its own run id.
         var installs = await db.InstalledSoftware.AsNoTracking()
-            .Where(i => i.TenantId == tenantId && i.LastSeenRunId == runId)
+            .Where(i => i.TenantId == tenantId)
             .Select(i => new
             {
                 i.Id,
