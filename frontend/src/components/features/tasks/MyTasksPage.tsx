@@ -24,9 +24,6 @@ export function MyTasksPage({
   onLoadNext,
   onPageSizeChange,
 }: MyTasksPageProps) {
-  const loadedCount = sections.reduce((sum, section) => sum + section.items.length, 0)
-  const activeQueueCount = sections.filter((section) => section.items.length > 0 || section.hasMore).length
-
   return (
     <section className="space-y-5">
       <header className="rounded-[28px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_50%),var(--color-card)] p-5">
@@ -39,12 +36,11 @@ export function MyTasksPage({
               My tasks
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Remediation cases waiting on your action, grouped by what each role needs to do next.
+              Remediation cases waiting on your action, grouped by what each
+              role needs to do next.
             </p>
           </div>
           <div className="grid min-w-[260px] gap-3 rounded-xl border border-border/70 bg-background/50 p-4">
-            <Metric label="Active queues" value={activeQueueCount.toLocaleString()} />
-            <Metric label="Loaded tasks" value={loadedCount.toLocaleString()} />
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 Page size
@@ -81,7 +77,7 @@ export function MyTasksPage({
         ))
       )}
     </section>
-  )
+  );
 }
 
 function approvalWorkbenchRouteForOutcome(outcome: string | null) {
