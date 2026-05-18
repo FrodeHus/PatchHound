@@ -347,7 +347,7 @@ git commit -m "feat: merge source software identities incrementally"
 - Modify `PostgresIngestionStateMerger.cs`
 - Test `tests/PatchHound.Tests/Infrastructure/IngestionV2/PostgresIngestionStateMergerInstallationTests.cs`
 
-- [ ] **Step 1: Write failing installation merge test**
+- [x] **Step 1: Write failing installation merge test**
 
 ```csharp
 [Fact]
@@ -367,11 +367,11 @@ public async Task MergeInstallationsAsync_updates_only_current_run_devices_and_r
 }
 ```
 
-- [ ] **Step 2: Implement `MergeDevicesAsync`**
+- [x] **Step 2: Implement `MergeDevicesAsync`**
 
 Use `RawDeviceObservations` as source and upsert `Devices` with `ON CONFLICT (TenantId, SourceSystemId, ExternalId)`.
 
-- [ ] **Step 3: Implement `MergeInstallationsAsync`**
+- [x] **Step 3: Implement `MergeInstallationsAsync`**
 
 Join raw installations to:
 
@@ -381,11 +381,13 @@ Join raw installations to:
 
 Upsert `InstalledSoftware`. Store `SoftwareSourceIdentityId` and `SoftwareReleaseId` if new columns are introduced; otherwise store the resolved product and version.
 
-- [ ] **Step 4: Implement stale installation resolution**
+- [x] **Step 4: Implement stale installation resolution**
 
 For devices touched in the run, mark prior installations from the same source inactive when absent from `RawInstallationObservations` for the run. Prefer an `IsActive` flag over deleting rows.
 
-- [ ] **Step 5: Run tests**
+Implemented with the existing schema by treating `InstalledSoftware.LastSeenRunId` as the current-run marker; stale rows are not deleted and are not touched for the current run.
+
+- [x] **Step 5: Run tests**
 
 Run: `dotnet test PatchHound.slnx --filter FullyQualifiedName~PostgresIngestionStateMergerInstallationTests -v minimal`
 
@@ -836,4 +838,3 @@ Because this is greenfield and does not preserve legacy compatibility, rollout s
 3. Run the realistic benchmark.
 4. Run one real Defender ingestion against a disposable tenant.
 5. Only then remove old migrations or squash schema if desired.
-

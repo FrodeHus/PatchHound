@@ -6,9 +6,27 @@ public sealed record SoftwareStateMergeResult(
     int SourceIdentityCount,
     int ProductDeltaCount);
 
+public sealed record DeviceStateMergeResult(
+    int DeviceCount,
+    int DeviceDeltaCount);
+
+public sealed record InstallationStateMergeResult(
+    int InstallationCount,
+    int InstallationDeltaCount);
+
 public interface IIngestionStateMerger
 {
     Task<SoftwareStateMergeResult> MergeSoftwareAsync(
+        Guid tenantId,
+        Guid runId,
+        CancellationToken ct);
+
+    Task<DeviceStateMergeResult> MergeDevicesAsync(
+        Guid tenantId,
+        Guid runId,
+        CancellationToken ct);
+
+    Task<InstallationStateMergeResult> MergeInstallationsAsync(
         Guid tenantId,
         Guid runId,
         CancellationToken ct);
