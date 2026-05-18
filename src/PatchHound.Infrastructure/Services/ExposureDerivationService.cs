@@ -189,6 +189,10 @@ public class ExposureDerivationService(
             try
             {
                 await using var cmd = new NpgsqlCommand(sql, connection);
+                // Default Npgsql CommandTimeout is 30s; a full-tenant derivation+upsert can
+                // exceed that for large tenants on cold caches. This is one batch job per
+                // ingestion run, not an interactive query — a long ceiling is appropriate.
+                cmd.CommandTimeout = 600;
                 cmd.Parameters.AddWithValue("tenantId", tenantId);
                 cmd.Parameters.AddWithValue("observedAt", observedAt);
                 cmd.Parameters.AddWithValue("runId", runId);
