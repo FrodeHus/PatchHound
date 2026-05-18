@@ -39,7 +39,183 @@ public class ExposureDerivationService(
         Guid runId,
         CancellationToken ct)
     {
-        var derived = await LoadDerivedExposuresAsync(tenantId, runId, ct);
+        BulkExposureUpsertResult bulkResult;
+        if (db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            bulkResult = await DeriveAndUpsertInMemoryAsync(tenantId, observedAt, runId, ct);
+        }
+        else
+        {
+            bulkResult = await DeriveAndUpsertPostgresAsync(tenantId, observedAt, runId, ct);
+        }
+
+        var resolved = await bulkWriter.ResolveStaleAsync(tenantId, runId, observedAt, ct);
+
+        logger.LogInformation(
+            "Derived exposures for tenant {TenantId}: inserted {Inserted}, reobserved {Reobserved}, resolved {Resolved}",
+            tenantId,
+            bulkResult.Inserted,
+            bulkResult.Reobserved,
+            resolved);
+
+        return new ExposureDerivationResult(bulkResult.Inserted, bulkResult.Reobserved, resolved);
+    }
+
+    /// <summary>
+    /// Single server-side statement: derives installs × applicabilities, filters by
+    /// version range via the <c>patchhound_version_matches</c> SQL function, dedupes
+    /// per (device, vulnerability), and upserts into <c>DeviceVulnerabilityExposures</c>.
+    /// Returns insert/update counts via <c>(xmax = 0)</c>. Memory cost is O(1) on the
+    /// worker — only the count row crosses the wire.
+    /// </summary>
+    private async Task<BulkExposureUpsertResult> DeriveAndUpsertPostgresAsync(
+        Guid tenantId, DateTimeOffset observedAt, Guid runId, CancellationToken ct)
+    {
+        // One round-trip: derive (installs × applicabilities, product-keyed first, CPE
+        // fallback when applicability has no product), filter by version range via the
+        // patchhound_version_matches() SQL function, dedupe per (device, vulnerability)
+        // with a deterministic preference for Product matches over CPE-fallback matches,
+        // then upsert into DeviceVulnerabilityExposures. Insert vs. update is detected
+        // via xmax = 0 in RETURNING — same trick PostgresBulkExposureWriter uses.
+        //
+        // EF global query filter audit (raw SQL bypasses HasQueryFilter):
+        //   - InstalledSoftware: filter is `IsSystemContext || AccessibleTenantIds.Contains(TenantId)`.
+        //     Covered by the explicit `i."TenantId" = @tenantId` predicate below — this method
+        //     is invoked per-tenant by the caller (which itself has authority to resolve tenantId).
+        //   - SoftwareProducts / VulnerabilityApplicabilities: no global query filter (shared catalog).
+        //
+        // Derivation is intentionally NOT scoped to "LastSeenRunId" = @runId. Each ingestion
+        // source acquires its own run id; a per-run filter would exclude installs from every
+        // other source's prior run, and ResolveStaleAsync would then resolve every other
+        // source's exposures. Staleness of InstalledSoftware rows is a separate concern.
+        const string sql = """
+            WITH active_installs AS (
+                SELECT i."Id"                 AS installed_software_id,
+                       i."DeviceId"           AS device_id,
+                       i."SoftwareProductId"  AS software_product_id,
+                       i."Version"            AS matched_version,
+                       p."PrimaryCpe23Uri"    AS product_cpe
+                FROM "InstalledSoftware" i
+                LEFT JOIN "SoftwareProducts" p ON p."Id" = i."SoftwareProductId"
+                WHERE i."TenantId" = @tenantId
+            ),
+            product_matches AS (
+                SELECT ai.device_id,
+                       a."VulnerabilityId" AS vulnerability_id,
+                       ai.software_product_id,
+                       ai.installed_software_id,
+                       ai.matched_version,
+                       'Product' AS match_source,
+                       a."VersionStartIncluding" AS vsi,
+                       a."VersionStartExcluding" AS vse,
+                       a."VersionEndIncluding"   AS vei,
+                       a."VersionEndExcluding"   AS vee
+                FROM active_installs ai
+                JOIN "VulnerabilityApplicabilities" a
+                  ON a."SoftwareProductId" = ai.software_product_id
+                WHERE a."Vulnerable" = TRUE
+            ),
+            cpe_matches AS (
+                SELECT ai.device_id,
+                       a."VulnerabilityId" AS vulnerability_id,
+                       ai.software_product_id,
+                       ai.installed_software_id,
+                       ai.matched_version,
+                       'Cpe' AS match_source,
+                       a."VersionStartIncluding" AS vsi,
+                       a."VersionStartExcluding" AS vse,
+                       a."VersionEndIncluding"   AS vei,
+                       a."VersionEndExcluding"   AS vee
+                FROM active_installs ai
+                JOIN "VulnerabilityApplicabilities" a
+                  ON a."SoftwareProductId" IS NULL
+                 AND a."CpeCriteria" IS NOT NULL
+                 AND ai.product_cpe IS NOT NULL
+                 AND lower(a."CpeCriteria") = lower(ai.product_cpe)
+                WHERE a."Vulnerable" = TRUE
+            ),
+            candidates AS (
+                SELECT * FROM product_matches
+                UNION ALL
+                SELECT * FROM cpe_matches
+            ),
+            in_range AS (
+                SELECT c.*
+                FROM candidates c
+                WHERE patchhound_version_matches(c.matched_version, c.vsi, c.vse, c.vei, c.vee)
+            ),
+            deduped AS (
+                SELECT DISTINCT ON (device_id, vulnerability_id)
+                       device_id, vulnerability_id, software_product_id,
+                       installed_software_id, matched_version, match_source
+                FROM in_range
+                -- Prefer Product matches over CPE fallback when both apply to the same (device, vuln).
+                ORDER BY device_id, vulnerability_id,
+                         CASE match_source WHEN 'Product' THEN 0 ELSE 1 END
+            ),
+            upsert AS (
+                INSERT INTO "DeviceVulnerabilityExposures"
+                    ("Id", "TenantId", "DeviceId", "VulnerabilityId",
+                     "SoftwareProductId", "InstalledSoftwareId",
+                     "MatchedVersion", "MatchSource", "Status",
+                     "FirstObservedAt", "LastObservedAt", "ResolvedAt", "LastSeenRunId")
+                SELECT gen_random_uuid(), @tenantId, device_id, vulnerability_id,
+                       software_product_id, installed_software_id,
+                       COALESCE(matched_version, ''), match_source, 'Open',
+                       @observedAt, @observedAt, NULL, @runId
+                FROM deduped
+                ON CONFLICT ("TenantId", "DeviceId", "VulnerabilityId")
+                DO UPDATE SET
+                    "LastObservedAt" = GREATEST(EXCLUDED."LastObservedAt", "DeviceVulnerabilityExposures"."LastObservedAt"),
+                    "Status"         = 'Open',
+                    "ResolvedAt"     = NULL,
+                    "LastSeenRunId"  = EXCLUDED."LastSeenRunId"
+                RETURNING (xmax = 0) AS inserted
+            )
+            SELECT
+                COALESCE(SUM(CASE WHEN inserted THEN 1 ELSE 0 END), 0)::int AS inserted_count,
+                COALESCE(SUM(CASE WHEN NOT inserted THEN 1 ELSE 0 END), 0)::int AS updated_count
+            FROM upsert;
+            """;
+
+        // EF execution strategy wraps the (single) statement so Npgsql's retry-on-failure
+        // policy can re-issue it on a transient error without partial visible state.
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+            var wasOpen = connection.State == System.Data.ConnectionState.Open;
+            if (!wasOpen) await connection.OpenAsync(ct);
+            try
+            {
+                await using var cmd = new NpgsqlCommand(sql, connection);
+                cmd.Parameters.AddWithValue("tenantId", tenantId);
+                cmd.Parameters.AddWithValue("observedAt", observedAt);
+                cmd.Parameters.AddWithValue("runId", runId);
+                await using var reader = await cmd.ExecuteReaderAsync(ct);
+                if (!await reader.ReadAsync(ct))
+                {
+                    return new BulkExposureUpsertResult(0, 0);
+                }
+                var inserted = reader.GetInt32(0);
+                var updated = reader.GetInt32(1);
+                return new BulkExposureUpsertResult(inserted, updated);
+            }
+            finally
+            {
+                if (!wasOpen) await connection.CloseAsync();
+            }
+        });
+    }
+
+    /// <summary>
+    /// InMemory provider path: keeps the LINQ derivation + buffered <see cref="IBulkExposureWriter.UpsertAsync"/>
+    /// flow used by tests. Production traffic always goes through the Postgres path.
+    /// </summary>
+    private async Task<BulkExposureUpsertResult> DeriveAndUpsertInMemoryAsync(
+        Guid tenantId, DateTimeOffset observedAt, Guid runId, CancellationToken ct)
+    {
+        var derived = await LoadDerivedExposuresInMemoryAsync(tenantId, runId, ct);
 
         var rows = new List<ExposureUpsertRow>(derived.Count);
         foreach (var d in derived)
@@ -58,10 +234,6 @@ public class ExposureDerivationService(
                 tenantId,
                 d.DeviceId,
                 d.VulnerabilityId,
-                // MatchSource encodes provenance: "Product" means we joined on SoftwareProductId,
-                // so SoftwareProductId on the exposure should match the install's product. For
-                // "Cpe" matches the applicability has no SoftwareProductId — we still record the
-                // install's product since that's what was scanned on the device.
                 d.SoftwareProductId,
                 d.InstalledSoftwareId,
                 d.MatchedVersion ?? string.Empty,
@@ -70,165 +242,7 @@ public class ExposureDerivationService(
                 runId));
         }
 
-        var bulkResult = await bulkWriter.UpsertAsync(rows, ct);
-        var resolved = await bulkWriter.ResolveStaleAsync(tenantId, runId, observedAt, ct);
-
-        logger.LogInformation(
-            "Derived exposures for tenant {TenantId}: inserted {Inserted}, reobserved {Reobserved}, resolved {Resolved}",
-            tenantId,
-            bulkResult.Inserted,
-            bulkResult.Reobserved,
-            resolved);
-
-        return new ExposureDerivationResult(bulkResult.Inserted, bulkResult.Reobserved, resolved);
-    }
-
-    /// <summary>
-    /// Runs the install × applicability cross-join server-side as a single CTE on
-    /// PostgreSQL. Falls back to a LINQ-shaped equivalent for the EF Core InMemory
-    /// provider (used by legacy InMemory tests). Both paths emit the same row shape.
-    /// </summary>
-    private async Task<List<DerivedExposureRow>> LoadDerivedExposuresAsync(Guid tenantId, Guid runId, CancellationToken ct)
-    {
-        var provider = db.Database.ProviderName;
-        if (provider == "Microsoft.EntityFrameworkCore.InMemory")
-        {
-            return await LoadDerivedExposuresInMemoryAsync(tenantId, runId, ct);
-        }
-
-        return await LoadDerivedExposuresPostgresAsync(tenantId, runId, ct);
-    }
-
-    private async Task<List<DerivedExposureRow>> LoadDerivedExposuresPostgresAsync(Guid tenantId, Guid runId, CancellationToken ct)
-    {
-        // Single CTE — joins active installs to applicabilities by SoftwareProductId
-        // first, with a CPE-equality fallback when the applicability has no product
-        // key. Range predicates and Version.TryParse can't be expressed in pure SQL
-        // (we'd need a semver parser) so VersionMatches stays client-side and runs
-        // over this already-narrowed output.
-        //
-        // EF global query filter audit (raw SQL bypasses HasQueryFilter):
-        //   - InstalledSoftware: filter is `IsSystemContext || AccessibleTenantIds.Contains(TenantId)`.
-        //     Covered by the explicit `i."TenantId" = @tenantId` predicate below — this method
-        //     is invoked per-tenant by the caller (which itself has authority to resolve tenantId).
-        //   - SoftwareProducts: no global query filter (canonical/shared catalog entity).
-        //   - VulnerabilityApplicabilities: no global query filter (canonical/shared catalog entity).
-        // No additional predicates are needed.
-        const string sql = """
-            WITH active_installs AS (
-                SELECT i."Id" AS installed_software_id,
-                       i."DeviceId" AS device_id,
-                       i."SoftwareProductId" AS software_product_id,
-                       i."Version" AS matched_version,
-                       p."PrimaryCpe23Uri" AS product_cpe
-                FROM "InstalledSoftware" i
-                LEFT JOIN "SoftwareProducts" p ON p."Id" = i."SoftwareProductId"
-                WHERE i."TenantId" = @tenantId
-                -- Intentionally NOT scoped to "LastSeenRunId" = @runId. Each ingestion
-                -- source acquires its own run id, so a per-run filter would exclude
-                -- installs from every other source's prior run. Derivation then
-                -- produces only the current source's exposures, and ResolveStaleAsync
-                -- marks every other source's exposures as Resolved — emptying the
-                -- "Status = 'Open'" materialized views. Source-agnostic derivation
-                -- is the correct semantic here; staleness of InstalledSoftware rows
-                -- is a separate concern handled elsewhere.
-            ),
-            product_matches AS (
-                SELECT ai.device_id,
-                       a."VulnerabilityId" AS vulnerability_id,
-                       ai.software_product_id,
-                       ai.installed_software_id,
-                       ai.matched_version,
-                       'Product' AS match_source,
-                       a."VersionStartIncluding" AS version_start_including,
-                       a."VersionStartExcluding" AS version_start_excluding,
-                       a."VersionEndIncluding" AS version_end_including,
-                       a."VersionEndExcluding" AS version_end_excluding
-                FROM active_installs ai
-                JOIN "VulnerabilityApplicabilities" a
-                  ON a."SoftwareProductId" = ai.software_product_id
-                WHERE a."Vulnerable" = TRUE
-            ),
-            cpe_matches AS (
-                SELECT ai.device_id,
-                       a."VulnerabilityId" AS vulnerability_id,
-                       ai.software_product_id,
-                       ai.installed_software_id,
-                       ai.matched_version,
-                       'Cpe' AS match_source,
-                       a."VersionStartIncluding" AS version_start_including,
-                       a."VersionStartExcluding" AS version_start_excluding,
-                       a."VersionEndIncluding" AS version_end_including,
-                       a."VersionEndExcluding" AS version_end_excluding
-                FROM active_installs ai
-                JOIN "VulnerabilityApplicabilities" a
-                  ON a."SoftwareProductId" IS NULL
-                 AND a."CpeCriteria" IS NOT NULL
-                 AND ai.product_cpe IS NOT NULL
-                 AND lower(a."CpeCriteria") = lower(ai.product_cpe)
-                WHERE a."Vulnerable" = TRUE
-            )
-            SELECT ai.device_id,
-                   ai.vulnerability_id,
-                   ai.software_product_id,
-                   ai.installed_software_id,
-                   ai.matched_version,
-                   ai.match_source,
-                   ai.version_start_including,
-                   ai.version_start_excluding,
-                   ai.version_end_including,
-                   ai.version_end_excluding
-            FROM product_matches ai
-            UNION ALL
-            SELECT ai.device_id,
-                   ai.vulnerability_id,
-                   ai.software_product_id,
-                   ai.installed_software_id,
-                   ai.matched_version,
-                   ai.match_source,
-                   ai.version_start_including,
-                   ai.version_start_excluding,
-                   ai.version_end_including,
-                   ai.version_end_excluding
-            FROM cpe_matches ai;
-            """;
-
-        var rows = new List<DerivedExposureRow>();
-        var connection = (NpgsqlConnection)db.Database.GetDbConnection();
-        var wasOpen = connection.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await connection.OpenAsync(ct);
-        try
-        {
-            // Intentional: no explicit transaction. This is a single SELECT statement;
-            // PostgreSQL's default READ COMMITTED isolation provides a consistent
-            // snapshot within the statement. Contrast with PostgresBulkExposureWriter,
-            // which wraps multiple statements (temp table + insert/update) in an
-            // explicit transaction because temp tables and atomicity require it.
-            await using var cmd = new NpgsqlCommand(sql, connection);
-            cmd.Parameters.AddWithValue("tenantId", tenantId);
-            // runId is intentionally not bound — the CTE is source-agnostic and does not filter on it.
-            _ = runId;
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                rows.Add(new DerivedExposureRow(
-                    DeviceId: reader.GetGuid(0),
-                    VulnerabilityId: reader.GetGuid(1),
-                    SoftwareProductId: reader.GetGuid(2),
-                    InstalledSoftwareId: reader.GetGuid(3),
-                    MatchedVersion: reader.IsDBNull(4) ? null : reader.GetString(4),
-                    MatchSource: reader.GetString(5),
-                    VersionStartIncluding: reader.IsDBNull(6) ? null : reader.GetString(6),
-                    VersionStartExcluding: reader.IsDBNull(7) ? null : reader.GetString(7),
-                    VersionEndIncluding: reader.IsDBNull(8) ? null : reader.GetString(8),
-                    VersionEndExcluding: reader.IsDBNull(9) ? null : reader.GetString(9)));
-            }
-        }
-        finally
-        {
-            if (!wasOpen) await connection.CloseAsync();
-        }
-        return rows;
+        return await bulkWriter.UpsertAsync(rows, ct);
     }
 
     /// <summary>
