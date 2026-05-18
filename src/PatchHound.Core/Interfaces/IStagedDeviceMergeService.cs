@@ -6,7 +6,8 @@ public record StagedDeviceMergeSummary(
     int InstalledSoftwareCreated,
     int InstalledSoftwareTouched,
     int DevicesSkipped = 0,
-    int DevicesDeactivated = 0);
+    int DevicesDeactivated = 0,
+    int InstalledSoftwareRemoved = 0);
 
 public interface IStagedDeviceMergeService
 {

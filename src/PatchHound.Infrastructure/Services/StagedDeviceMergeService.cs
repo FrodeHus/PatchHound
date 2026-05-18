@@ -237,13 +237,58 @@ public class StagedDeviceMergeService(
 
         await bulkDeviceMergeWriter.UpsertInstalledSoftwareAsync(installedRows, ct);
 
+        // Per-source stale-install sweep. Each ingestion run is per-(tenant, source) with
+        // full-snapshot semantics: rows the source did not re-report this run are stale.
+        // Without this sweep, ExposureDerivationService (which is intentionally source-
+        // agnostic — see comment in that file) keeps re-deriving exposures from stale
+        // installs, which reopens previously-resolved exposures and inflates the
+        // "recurred" episode count instead of letting ResolveStaleAsync close them.
+        //
+        // Scope = sources that actually participated in this run (drawn from the device
+        // upsert pass — a source counts as "participating" even if it ingested zero
+        // software for some devices, so its stale installs still need pruning).
+        // The DeviceVulnerabilityExposure → InstalledSoftware FK is OnDelete(SetNull),
+        // so deleting the install simply nulls the back-reference and the exposure
+        // stays intact for ResolveStaleAsync to close on its LastSeenRunId mismatch.
+        var participatingSourceIds = participatingDeviceKeys.Values
+            .Select(v => v.SourceSystemId)
+            .Distinct()
+            .ToList();
+        var installedSoftwareRemoved = 0;
+        if (participatingSourceIds.Count > 0)
+        {
+            var staleQuery = db.InstalledSoftware
+                .IgnoreQueryFilters()
+                .Where(i => i.TenantId == tenantId
+                         && participatingSourceIds.Contains(i.SourceSystemId)
+                         && i.LastSeenRunId != ingestionRunId);
+
+            if (db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+            {
+                // InMemory provider does not support ExecuteDeleteAsync; fall back to
+                // load + Remove. Production traffic always uses the Postgres path.
+                var staleRows = await staleQuery.ToListAsync(ct);
+                if (staleRows.Count > 0)
+                {
+                    db.InstalledSoftware.RemoveRange(staleRows);
+                    await db.SaveChangesAsync(ct);
+                    installedSoftwareRemoved = staleRows.Count;
+                }
+            }
+            else
+            {
+                installedSoftwareRemoved = await staleQuery.ExecuteDeleteAsync(ct);
+            }
+        }
+
         return new StagedDeviceMergeSummary(
             DevicesCreated: devicesCreated,
             DevicesTouched: devicesTouched,
             InstalledSoftwareCreated: installedCreated,
             InstalledSoftwareTouched: installedTouched,
             DevicesSkipped: devicesSkipped,
-            DevicesDeactivated: devicesDeactivated
+            DevicesDeactivated: devicesDeactivated,
+            InstalledSoftwareRemoved: installedSoftwareRemoved
         );
     }
 
