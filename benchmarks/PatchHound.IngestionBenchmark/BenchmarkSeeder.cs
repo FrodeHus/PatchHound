@@ -36,14 +36,10 @@ public static class BenchmarkSeeder
     {
         var stagedAt = observedAt;
 
-        var softwareCatalog = new List<(string ExternalId, string Vendor, string Product, string Version)>();
+        var sharedSoftwareCatalog = new List<(string ExternalId, string Vendor, string Product, string Version)>();
         for (var i = 0; i < opts.SoftwarePerDevice; i++)
         {
-            softwareCatalog.Add((
-                ExternalId: $"sw-{i:D3}",
-                Vendor: $"Vendor{i % 5}",
-                Product: $"Product{i}",
-                Version: $"{(i % 4) + 1}.0.{i}"));
+            sharedSoftwareCatalog.Add(CreateSoftwareCatalogEntry(i, deviceIndex: null));
         }
 
         var vulnCatalog = new List<(string ExternalId, string Title, Severity Severity, decimal Cvss)>();
@@ -58,30 +54,14 @@ public static class BenchmarkSeeder
         }
 
         // Software assets — one StagedDevice row per software entry (AssetType.Software).
-        foreach (var sw in softwareCatalog)
+        // The default shared catalog models small package catalogs. The per-device mode
+        // models Defender data where source external IDs are often unique per device.
+        if (opts.SoftwareCatalog == SoftwareCatalogMode.Shared)
         {
-            var softwareAsset = new IngestionAsset(
-                ExternalId: sw.ExternalId,
-                Name: $"{sw.Vendor} {sw.Product} {sw.Version}",
-                AssetType: AssetType.Software,
-                Description: null,
-                Metadata: JsonSerializer.Serialize(new
-                {
-                    softwareId = sw.ExternalId,
-                    name = sw.Product,
-                    vendor = sw.Vendor,
-                    version = sw.Version,
-                    derivedFromSoftwareInventory = true,
-                }));
-            db.StagedDevices.Add(StagedDevice.Create(
-                ingestionRunId: runId,
-                tenantId: tenantId,
-                sourceKey: SourceKey,
-                externalId: sw.ExternalId,
-                name: softwareAsset.Name,
-                assetType: AssetType.Software,
-                payloadJson: JsonSerializer.Serialize(softwareAsset),
-                stagedAt: stagedAt));
+            foreach (var sw in sharedSoftwareCatalog)
+            {
+                AddSoftwareAsset(db, tenantId, runId, stagedAt, sw);
+            }
         }
 
         // Devices + software links.
@@ -112,8 +92,19 @@ public static class BenchmarkSeeder
                 payloadJson: JsonSerializer.Serialize(deviceAsset),
                 stagedAt: stagedAt));
 
-            foreach (var sw in softwareCatalog)
+            var deviceSoftwareCatalog = opts.SoftwareCatalog == SoftwareCatalogMode.Shared
+                ? sharedSoftwareCatalog
+                : Enumerable.Range(0, opts.SoftwarePerDevice)
+                    .Select(i => CreateSoftwareCatalogEntry(i, d))
+                    .ToList();
+
+            foreach (var sw in deviceSoftwareCatalog)
             {
+                if (opts.SoftwareCatalog == SoftwareCatalogMode.PerDevice)
+                {
+                    AddSoftwareAsset(db, tenantId, runId, stagedAt, sw);
+                }
+
                 var link = new IngestionDeviceSoftwareLink(
                     DeviceExternalId: deviceExternalId,
                     SoftwareExternalId: sw.ExternalId,
@@ -135,7 +126,7 @@ public static class BenchmarkSeeder
         for (var v = 0; v < vulnCatalog.Count; v++)
         {
             var vuln = vulnCatalog[v];
-            var targetSoftware = softwareCatalog[v % softwareCatalog.Count];
+            var targetSoftware = sharedSoftwareCatalog[v % sharedSoftwareCatalog.Count];
 
             var vulnPayload = new IngestionResult(
                 ExternalId: vuln.ExternalId,
@@ -188,5 +179,50 @@ public static class BenchmarkSeeder
                         stagedAt: stagedAt));
             }
         }
+    }
+
+    private static (string ExternalId, string Vendor, string Product, string Version) CreateSoftwareCatalogEntry(
+        int softwareIndex,
+        int? deviceIndex)
+    {
+        var externalId = deviceIndex.HasValue
+            ? $"sw-{deviceIndex.Value:D6}-{softwareIndex:D3}"
+            : $"sw-{softwareIndex:D3}";
+        return (
+            ExternalId: externalId,
+            Vendor: $"Vendor{softwareIndex % 5}",
+            Product: $"Product{softwareIndex}",
+            Version: $"{(softwareIndex % 4) + 1}.0.{softwareIndex}");
+    }
+
+    private static void AddSoftwareAsset(
+        PatchHoundDbContext db,
+        Guid tenantId,
+        Guid runId,
+        DateTimeOffset stagedAt,
+        (string ExternalId, string Vendor, string Product, string Version) sw)
+    {
+        var softwareAsset = new IngestionAsset(
+            ExternalId: sw.ExternalId,
+            Name: $"{sw.Vendor} {sw.Product} {sw.Version}",
+            AssetType: AssetType.Software,
+            Description: null,
+            Metadata: JsonSerializer.Serialize(new
+            {
+                softwareId = sw.ExternalId,
+                name = sw.Product,
+                vendor = sw.Vendor,
+                version = sw.Version,
+                derivedFromSoftwareInventory = true,
+            }));
+        db.StagedDevices.Add(StagedDevice.Create(
+            ingestionRunId: runId,
+            tenantId: tenantId,
+            sourceKey: SourceKey,
+            externalId: sw.ExternalId,
+            name: softwareAsset.Name,
+            assetType: AssetType.Software,
+            payloadJson: JsonSerializer.Serialize(softwareAsset),
+            stagedAt: stagedAt));
     }
 }

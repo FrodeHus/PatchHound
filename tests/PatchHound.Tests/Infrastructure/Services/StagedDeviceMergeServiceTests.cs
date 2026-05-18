@@ -161,6 +161,48 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Merge_resolves_distinct_external_software_aliases_once_per_canonical_product()
+    {
+        var runId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+
+        var product = SoftwareProduct.Create("Contoso", "Agent", null);
+        _db.SoftwareProducts.Add(product);
+        await _db.SaveChangesAsync();
+
+        var resolver = new CountingSoftwareProductResolver(product);
+        var sut = new StagedDeviceMergeService(
+            _db,
+            resolver,
+            new InMemoryBulkDeviceMergeWriter(_db));
+
+        await SeedStagedDeviceAsync(
+            runId: runId,
+            tenantId: tenantId,
+            deviceExternalId: "dev-many-aliases",
+            deviceName: "many-aliases-host",
+            healthStatus: "Active",
+            lastSeenAt: DateTimeOffset.UtcNow.AddMinutes(-5));
+
+        for (var i = 0; i < 5; i++)
+        {
+            await SeedStagedSoftwareLinkAsync(
+                runId: runId,
+                tenantId: tenantId,
+                deviceExternalId: "dev-many-aliases",
+                softwareExternalId: $"defender-sw::contoso_agent::{i}",
+                softwareAssetName: $"Contoso Agent 1.2.{i}",
+                vendor: "Contoso",
+                productName: "Agent",
+                version: $"1.2.{i}");
+        }
+
+        await sut.MergeAsync(runId, tenantId, CancellationToken.None);
+
+        resolver.CallCount.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Merge_does_not_resolve_unlinked_staged_software_assets()
     {
         var runId = Guid.NewGuid();
@@ -582,6 +624,65 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
             softwareExternalId: softwareExternalId,
             observedAt: link.ObservedAt,
             payloadJson: linkPayloadJson,
+            stagedAt: DateTimeOffset.UtcNow
+        );
+        _db.StagedDeviceSoftwareInstallations.Add(stagedLink);
+
+        await _db.SaveChangesAsync();
+    }
+
+    private async Task SeedStagedSoftwareLinkAsync(
+        Guid runId,
+        Guid tenantId,
+        string deviceExternalId,
+        string softwareExternalId,
+        string softwareAssetName,
+        string vendor,
+        string productName,
+        string version)
+    {
+        var softwareMetadata = JsonSerializer.Serialize(
+            new
+            {
+                softwareId = softwareExternalId,
+                name = productName,
+                vendor = vendor,
+                version = version,
+                derivedFromSoftwareInventory = true,
+            }
+        );
+        var softwareAsset = new IngestionAsset(
+            ExternalId: softwareExternalId,
+            Name: softwareAssetName,
+            AssetType: AssetType.Software,
+            Description: softwareAssetName,
+            Metadata: softwareMetadata
+        );
+        var stagedSoftware = StagedDevice.Create(
+            ingestionRunId: runId,
+            tenantId: tenantId,
+            sourceKey: "defender",
+            externalId: softwareExternalId,
+            name: softwareAssetName,
+            assetType: AssetType.Software,
+            payloadJson: JsonSerializer.Serialize(softwareAsset),
+            stagedAt: DateTimeOffset.UtcNow
+        );
+        _db.StagedDevices.Add(stagedSoftware);
+
+        var link = new IngestionDeviceSoftwareLink(
+            DeviceExternalId: deviceExternalId,
+            SoftwareExternalId: softwareExternalId,
+            ObservedAt: DateTimeOffset.UtcNow
+        );
+        var stagedLink = StagedDeviceSoftwareInstallation.Create(
+            ingestionRunId: runId,
+            tenantId: tenantId,
+            sourceKey: "defender",
+            deviceExternalId: deviceExternalId,
+            softwareExternalId: softwareExternalId,
+            observedAt: link.ObservedAt,
+            payloadJson: JsonSerializer.Serialize(link),
             stagedAt: DateTimeOffset.UtcNow
         );
         _db.StagedDeviceSoftwareInstallations.Add(stagedLink);

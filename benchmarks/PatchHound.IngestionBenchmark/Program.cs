@@ -18,8 +18,10 @@ Console.WriteLine($"  tenants            : {opts.TenantCount}");
 Console.WriteLine($"  devices/tenant     : {opts.DevicesPerTenant}");
 Console.WriteLine($"  vulns/device       : {opts.VulnsPerDevice}");
 Console.WriteLine($"  software/device    : {opts.SoftwarePerDevice}");
+Console.WriteLine($"  software catalog   : {FormatSoftwareCatalog(opts.SoftwareCatalog)}");
 Console.WriteLine($"  runs               : {opts.Runs}");
 Console.WriteLine($"  total devices      : {opts.TotalDevices}");
+Console.WriteLine($"  total staged sw    : {opts.TotalStagedSoftware}");
 Console.WriteLine($"  total staged exps  : {opts.TotalStagedExposures}");
 Console.WriteLine();
 
@@ -200,6 +202,13 @@ for (var runIndex = 0; runIndex < opts.Runs; runIndex++)
 Console.WriteLine("Done. Disposing container ...");
 
 // ───────── helpers ─────────
+
+static string FormatSoftwareCatalog(SoftwareCatalogMode mode) => mode switch
+{
+    SoftwareCatalogMode.Shared => "shared",
+    SoftwareCatalogMode.PerDevice => "per-device",
+    _ => mode.ToString().ToLowerInvariant(),
+};
 
 internal sealed class BenchmarkTenantContext : ITenantContext
 {

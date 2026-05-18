@@ -84,29 +84,10 @@ public class StagedDeviceMergeService(
         var sourceSystems = await db
             .SourceSystems.ToDictionaryAsync(s => s.Key, StringComparer.Ordinal, ct);
 
-        var softwareProductsByExternalId = new Dictionary<string, SoftwareProduct>(StringComparer.OrdinalIgnoreCase);
-        foreach (var stagedSoftwareAsset in stagedSoftwareByExternalId.Values
-            .Where(asset => linkedSoftwareExternalIds.Contains(asset.ExternalId)))
-        {
-            var normalizedSourceKey = stagedSoftwareAsset.SourceKey.Trim().ToLowerInvariant();
-            if (!sourceSystems.TryGetValue(normalizedSourceKey, out var sourceSystem))
-            {
-                throw new InvalidOperationException(
-                    $"Unknown source system key '{stagedSoftwareAsset.SourceKey}'. Seed it before ingesting."
-                );
-            }
-
-            var (vendor, productName, _) = ExtractSoftwareIdentity(stagedSoftwareAsset);
-            softwareProductsByExternalId[stagedSoftwareAsset.ExternalId] = await softwareResolver.ResolveAsync(
-                new SoftwareObservation(
-                    SourceSystemId: sourceSystem.Id,
-                    ExternalId: stagedSoftwareAsset.ExternalId,
-                    Vendor: vendor,
-                    Name: productName
-                ),
-                ct
-            );
-        }
+        var softwareProductIdsByExternalId = await ResolveSoftwareProductIdsByExternalIdAsync(
+            stagedSoftwareByExternalId.Values.Where(asset => linkedSoftwareExternalIds.Contains(asset.ExternalId)),
+            sourceSystems,
+            ct);
 
         // 5. Pre-load all existing devices for the staged external IDs to avoid N+1 SELECTs.
         //    Key: (SourceSystemId, ExternalId) — handles runs that span multiple source systems.
@@ -222,10 +203,10 @@ public class StagedDeviceMergeService(
                 }
 
                 var (_, _, version) = ExtractSoftwareIdentity(stagedSoftwareAsset);
-                var product = softwareProductsByExternalId[stagedSoftwareAsset.ExternalId];
+                var productId = softwareProductIdsByExternalId[stagedSoftwareAsset.ExternalId];
 
                 var normalizedVersion = version?.Trim() ?? string.Empty;
-                var key = (canonicalDeviceId, product.Id, sourceSystem.Id, normalizedVersion);
+                var key = (canonicalDeviceId, productId, sourceSystem.Id, normalizedVersion);
 
                 if (!seenInstalledKeys.Add(key))
                 {
@@ -237,7 +218,7 @@ public class StagedDeviceMergeService(
                 installedRows.Add(new InstalledSoftwareMergeRow(
                     TenantId: tenantId,
                     DeviceId: canonicalDeviceId,
-                    SoftwareProductId: product.Id,
+                    SoftwareProductId: productId,
                     SourceSystemId: sourceSystem.Id,
                     Version: normalizedVersion,
                     ObservedAt: observedAt,
@@ -264,6 +245,125 @@ public class StagedDeviceMergeService(
             DevicesSkipped: devicesSkipped,
             DevicesDeactivated: devicesDeactivated
         );
+    }
+
+    private async Task<Dictionary<string, Guid>> ResolveSoftwareProductIdsByExternalIdAsync(
+        IEnumerable<StagedDevice> linkedSoftwareAssets,
+        IReadOnlyDictionary<string, SourceSystem> sourceSystems,
+        CancellationToken ct)
+    {
+        var observations = new List<SoftwareAssetObservation>();
+        foreach (var stagedSoftwareAsset in linkedSoftwareAssets)
+        {
+            var normalizedSourceKey = stagedSoftwareAsset.SourceKey.Trim().ToLowerInvariant();
+            if (!sourceSystems.TryGetValue(normalizedSourceKey, out var sourceSystem))
+            {
+                throw new InvalidOperationException(
+                    $"Unknown source system key '{stagedSoftwareAsset.SourceKey}'. Seed it before ingesting."
+                );
+            }
+
+            var (vendor, productName, _) = ExtractSoftwareIdentity(stagedSoftwareAsset);
+            observations.Add(new SoftwareAssetObservation(
+                ExternalId: stagedSoftwareAsset.ExternalId,
+                SourceSystemId: sourceSystem.Id,
+                Vendor: vendor,
+                Name: productName,
+                CanonicalProductKey: BuildCanonicalProductKey(vendor, productName)));
+        }
+
+        if (observations.Count == 0)
+        {
+            return new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var productIdsByExternalId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var existingAliasKeys = new HashSet<(Guid SourceSystemId, string ExternalId)>();
+        var sourceSystemIds = observations.Select(o => o.SourceSystemId).Distinct().ToList();
+        var externalIds = observations.Select(o => o.ExternalId).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        foreach (var externalIdChunk in externalIds.Chunk(5_000))
+        {
+            var chunk = externalIdChunk.ToList();
+            var aliases = await db.SoftwareAliases
+                .AsNoTracking()
+                .Where(a => sourceSystemIds.Contains(a.SourceSystemId) && chunk.Contains(a.ExternalId))
+                .ToListAsync(ct);
+
+            foreach (var alias in aliases)
+            {
+                existingAliasKeys.Add((alias.SourceSystemId, alias.ExternalId));
+                productIdsByExternalId[alias.ExternalId] = alias.SoftwareProductId;
+            }
+        }
+
+        const int aliasSaveBatchSize = 5_000;
+        var newAliases = new List<SoftwareAlias>(aliasSaveBatchSize);
+        foreach (var group in observations
+            .Where(o => !existingAliasKeys.Contains((o.SourceSystemId, o.ExternalId)))
+            .GroupBy(o => o.CanonicalProductKey, StringComparer.Ordinal))
+        {
+            var representative = group.First();
+            var product = await softwareResolver.ResolveAsync(
+                new SoftwareObservation(
+                    SourceSystemId: representative.SourceSystemId,
+                    ExternalId: representative.ExternalId,
+                    Vendor: representative.Vendor,
+                    Name: representative.Name
+                ),
+                ct);
+
+            var productId = product.Id;
+            existingAliasKeys.Add((representative.SourceSystemId, representative.ExternalId));
+
+            foreach (var observation in group)
+            {
+                productIdsByExternalId[observation.ExternalId] = productId;
+
+                if (observation == representative)
+                {
+                    continue;
+                }
+
+                var aliasKey = (observation.SourceSystemId, observation.ExternalId);
+                if (!existingAliasKeys.Add(aliasKey))
+                {
+                    continue;
+                }
+
+                newAliases.Add(SoftwareAlias.Create(
+                    softwareProductId: productId,
+                    sourceSystemId: observation.SourceSystemId,
+                    externalId: observation.ExternalId,
+                    observedVendor: observation.Vendor,
+                    observedName: observation.Name));
+
+                if (newAliases.Count >= aliasSaveBatchSize)
+                {
+                    await FlushNewAliasesAsync(newAliases, ct);
+                }
+            }
+        }
+
+        if (newAliases.Count > 0)
+        {
+            await FlushNewAliasesAsync(newAliases, ct);
+        }
+
+        return productIdsByExternalId;
+    }
+
+    private async Task FlushNewAliasesAsync(List<SoftwareAlias> aliases, CancellationToken ct)
+    {
+        db.SoftwareAliases.AddRange(aliases);
+        await db.SaveChangesAsync(ct);
+
+        foreach (var alias in aliases)
+        {
+            db.Entry(alias).State = EntityState.Detached;
+        }
+
+        aliases.Clear();
     }
 
     private static DeviceMergeRow BuildRow(
@@ -311,6 +411,9 @@ public class StagedDeviceMergeService(
         var cutoff = DateTimeOffset.UtcNow.AddDays(-30);
         return payload.DeviceLastSeenAt.HasValue && payload.DeviceLastSeenAt.Value < cutoff;
     }
+
+    private static string BuildCanonicalProductKey(string vendor, string name)
+        => $"{vendor.Trim().ToLowerInvariant()}::{name.Trim().ToLowerInvariant()}";
 
     /// <summary>
     /// Extracts vendor / product name / version from a software-type
@@ -398,4 +501,11 @@ public class StagedDeviceMergeService(
 
         return (vendor, name, version);
     }
+
+    private sealed record SoftwareAssetObservation(
+        string ExternalId,
+        Guid SourceSystemId,
+        string Vendor,
+        string Name,
+        string CanonicalProductKey);
 }

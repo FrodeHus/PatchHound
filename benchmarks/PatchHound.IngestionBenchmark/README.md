@@ -9,6 +9,11 @@ prints per-stage timings. Not invoked by `dotnet test`.
     dotnet run --project benchmarks/PatchHound.IngestionBenchmark -- \
       --tenants=1 --devices=1000 --vulns-per-device=20 --software-per-device=5 --runs=3
 
+To model Defender-like software cardinality where each device contributes distinct
+source software IDs, add:
+
+    --software-catalog=per-device
+
 ## Flags
 
 | Flag                       | Default | Meaning |
@@ -17,6 +22,7 @@ prints per-stage timings. Not invoked by `dotnet test`.
 | `--devices=N`              | 100     | Devices per tenant |
 | `--vulns-per-device=N`     | 10      | Staged vulnerabilities per device |
 | `--software-per-device=N`  | 5       | Installed software rows per device |
+| `--software-catalog=MODE`  | shared  | `shared` creates one software catalog reused by every device; `per-device` creates unique software external IDs per device. |
 | `--runs=N`                 | 1       | Repeat ingestion against the same tenants. Re-runs exercise UPSERT / reobserve / resolve paths. |
 
 ## Requirements
