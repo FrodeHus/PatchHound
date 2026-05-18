@@ -316,9 +316,9 @@ public class ExposureDerivationService(
 
     /// <summary>
     /// Returns true when the installed version satisfies every present predicate on
-    /// the applicability. Unparseable versions (either side) fall back to a match
-    /// so we don't silently drop a known-vulnerable product because of a non-numeric
-    /// version string.
+    /// the applicability. Exact inclusive bounds fall back to string equality when
+    /// numeric parsing fails. Other unparseable versions keep the permissive behavior
+    /// so bounded NVD rules do not silently drop a known-vulnerable product.
     /// </summary>
     internal static bool VersionMatches(string? installedVersion, VulnerabilityApplicability app)
         => VersionMatches(
@@ -344,6 +344,26 @@ public class ExposureDerivationService(
         if (!hasPredicate)
         {
             return true;
+        }
+
+        var hasExactInclusiveBounds =
+            !string.IsNullOrWhiteSpace(versionStartIncluding)
+            && !string.IsNullOrWhiteSpace(versionEndIncluding)
+            && string.IsNullOrWhiteSpace(versionStartExcluding)
+            && string.IsNullOrWhiteSpace(versionEndExcluding)
+            && string.Equals(
+                versionStartIncluding!.Trim(),
+                versionEndIncluding!.Trim(),
+                StringComparison.OrdinalIgnoreCase);
+
+        if (hasExactInclusiveBounds
+            && (!Version.TryParse(installedVersion, out _)
+                || !Version.TryParse(versionStartIncluding, out _)))
+        {
+            return string.Equals(
+                installedVersion?.Trim(),
+                versionStartIncluding!.Trim(),
+                StringComparison.OrdinalIgnoreCase);
         }
 
         if (string.IsNullOrWhiteSpace(installedVersion)

@@ -13,6 +13,10 @@ public sealed class FakeDefenderApiClient : DefenderApiClient
         _machineVulnerabilities = machineVulnerabilities;
     }
 
+    public static FakeDefenderApiClient WithMachineVulnerabilities(
+        params DefenderMachineVulnerabilityEntry[] entries
+    ) => new(new DefenderMachineVulnerabilityResponse { Value = entries.ToList() });
+
     public static FakeDefenderApiClient WithSingleVulnerability(
         string cveId,
         Severity severity,

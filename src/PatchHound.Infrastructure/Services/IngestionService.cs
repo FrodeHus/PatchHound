@@ -904,7 +904,9 @@ public class IngestionService
             .Where(item => item.IngestionRunId == ingestionRunId)
             .ToListAsync(ct);
 
-        var applicabilitiesByVulnExternalId = BuildApplicabilityInputsFromStagedExposures(stagedExposures);
+        var applicabilitiesByVulnExternalId = BuildApplicabilityInputsFromStagedExposures(
+            stagedExposures,
+            sourceKey);
 
         // ── Step 1: Load and upsert staged vulnerabilities into Vulnerability table ──
         var stagedVulns = await _dbContext
@@ -1458,17 +1460,26 @@ public class IngestionService
 
     /// <summary>
     /// Derives one <see cref="VulnerabilityApplicabilityInput"/> per unique
-    /// (vendor, product, version) triple present in the staged exposure payloads,
+    /// staged exposure payload shape. Defender payloads represent confirmed
+    /// product-version matches, so they are deduped by exact CPE/version bounds.
+    /// Other staged sources keep one applicability per unique
+    /// (vendor, product, version) triple,
     /// keyed by vulnerability external id. CPE is built with
     /// <see cref="SoftwareProductResolver.DeriveCpe"/> so it matches the CPE assigned
     /// to <see cref="SoftwareProduct"/> rows created from observed software, letting
     /// <see cref="ExposureDerivationService"/> join installs ↔ applicabilities.
     /// </summary>
     private static IReadOnlyDictionary<string, IReadOnlyList<VulnerabilityApplicabilityInput>>
-        BuildApplicabilityInputsFromStagedExposures(IReadOnlyList<StagedVulnerabilityExposure> stagedExposures)
+        BuildApplicabilityInputsFromStagedExposures(
+            IReadOnlyList<StagedVulnerabilityExposure> stagedExposures,
+            string sourceKey)
     {
         var byVuln = new Dictionary<string, Dictionary<(string Cpe, string? Version), VulnerabilityApplicabilityInput>>(
             StringComparer.OrdinalIgnoreCase);
+        var usesExactVersionApplicability = string.Equals(
+            sourceKey,
+            TenantSourceCatalog.DefenderSourceKey,
+            StringComparison.OrdinalIgnoreCase);
 
         foreach (var staged in stagedExposures)
         {
@@ -1493,7 +1504,14 @@ public class IngestionService
             }
 
             var cpe = SoftwareProductResolver.DeriveCpe(asset.ProductVendor ?? string.Empty, asset.ProductName);
-            var version = string.IsNullOrWhiteSpace(asset.ProductVersion) ? null : asset.ProductVersion;
+            var version = string.IsNullOrWhiteSpace(asset.ProductVersion)
+                ? null
+                : asset.ProductVersion.Trim();
+            if (usesExactVersionApplicability && version is null)
+            {
+                continue;
+            }
+
             var key = (cpe, version);
 
             if (!byVuln.TryGetValue(staged.VulnerabilityExternalId, out var perVuln))
@@ -1508,7 +1526,7 @@ public class IngestionService
                     SoftwareProductId: null,
                     CpeCriteria: cpe,
                     Vulnerable: true,
-                    VersionStartIncluding: null,
+                    VersionStartIncluding: usesExactVersionApplicability ? version : null,
                     VersionStartExcluding: null,
                     VersionEndIncluding: version,
                     VersionEndExcluding: null);
