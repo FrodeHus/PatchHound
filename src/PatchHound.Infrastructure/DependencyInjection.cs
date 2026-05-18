@@ -71,6 +71,7 @@ public static class DependencyInjection
         services.AddScoped<IBulkSoftwareProjectionWriter, PostgresBulkSoftwareProjectionWriter>();
         services.AddScoped<IObservationBulkLoader, PostgresObservationBulkLoader>();
         services.AddScoped<IIngestionStateMerger, PostgresIngestionStateMerger>();
+        services.AddScoped<IExposureStateMerger, PostgresExposureStateMerger>();
 
         // Repositories
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();

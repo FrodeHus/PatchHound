@@ -109,6 +109,39 @@ public sealed class PostgresIngestionStateMerger(PatchHoundDbContext db) : IInge
         });
     }
 
+    public async Task<VulnerabilityStateMergeResult> MergeVulnerabilitiesAsync(
+        Guid tenantId,
+        Guid runId,
+        CancellationToken ct)
+    {
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+            var wasOpen = connection.State == System.Data.ConnectionState.Open;
+            if (!wasOpen)
+            {
+                await connection.OpenAsync(ct);
+            }
+
+            try
+            {
+                await using var tx = await connection.BeginTransactionAsync(ct);
+                var vulnerabilities = await UpsertVulnerabilitiesAsync(connection, tx, tenantId, runId, ct);
+                var deltas = await InsertVulnerabilityDeltasAsync(connection, tx, tenantId, runId, ct);
+                await tx.CommitAsync(ct);
+                return new VulnerabilityStateMergeResult(vulnerabilities, deltas);
+            }
+            finally
+            {
+                if (!wasOpen)
+                {
+                    await connection.CloseAsync();
+                }
+            }
+        });
+    }
+
     private static Task<int> UpsertSoftwareProductsAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction tx,
@@ -503,6 +536,106 @@ public sealed class PostgresIngestionStateMerger(PatchHoundDbContext db) : IInge
             inserted AS (
                 INSERT INTO "IngestionRunDeltas" ("Id", "RunId", "TenantId", "Kind", "EntityId", "CreatedAt")
                 SELECT gen_random_uuid(), @runId, @tenantId, 'InstalledSoftware', entity_id, observed_at
+                FROM source_rows
+                ON CONFLICT ("RunId", "Kind", "EntityId") DO NOTHING
+                RETURNING 1
+            )
+            SELECT COUNT(*) FROM inserted;
+            """, tenantId, runId, ct);
+    }
+
+    private static Task<int> UpsertVulnerabilitiesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction tx,
+        Guid tenantId,
+        Guid runId,
+        CancellationToken ct)
+    {
+        return ExecuteScalarAsync(connection, tx, """
+            WITH source_rows AS (
+                SELECT DISTINCT ON (r."ExternalId")
+                       ss."Key" AS source_key,
+                       r."ExternalId",
+                       r."Title",
+                       r."Description",
+                       r."VendorSeverity",
+                       r."CvssScore",
+                       r."CvssVector",
+                       r."PublishedDate",
+                       r."ObservedAt"
+                FROM "RawVulnerabilityObservations" r
+                JOIN "SourceSystems" ss
+                  ON ss."Id" = r."SourceSystemId"
+                WHERE r."TenantId" = @tenantId
+                  AND r."IngestionRunId" = @runId
+                ORDER BY r."ExternalId", r."ObservedAt" DESC
+            ),
+            upserted AS (
+                INSERT INTO "Vulnerabilities" (
+                    "Id",
+                    "Source",
+                    "ExternalId",
+                    "Title",
+                    "Description",
+                    "VendorSeverity",
+                    "CvssScore",
+                    "CvssVector",
+                    "PublishedDate",
+                    "CreatedAt",
+                    "UpdatedAt")
+                SELECT gen_random_uuid(),
+                       source_key,
+                       "ExternalId",
+                       "Title",
+                       "Description",
+                       "VendorSeverity",
+                       "CvssScore",
+                       "CvssVector",
+                       "PublishedDate",
+                       "ObservedAt",
+                       "ObservedAt"
+                FROM source_rows
+                ON CONFLICT ("ExternalId") DO UPDATE SET
+                    "Title" = CASE
+                        WHEN EXCLUDED."Title" <> '' AND lower(EXCLUDED."Title") <> lower("Vulnerabilities"."ExternalId")
+                            THEN EXCLUDED."Title"
+                        ELSE "Vulnerabilities"."Title"
+                    END,
+                    "Description" = CASE
+                        WHEN EXCLUDED."Description" <> '' THEN EXCLUDED."Description"
+                        ELSE "Vulnerabilities"."Description"
+                    END,
+                    "VendorSeverity" = EXCLUDED."VendorSeverity",
+                    "CvssScore" = COALESCE(EXCLUDED."CvssScore", "Vulnerabilities"."CvssScore"),
+                    "CvssVector" = COALESCE(EXCLUDED."CvssVector", "Vulnerabilities"."CvssVector"),
+                    "PublishedDate" = COALESCE(EXCLUDED."PublishedDate", "Vulnerabilities"."PublishedDate"),
+                    "UpdatedAt" = GREATEST("Vulnerabilities"."UpdatedAt", EXCLUDED."UpdatedAt")
+                RETURNING 1
+            )
+            SELECT COUNT(*) FROM upserted;
+            """, tenantId, runId, ct);
+    }
+
+    private static Task<int> InsertVulnerabilityDeltasAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction tx,
+        Guid tenantId,
+        Guid runId,
+        CancellationToken ct)
+    {
+        return ExecuteScalarAsync(connection, tx, """
+            WITH source_rows AS (
+                SELECT DISTINCT v."Id" AS entity_id, MAX(r."ObservedAt") AS observed_at
+                FROM "RawVulnerabilityObservations" r
+                JOIN "Vulnerabilities" v
+                  ON v."ExternalId" = r."ExternalId"
+                WHERE r."TenantId" = @tenantId
+                  AND r."IngestionRunId" = @runId
+                GROUP BY v."Id"
+            ),
+            inserted AS (
+                INSERT INTO "IngestionRunDeltas" ("Id", "RunId", "TenantId", "Kind", "EntityId", "CreatedAt")
+                SELECT gen_random_uuid(), @runId, @tenantId, 'Vulnerability', entity_id, observed_at
                 FROM source_rows
                 ON CONFLICT ("RunId", "Kind", "EntityId") DO NOTHING
                 RETURNING 1

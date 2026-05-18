@@ -14,6 +14,10 @@ public sealed record InstallationStateMergeResult(
     int InstallationCount,
     int InstallationDeltaCount);
 
+public sealed record VulnerabilityStateMergeResult(
+    int VulnerabilityCount,
+    int VulnerabilityDeltaCount);
+
 public interface IIngestionStateMerger
 {
     Task<SoftwareStateMergeResult> MergeSoftwareAsync(
@@ -27,6 +31,11 @@ public interface IIngestionStateMerger
         CancellationToken ct);
 
     Task<InstallationStateMergeResult> MergeInstallationsAsync(
+        Guid tenantId,
+        Guid runId,
+        CancellationToken ct);
+
+    Task<VulnerabilityStateMergeResult> MergeVulnerabilitiesAsync(
         Guid tenantId,
         Guid runId,
         CancellationToken ct);

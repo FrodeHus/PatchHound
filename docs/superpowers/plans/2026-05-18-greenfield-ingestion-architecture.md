@@ -409,7 +409,7 @@ git commit -m "feat: merge devices and installations from observations"
 - Create `src/PatchHound.Infrastructure/Services/IngestionV2/PostgresExposureStateMerger.cs`
 - Test `tests/PatchHound.Tests/Infrastructure/IngestionV2/PostgresExposureStateMergerTests.cs`
 
-- [ ] **Step 1: Write failing direct exposure test**
+- [x] **Step 1: Write failing direct exposure test**
 
 ```csharp
 [Fact]
@@ -430,7 +430,7 @@ public async Task MergeDirectExposuresAsync_opens_reobserves_and_resolves_by_run
 }
 ```
 
-- [ ] **Step 2: Implement vulnerability bulk merge**
+- [x] **Step 2: Implement vulnerability bulk merge**
 
 Replace per-vulnerability resolver semantics with set-based SQL:
 
@@ -438,15 +438,15 @@ Replace per-vulnerability resolver semantics with set-based SQL:
 - Reconcile references and applicability rules in separate bulk SQL.
 - Insert `Vulnerability` deltas.
 
-- [ ] **Step 3: Implement direct exposure merge**
+- [x] **Step 3: Implement direct exposure merge**
 
 Upsert exposures from `RawExposureObservations` joined to current devices, vulnerabilities, and software identities. Conflict key remains `(TenantId, DeviceId, VulnerabilityId)` unless greenfield schema allows `(TenantId, DeviceId, VulnerabilityId, SoftwareSourceIdentityId)`.
 
-- [ ] **Step 4: Resolve stale exposures by touched devices and source**
+- [x] **Step 4: Resolve stale exposures by touched devices and source**
 
 Resolve only open exposures for devices touched by the run and source system when no matching raw exposure exists in the current run.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `dotnet test PatchHound.slnx --filter FullyQualifiedName~PostgresExposureStateMergerTests -v minimal`
 
