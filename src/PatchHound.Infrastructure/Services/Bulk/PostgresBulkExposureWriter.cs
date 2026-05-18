@@ -119,13 +119,25 @@ public sealed class PostgresBulkExposureWriter(PatchHoundDbContext db) : IBulkEx
 
     public async Task<int> ResolveStaleAsync(Guid tenantId, Guid runId, DateTimeOffset resolvedAt, CancellationToken ct)
     {
-        return await db.Database.ExecuteSqlInterpolatedAsync($"""
-            UPDATE "DeviceVulnerabilityExposures"
-            SET "Status" = 'Resolved', "ResolvedAt" = {resolvedAt}
-            WHERE "TenantId" = {tenantId}
-              AND "Status" = 'Open'
-              AND ("LastSeenRunId" IS DISTINCT FROM {runId})
-            """, ct);
+        // Single UPDATE, but can touch a large number of rows on the first run after
+        // a stale-install backlog is cleared. Raise the command timeout to the same
+        // batch-job ceiling used by ExposureDerivationService.
+        var prior = db.Database.GetCommandTimeout();
+        db.Database.SetCommandTimeout(600);
+        try
+        {
+            return await db.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE "DeviceVulnerabilityExposures"
+                SET "Status" = 'Resolved', "ResolvedAt" = {resolvedAt}
+                WHERE "TenantId" = {tenantId}
+                  AND "Status" = 'Open'
+                  AND ("LastSeenRunId" IS DISTINCT FROM {runId})
+                """, ct);
+        }
+        finally
+        {
+            db.Database.SetCommandTimeout(prior);
+        }
     }
 
     private static void ValidateLengths(IReadOnlyCollection<ExposureUpsertRow> rows)

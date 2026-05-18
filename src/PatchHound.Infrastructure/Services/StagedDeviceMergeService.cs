@@ -277,7 +277,19 @@ public class StagedDeviceMergeService(
             }
             else
             {
-                installedSoftwareRemoved = await staleQuery.ExecuteDeleteAsync(ct);
+                // First sweep after deploy can be large (backlog of never-pruned rows);
+                // default 30s command timeout is not enough. This is a batch job — a
+                // long ceiling is appropriate. Mirrors ExposureDerivationService.
+                var prior = db.Database.GetCommandTimeout();
+                db.Database.SetCommandTimeout(600);
+                try
+                {
+                    installedSoftwareRemoved = await staleQuery.ExecuteDeleteAsync(ct);
+                }
+                finally
+                {
+                    db.Database.SetCommandTimeout(prior);
+                }
             }
         }
 
