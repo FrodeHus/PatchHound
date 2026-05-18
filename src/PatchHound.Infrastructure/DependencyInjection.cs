@@ -13,6 +13,7 @@ using PatchHound.Infrastructure.Repositories;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Services.Bulk;
+using PatchHound.Infrastructure.Services.IngestionV2;
 using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Infrastructure.Services.Workflows;
 using PatchHound.Infrastructure.Tenants;
@@ -68,6 +69,8 @@ public static class DependencyInjection
         services.AddScoped<IBulkDeviceMergeWriter, PostgresBulkDeviceMergeWriter>();
         services.AddScoped<IBulkVulnerabilityReferenceWriter, PostgresBulkVulnerabilityReferenceWriter>();
         services.AddScoped<IBulkSoftwareProjectionWriter, PostgresBulkSoftwareProjectionWriter>();
+        services.AddScoped<IObservationBulkLoader, PostgresObservationBulkLoader>();
+        services.AddScoped<IIngestionStateMerger, PostgresIngestionStateMerger>();
 
         // Repositories
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
