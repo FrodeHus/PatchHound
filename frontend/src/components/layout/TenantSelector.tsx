@@ -1,4 +1,3 @@
-import { ChevronDown } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 type TenantSelectorProps = {
@@ -39,9 +38,8 @@ export function TenantSelector({
         >
           <SelectTrigger className="mt-0.5 h-auto min-w-0 border-0 bg-transparent px-0 py-0 text-center shadow-none hover:bg-transparent focus:ring-0 focus:ring-offset-0">
             <SelectValue>
-              <span className="inline-flex items-center gap-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground">
-                <span className="max-w-[240px] truncate">{selectedTenantName}</span>
-                <ChevronDown className="size-4 text-muted-foreground" />
+              <span className="max-w-[240px] truncate text-xl font-semibold tracking-[-0.03em] text-foreground">
+                {selectedTenantName}
               </span>
             </SelectValue>
           </SelectTrigger>
