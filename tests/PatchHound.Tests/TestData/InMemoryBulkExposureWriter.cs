@@ -77,8 +77,14 @@ internal sealed class InMemoryBulkExposureWriter(PatchHoundDbContext db) : IBulk
                      && e.LastSeenRunId != runId)
             .ToListAsync(ct);
 
-        foreach (var exp in stale) exp.Resolve(resolvedAt);
+        foreach (var exp in stale)
+        {
+            exp.MarkMissing(runId);
+        }
+
+        var resolved = stale.Where(exp => exp.MissingSyncCount >= 2).ToList();
+        foreach (var exp in resolved) exp.Resolve(resolvedAt);
         await db.SaveChangesAsync(ct);
-        return stale.Count;
+        return resolved.Count;
     }
 }

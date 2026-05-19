@@ -239,6 +239,7 @@ public class StagedDeviceMergeService(
 
         // Per-source stale-install sweep. Each ingestion run is per-(tenant, source) with
         // full-snapshot semantics: rows the source did not re-report this run are stale.
+        // Require two consecutive misses before removal to absorb transient source gaps.
         // Without this sweep, ExposureDerivationService (which is intentionally source-
         // agnostic — see comment in that file) keeps re-deriving exposures from stale
         // installs, which reopens previously-resolved exposures and inflates the
@@ -262,6 +263,8 @@ public class StagedDeviceMergeService(
                 .Where(i => i.TenantId == tenantId
                          && participatingSourceIds.Contains(i.SourceSystemId)
                          && i.LastSeenRunId != ingestionRunId);
+            var staleRowsToMarkQuery = staleQuery
+                .Where(i => i.LastMissedRunId == null || i.LastMissedRunId != ingestionRunId);
 
             if (db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
             {
@@ -270,9 +273,20 @@ public class StagedDeviceMergeService(
                 var staleRows = await staleQuery.ToListAsync(ct);
                 if (staleRows.Count > 0)
                 {
-                    db.InstalledSoftware.RemoveRange(staleRows);
+                    foreach (var staleRow in staleRows)
+                    {
+                        if (staleRow.LastMissedRunId != ingestionRunId)
+                        {
+                            staleRow.MarkMissing(ingestionRunId);
+                        }
+                    }
+
+                    var rowsToRemove = staleRows
+                        .Where(staleRow => staleRow.MissingSyncCount >= 2)
+                        .ToList();
+                    db.InstalledSoftware.RemoveRange(rowsToRemove);
                     await db.SaveChangesAsync(ct);
-                    installedSoftwareRemoved = staleRows.Count;
+                    installedSoftwareRemoved = rowsToRemove.Count;
                 }
             }
             else
@@ -284,7 +298,19 @@ public class StagedDeviceMergeService(
                 db.Database.SetCommandTimeout(600);
                 try
                 {
-                    installedSoftwareRemoved = await staleQuery.ExecuteDeleteAsync(ct);
+                    await staleRowsToMarkQuery.ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(
+                                item => item.MissingSyncCount,
+                                item => item.MissingSyncCount + 1)
+                            .SetProperty(
+                                item => item.LastMissedRunId,
+                                ingestionRunId),
+                        ct);
+
+                    installedSoftwareRemoved = await staleQuery
+                        .Where(item => item.MissingSyncCount >= 2)
+                        .ExecuteDeleteAsync(ct);
                 }
                 finally
                 {

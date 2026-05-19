@@ -9,8 +9,9 @@ public interface IBulkExposureWriter
         CancellationToken ct);
 
     /// <summary>
-    /// Resolves exposures for the given tenant whose LastSeenRunId is not the
-    /// given run id and whose status is Open. Returns the number of rows resolved.
+    /// Marks open exposures as missing when their LastSeenRunId is not the given
+    /// run id, then resolves rows that have been missing for two distinct runs.
+    /// Returns the number of rows resolved.
     /// </summary>
     Task<int> ResolveStaleAsync(Guid tenantId, Guid runId, DateTimeOffset resolvedAt, CancellationToken ct);
 }

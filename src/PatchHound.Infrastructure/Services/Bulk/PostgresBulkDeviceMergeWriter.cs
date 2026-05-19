@@ -236,14 +236,16 @@ public sealed class PostgresBulkDeviceMergeWriter(PatchHoundDbContext db) : IBul
                     upsert AS (
                         INSERT INTO "InstalledSoftware"
                             ("Id", "TenantId", "DeviceId", "SoftwareProductId", "SourceSystemId",
-                             "Version", "FirstSeenAt", "LastSeenAt", "LastSeenRunId")
+                             "Version", "FirstSeenAt", "LastSeenAt", "LastSeenRunId", "LastMissedRunId", "MissingSyncCount")
                         SELECT id, tenant_id, device_id, software_product_id, source_system_id,
-                               version, observed_at, observed_at, run_id
+                               version, observed_at, observed_at, run_id, NULL, 0
                         FROM deduped
                         ON CONFLICT ("TenantId", "DeviceId", "SoftwareProductId", "SourceSystemId", "Version")
                         DO UPDATE SET
                             "LastSeenAt" = GREATEST(EXCLUDED."LastSeenAt", "InstalledSoftware"."LastSeenAt"),
-                            "LastSeenRunId" = EXCLUDED."LastSeenRunId"
+                            "LastSeenRunId" = EXCLUDED."LastSeenRunId",
+                            "LastMissedRunId" = NULL,
+                            "MissingSyncCount" = 0
                         RETURNING 1
                     )
                     SELECT COUNT(*) FROM upsert;

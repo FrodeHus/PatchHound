@@ -67,6 +67,8 @@ public class PostgresBulkExposureWriterTests
 
         var run2 = Guid.NewGuid();
         await writer.ResolveStaleAsync(TenantId, run2, DateTimeOffset.UtcNow.AddMinutes(5), CancellationToken.None);
+        var resolveRun = Guid.NewGuid();
+        await writer.ResolveStaleAsync(TenantId, resolveRun, DateTimeOffset.UtcNow.AddMinutes(6), CancellationToken.None);
 
         var run3 = Guid.NewGuid();
         var reobservedAt = DateTimeOffset.UtcNow.AddMinutes(10);
@@ -108,7 +110,7 @@ public class PostgresBulkExposureWriterTests
     }
 
     [Fact]
-    public async Task ResolveStaleAsync_resolves_only_exposures_not_seen_in_current_run()
+    public async Task ResolveStaleAsync_requires_two_missed_runs_before_resolving_exposure()
     {
         await _fx.ResetAsync();
         await using var db = _fx.CreateDbContext();
@@ -129,7 +131,29 @@ public class PostgresBulkExposureWriterTests
             new ExposureUpsertRow(TenantId, deviceId, vulnA, null, null, "1.0", "Cpe", DateTimeOffset.UtcNow, newRun),
         }, CancellationToken.None);
 
-        var resolved = await writer.ResolveStaleAsync(TenantId, newRun, DateTimeOffset.UtcNow, CancellationToken.None);
+        var firstMissResolved = await writer.ResolveStaleAsync(TenantId, newRun, DateTimeOffset.UtcNow, CancellationToken.None);
+        firstMissResolved.Should().Be(0);
+
+        var afterFirstMiss = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters()
+            .SingleAsync(e => e.VulnerabilityId == vulnB);
+        afterFirstMiss.Status.Should().Be(ExposureStatus.Open);
+        afterFirstMiss.MissingSyncCount.Should().Be(1);
+
+        var repeatedFirstMissRunResolved = await writer.ResolveStaleAsync(TenantId, newRun, DateTimeOffset.UtcNow, CancellationToken.None);
+        repeatedFirstMissRunResolved.Should().Be(0);
+
+        afterFirstMiss = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters()
+            .SingleAsync(e => e.VulnerabilityId == vulnB);
+        afterFirstMiss.Status.Should().Be(ExposureStatus.Open);
+        afterFirstMiss.MissingSyncCount.Should().Be(1);
+
+        var secondMissRun = Guid.NewGuid();
+        await writer.UpsertAsync(new[]
+        {
+            new ExposureUpsertRow(TenantId, deviceId, vulnA, null, null, "1.0", "Cpe", DateTimeOffset.UtcNow, secondMissRun),
+        }, CancellationToken.None);
+
+        var resolved = await writer.ResolveStaleAsync(TenantId, secondMissRun, DateTimeOffset.UtcNow, CancellationToken.None);
         resolved.Should().Be(1);
 
         var byVuln = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters()

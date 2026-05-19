@@ -1561,15 +1561,23 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<Guid?>("InstalledSoftwareId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset>("LastObservedAt")
-                        .HasColumnType("timestamp with time zone");
+	                    b.Property<DateTimeOffset>("LastObservedAt")
+	                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("LastSeenRunId")
-                        .HasColumnType("uuid");
+	                    b.Property<Guid?>("LastMissedRunId")
+	                        .HasColumnType("uuid");
 
-                    b.Property<string>("MatchSource")
-                        .IsRequired()
-                        .HasMaxLength(16)
+	                    b.Property<Guid?>("LastSeenRunId")
+	                        .HasColumnType("uuid");
+
+	                    b.Property<int>("MissingSyncCount")
+	                        .ValueGeneratedOnAdd()
+	                        .HasColumnType("integer")
+	                        .HasDefaultValue(0);
+
+	                    b.Property<string>("MatchSource")
+	                        .IsRequired()
+	                        .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
                     b.Property<string>("MatchedVersion")
@@ -2129,14 +2137,22 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("FirstSeenAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTimeOffset>("LastSeenAt")
-                        .HasColumnType("timestamp with time zone");
+	                    b.Property<DateTimeOffset>("LastSeenAt")
+	                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("LastSeenRunId")
-                        .HasColumnType("uuid");
+	                    b.Property<Guid?>("LastMissedRunId")
+	                        .HasColumnType("uuid");
 
-                    b.Property<Guid>("SoftwareProductId")
-                        .HasColumnType("uuid");
+	                    b.Property<Guid?>("LastSeenRunId")
+	                        .HasColumnType("uuid");
+
+	                    b.Property<int>("MissingSyncCount")
+	                        .ValueGeneratedOnAdd()
+	                        .HasColumnType("integer")
+	                        .HasDefaultValue(0);
+
+	                    b.Property<Guid>("SoftwareProductId")
+	                        .HasColumnType("uuid");
 
                     b.Property<Guid>("SourceSystemId")
                         .HasColumnType("uuid");

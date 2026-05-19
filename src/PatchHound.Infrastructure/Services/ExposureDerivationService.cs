@@ -158,18 +158,20 @@ public class ExposureDerivationService(
                     ("Id", "TenantId", "DeviceId", "VulnerabilityId",
                      "SoftwareProductId", "InstalledSoftwareId",
                      "MatchedVersion", "MatchSource", "Status",
-                     "FirstObservedAt", "LastObservedAt", "ResolvedAt", "LastSeenRunId")
+                     "FirstObservedAt", "LastObservedAt", "ResolvedAt", "LastSeenRunId", "LastMissedRunId", "MissingSyncCount")
                 SELECT gen_random_uuid(), @tenantId, device_id, vulnerability_id,
                        software_product_id, installed_software_id,
                        COALESCE(matched_version, ''), match_source, 'Open',
-                       @observedAt, @observedAt, NULL, @runId
+                       @observedAt, @observedAt, NULL, @runId, NULL, 0
                 FROM deduped
                 ON CONFLICT ("TenantId", "DeviceId", "VulnerabilityId")
                 DO UPDATE SET
                     "LastObservedAt" = GREATEST(EXCLUDED."LastObservedAt", "DeviceVulnerabilityExposures"."LastObservedAt"),
                     "Status"         = 'Open',
                     "ResolvedAt"     = NULL,
-                    "LastSeenRunId"  = EXCLUDED."LastSeenRunId"
+                    "LastSeenRunId"  = EXCLUDED."LastSeenRunId",
+                    "LastMissedRunId" = NULL,
+                    "MissingSyncCount" = 0
                 RETURNING (xmax = 0) AS inserted
             )
             SELECT

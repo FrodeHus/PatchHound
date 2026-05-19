@@ -294,6 +294,56 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Merge_requires_two_missed_runs_before_removing_stale_installed_software()
+    {
+        var tenantId = Guid.NewGuid();
+        var run1Id = Guid.NewGuid();
+        var run2Id = Guid.NewGuid();
+        var run3Id = Guid.NewGuid();
+
+        await SeedStagedDeviceWithSoftwareAsync(
+            runId: run1Id,
+            tenantId: tenantId,
+            deviceExternalId: "dev-stale-grace",
+            deviceName: "host-stale-grace",
+            softwareExternalId: "defender-sw::acme_widget::1.0",
+            softwareAssetName: "Widget 1.0",
+            vendor: "Acme",
+            productName: "Widget",
+            version: "1.0");
+
+        await _sut.MergeAsync(run1Id, tenantId, CancellationToken.None);
+
+        await SeedStagedDeviceAsync(
+            runId: run2Id,
+            tenantId: tenantId,
+            deviceExternalId: "dev-stale-grace",
+            deviceName: "host-stale-grace",
+            healthStatus: "Active",
+            lastSeenAt: DateTimeOffset.UtcNow);
+
+        var firstMiss = await _sut.MergeAsync(run2Id, tenantId, CancellationToken.None);
+        firstMiss.InstalledSoftwareRemoved.Should().Be(0);
+
+        var installedAfterFirstMiss = await _db.InstalledSoftware.IgnoreQueryFilters().SingleAsync();
+        installedAfterFirstMiss.MissingSyncCount.Should().Be(1);
+
+        await SeedStagedDeviceAsync(
+            runId: run3Id,
+            tenantId: tenantId,
+            deviceExternalId: "dev-stale-grace",
+            deviceName: "host-stale-grace",
+            healthStatus: "Active",
+            lastSeenAt: DateTimeOffset.UtcNow);
+
+        var secondMiss = await _sut.MergeAsync(run3Id, tenantId, CancellationToken.None);
+        secondMiss.InstalledSoftwareRemoved.Should().Be(1);
+
+        var installedAfterSecondMiss = await _db.InstalledSoftware.IgnoreQueryFilters().ToListAsync();
+        installedAfterSecondMiss.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Merge_two_tenants_does_not_cross_contaminate()
     {
         var runId = Guid.NewGuid();

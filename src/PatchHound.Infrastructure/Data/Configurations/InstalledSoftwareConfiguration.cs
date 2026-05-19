@@ -22,6 +22,8 @@ public class InstalledSoftwareConfiguration : IEntityTypeConfiguration<Installed
         builder.HasIndex(i => new { i.TenantId, i.LastSeenRunId, i.SoftwareProductId })
             .HasDatabaseName("IX_InstalledSoftware_TenantId_LastSeenRunId_SoftwareProductId");
         builder.HasIndex(i => i.TenantId);
+        builder.Property(i => i.LastMissedRunId);
+        builder.Property(i => i.MissingSyncCount).HasDefaultValue(0);
         builder.Property(i => i.Version).HasMaxLength(128).IsRequired();
 
         builder.HasOne<Device>().WithMany().HasForeignKey(i => i.DeviceId).OnDelete(DeleteBehavior.Cascade);

@@ -11,6 +11,8 @@ public class InstalledSoftware
     public DateTimeOffset FirstSeenAt { get; private set; }
     public DateTimeOffset LastSeenAt { get; private set; }
     public Guid? LastSeenRunId { get; private set; }
+    public Guid? LastMissedRunId { get; private set; }
+    public int MissingSyncCount { get; private set; }
 
     private InstalledSoftware() { }
 
@@ -65,6 +67,8 @@ public class InstalledSoftware
             FirstSeenAt = at,
             LastSeenAt = at,
             LastSeenRunId = runId,
+            LastMissedRunId = null,
+            MissingSyncCount = 0,
         };
     }
 
@@ -84,5 +88,20 @@ public class InstalledSoftware
         {
             LastSeenRunId = runId;
         }
+
+        LastMissedRunId = null;
+        MissingSyncCount = 0;
+    }
+
+    public void MarkMissing(Guid runId)
+    {
+        if (runId == Guid.Empty) throw new ArgumentException(nameof(runId));
+        if (LastMissedRunId == runId)
+        {
+            return;
+        }
+
+        LastMissedRunId = runId;
+        MissingSyncCount++;
     }
 }

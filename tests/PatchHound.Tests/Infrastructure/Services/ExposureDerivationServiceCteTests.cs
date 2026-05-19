@@ -118,10 +118,18 @@ public class ExposureDerivationServiceCteTests
         db.InstalledSoftware.Remove(installed);
         await db.SaveChangesAsync();
 
-        // Second run — exposure should be resolved by ResolveStaleAsync (LastSeenRunId != newRun)
+        // Second run — first missing detection increments the miss counter but keeps the exposure open
         var secondRun = Guid.NewGuid();
         var resolveAt = DateTimeOffset.UtcNow.AddHours(1);
-        var result = await svc.DeriveForTenantAsync(TenantId, resolveAt, secondRun, CancellationToken.None);
+        var firstMiss = await svc.DeriveForTenantAsync(TenantId, resolveAt, secondRun, CancellationToken.None);
+
+        firstMiss.Inserted.Should().Be(0);
+        firstMiss.Reobserved.Should().Be(0);
+        firstMiss.Resolved.Should().Be(0);
+
+        // Third run — second consecutive miss resolves the exposure.
+        var thirdRun = Guid.NewGuid();
+        var result = await svc.DeriveForTenantAsync(TenantId, resolveAt, thirdRun, CancellationToken.None);
 
         result.Inserted.Should().Be(0);
         result.Reobserved.Should().Be(0);

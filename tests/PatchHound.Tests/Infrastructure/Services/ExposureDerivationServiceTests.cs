@@ -95,7 +95,7 @@ public class ExposureDerivationServiceTests
     }
 
     [Fact]
-    public async Task Resolves_exposure_when_installed_software_row_is_missing_on_next_derive()
+    public async Task Resolves_exposure_when_installed_software_row_is_missing_for_two_derives()
     {
         var tenantId = Guid.NewGuid();
         await using var db = await CreateTenantDbAsync(tenantId);
@@ -110,8 +110,15 @@ public class ExposureDerivationServiceTests
         await db.SaveChangesAsync();
 
         var resolvedAt = DateTimeOffset.UtcNow.AddHours(1);
-        await svc.DeriveForTenantAsync(tenantId, resolvedAt, Guid.NewGuid(), CancellationToken.None);
+        var firstMiss = await svc.DeriveForTenantAsync(tenantId, resolvedAt, Guid.NewGuid(), CancellationToken.None);
         await db.SaveChangesAsync();
+
+        firstMiss.Resolved.Should().Be(0);
+
+        var secondMiss = await svc.DeriveForTenantAsync(tenantId, resolvedAt, Guid.NewGuid(), CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        secondMiss.Resolved.Should().Be(1);
 
         var exposures = await db.DeviceVulnerabilityExposures.ToListAsync();
         exposures.Should().ContainSingle();
