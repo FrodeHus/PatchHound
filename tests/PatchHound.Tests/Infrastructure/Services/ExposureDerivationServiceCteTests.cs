@@ -208,6 +208,46 @@ public class ExposureDerivationServiceCteTests
     }
 
     [Fact]
+    public async Task DeriveForTenantAsync_matches_exact_unparseable_version_by_string_equality()
+    {
+        await _fx.ResetAsync();
+        await using var db = _fx.CreateDbContext();
+
+        var product = SoftwareProduct.Create("Acme", "Server", "cpe:2.3:a:acme:server:*:*:*:*:*:*:*:*");
+        var vuln = Vulnerability.Create("microsoft-defender", "CVE-2026-CTE5", "t", "d", Severity.High, 7.5m, "v", DateTimeOffset.UtcNow);
+        db.SoftwareProducts.Add(product);
+        db.Vulnerabilities.Add(vuln);
+        db.VulnerabilityApplicabilities.Add(VulnerabilityApplicability.Create(
+            vuln.Id, product.Id, null, vulnerable: true,
+            versionStartIncluding: "Release",
+            versionStartExcluding: null,
+            versionEndIncluding: "RELEASE",
+            versionEndExcluding: null));
+
+        var source = SourceSystem.Create("test", "Test");
+        db.SourceSystems.Add(source);
+        var matchingDevice = Device.Create(TenantId, source.Id, "dev-1", "Device 1", Criticality.Medium);
+        var otherDevice = Device.Create(TenantId, source.Id, "dev-2", "Device 2", Criticality.Medium);
+        db.Devices.AddRange(matchingDevice, otherDevice);
+        var runId = Guid.NewGuid();
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(
+            TenantId, matchingDevice.Id, product.Id, source.Id, "release", DateTimeOffset.UtcNow, runId));
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(
+            TenantId, otherDevice.Id, product.Id, source.Id, "2023", DateTimeOffset.UtcNow, runId));
+        await db.SaveChangesAsync();
+
+        var svc = new ExposureDerivationService(
+            db, NullLogger<ExposureDerivationService>.Instance, new PostgresBulkExposureWriter(db));
+
+        var result = await svc.DeriveForTenantAsync(TenantId, DateTimeOffset.UtcNow, runId, CancellationToken.None);
+
+        result.Inserted.Should().Be(1);
+        var exposure = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().SingleAsync();
+        exposure.DeviceId.Should().Be(matchingDevice.Id);
+        exposure.MatchedVersion.Should().Be("release");
+    }
+
+    [Fact]
     public async Task DeriveForTenantAsync_derives_across_installs_from_other_sources_prior_runs()
     {
         // Regression test: derivation must be source-agnostic. Each ingestion source

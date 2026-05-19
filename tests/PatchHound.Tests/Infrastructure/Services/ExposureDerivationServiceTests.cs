@@ -14,6 +14,30 @@ namespace PatchHound.Tests.Infrastructure.Services;
 public class ExposureDerivationServiceTests
 {
     [Fact]
+    public void VersionMatches_requires_string_equality_for_unparseable_exact_inclusive_bounds()
+    {
+        ExposureDerivationService
+            .VersionMatches("2022", "2022", null, "2022", null)
+            .Should()
+            .BeTrue();
+
+        ExposureDerivationService
+            .VersionMatches("release", "Release", null, "RELEASE", null)
+            .Should()
+            .BeTrue();
+
+        ExposureDerivationService
+            .VersionMatches("2023", "2022", null, "2022", null)
+            .Should()
+            .BeFalse();
+
+        ExposureDerivationService
+            .VersionMatches(null, "2022", null, "2022", null)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
     public async Task Derives_exposure_for_product_keyed_applicability()
     {
         var tenantId = Guid.NewGuid();

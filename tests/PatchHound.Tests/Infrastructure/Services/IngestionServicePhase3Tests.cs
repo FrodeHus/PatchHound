@@ -218,23 +218,18 @@ public class IngestionServicePhase3Tests
     }
 
     /// <summary>
-    /// Regression test for the Phase 3 refactor gap: when a source stages a vulnerability
-    /// with per-device <see cref="IngestionAffectedAsset"/> payload carrying ProductVendor
-    /// and ProductName, <see cref="IngestionService.ProcessStagedResultsAsync"/> must
-    /// populate a <see cref="VulnerabilityApplicability"/> row so that
-    /// <see cref="ExposureDerivationService"/> can match installed software against the
-    /// vulnerability. Without this, the applicabilities table stays empty and every
-    /// exposure produced by ProcessStagedResults gets immediately resolved by the
-    /// derivation pass.
+    /// Defender's machine vulnerability stream reports exact vulnerable product versions.
+    /// PatchHound should reuse that exact-version CPE rule for another machine with the
+    /// same installed version, without marking newer fixed versions vulnerable.
     /// </summary>
     [Fact]
-    public async Task ProcessStagedResultsAsync_creates_applicability_from_staged_payload_and_enables_exposure_derivation()
+    public async Task ProcessStagedResultsAsync_creates_exact_version_defender_applicability()
     {
         var tenantId = Guid.NewGuid();
         await using var db = await CreateTenantDbAsync(tenantId);
 
         var product = SoftwareProduct.Create(
-            "Microsoft", "Edge", "cpe:2.3:a:microsoft:edge:*:*:*:*:*:*:*:*");
+            "Microsoft", "Teams", "cpe:2.3:a:microsoft:teams:*:*:*:*:*:*:*:*");
         db.SoftwareProducts.Add(product);
 
         var sourceSystem = SourceSystem.Create("microsoft-defender", "Defender");
@@ -251,30 +246,42 @@ public class IngestionServicePhase3Tests
             SecurityRequirementLevel.High);
         db.SecurityProfiles.Add(profile);
 
-        var device = Device.Create(tenantId, sourceSystem.Id, "machine-1", "Machine 1", Criticality.High);
-        device.AssignSecurityProfile(profile.Id);
-        db.Devices.Add(device);
+        var vulnerableDevice = Device.Create(tenantId, sourceSystem.Id, "desktop-b33jt1r", "desktop-b33jt1r", Criticality.High);
+        vulnerableDevice.AssignSecurityProfile(profile.Id);
+        var sameVersionDevice = Device.Create(tenantId, sourceSystem.Id, "atreides", "atreides", Criticality.High);
+        sameVersionDevice.AssignSecurityProfile(profile.Id);
+        var fixedDevice = Device.Create(tenantId, sourceSystem.Id, "fenris", "fenris", Criticality.High);
+        fixedDevice.AssignSecurityProfile(profile.Id);
+        db.Devices.AddRange(vulnerableDevice, sameVersionDevice, fixedDevice);
 
         var run = IngestionRun.Start(tenantId, "microsoft-defender", DateTimeOffset.UtcNow);
         db.IngestionRuns.Add(run);
-        db.InstalledSoftware.Add(InstalledSoftware.Observe(
-            tenantId, device.Id, product.Id, sourceSystem.Id, "120.0", DateTimeOffset.UtcNow, run.Id));
+        db.InstalledSoftware.AddRange(
+            InstalledSoftware.Observe(
+                tenantId, vulnerableDevice.Id, product.Id, sourceSystem.Id,
+                "24277.3102.3183.2670", DateTimeOffset.UtcNow, run.Id),
+            InstalledSoftware.Observe(
+                tenantId, sameVersionDevice.Id, product.Id, sourceSystem.Id,
+                "24277.3102.3183.2670", DateTimeOffset.UtcNow, run.Id),
+            InstalledSoftware.Observe(
+                tenantId, fixedDevice.Id, product.Id, sourceSystem.Id,
+                "26032.208.4399.5", DateTimeOffset.UtcNow, run.Id));
 
         db.StagedVulnerabilities.Add(StagedVulnerability.Create(
             run.Id, tenantId, "microsoft-defender",
-            "CVE-2026-APPL", "Edge vuln", Severity.High, "{}", DateTimeOffset.UtcNow));
+            "CVE-2025-53783", "Teams vuln", Severity.High, "{}", DateTimeOffset.UtcNow));
 
         var affectedAsset = new IngestionAffectedAsset(
-            ExternalAssetId: "machine-1",
-            AssetName: "Machine 1",
+            ExternalAssetId: "desktop-b33jt1r",
+            AssetName: "desktop-b33jt1r",
             AssetType: AssetType.Device,
             ProductVendor: "Microsoft",
-            ProductName: "Edge",
-            ProductVersion: "120.0");
+            ProductName: "Teams",
+            ProductVersion: "24277.3102.3183.2670");
 
         db.StagedVulnerabilityExposures.Add(StagedVulnerabilityExposure.Create(
             run.Id, tenantId, "microsoft-defender",
-            "CVE-2026-APPL", "machine-1", "Machine 1",
+            "CVE-2025-53783", "desktop-b33jt1r", "desktop-b33jt1r",
             AssetType.Device,
             JsonSerializer.Serialize(affectedAsset, StagingSerializerOptions.Instance),
             DateTimeOffset.UtcNow));
@@ -287,20 +294,22 @@ public class IngestionServicePhase3Tests
             run.Id, tenantId, "microsoft-defender", snapshotId: null, "Defender", CancellationToken.None);
 
         var apps = await db.VulnerabilityApplicabilities.ToListAsync();
-        apps.Should().ContainSingle("staged payload's vendor/product should produce one applicability");
-        apps[0].CpeCriteria.Should().Be("cpe:2.3:a:microsoft:edge:*:*:*:*:*:*:*:*");
-        apps[0].Vulnerable.Should().BeTrue();
-        apps[0].VersionEndIncluding.Should().Be("120.0",
-            "applicability should carry the observed product version as the end-including predicate");
+        apps.Should().ContainSingle("Defender machine evidence should create one exact-version reusable CPE rule");
+        apps[0].CpeCriteria.Should().Be("cpe:2.3:a:microsoft:teams:*:*:*:*:*:*:*:*");
+        apps[0].VersionStartIncluding.Should().Be("24277.3102.3183.2670");
+        apps[0].VersionStartExcluding.Should().BeNull();
+        apps[0].VersionEndIncluding.Should().Be("24277.3102.3183.2670");
+        apps[0].VersionEndExcluding.Should().BeNull();
 
         await ingestion.RunExposureDerivationAsync(tenantId, run.Id, CancellationToken.None);
 
         var exposures = await db.DeviceVulnerabilityExposures
             .Where(e => e.Status != ExposureStatus.Resolved)
+            .Include(e => e.Device)
             .ToListAsync();
-        exposures.Should().ContainSingle(
-            "derivation must produce one live exposure from the installed software × new applicability match");
-        exposures[0].DeviceId.Should().Be(device.Id);
+        exposures.Select(e => e.Device.Name).Should().BeEquivalentTo(
+            ["desktop-b33jt1r", "atreides"],
+            "same product/version should be vulnerable, but newer fixed Teams should not");
     }
 
     [Fact]
