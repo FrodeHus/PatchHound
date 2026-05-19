@@ -19,7 +19,8 @@ public class BusinessLabelConfiguration : IEntityTypeConfiguration<BusinessLabel
         builder.Property(item => item.WeightCategory)
             .HasConversion<string>()
             .HasMaxLength(32)
-            .HasDefaultValue(BusinessLabelWeightCategory.Normal);
+            .HasDefaultValue(BusinessLabelWeightCategory.Normal)
+            .HasSentinel((BusinessLabelWeightCategory)(-1));
 
         builder.Ignore(item => item.RiskWeight);
     }

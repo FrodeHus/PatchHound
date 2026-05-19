@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PatchHound.Core.Entities;
 using System.Text.Json;
@@ -7,6 +8,13 @@ namespace PatchHound.Infrastructure.Data.Configurations;
 
 public class CloudApplicationConfiguration : IEntityTypeConfiguration<CloudApplication>
 {
+    private static readonly ValueComparer<IReadOnlyList<string>> RedirectUrisComparer =
+        new(
+            (left, right) => left!.SequenceEqual(right!),
+            value => value.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode())),
+            value => value.ToList()
+        );
+
     public void Configure(EntityTypeBuilder<CloudApplication> builder)
     {
         builder.HasKey(x => x.Id);
@@ -24,7 +32,8 @@ public class CloudApplicationConfiguration : IEntityTypeConfiguration<CloudAppli
             .HasConversion(
                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                 v => DeserializeRedirectUris(v)
-            );
+            )
+            .Metadata.SetValueComparer(RedirectUrisComparer);
         builder.Property(x => x.OwnerTeamId);
         builder.Property(x => x.OwnerTeamRuleId);
 

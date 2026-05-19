@@ -1,4 +1,6 @@
 using FluentAssertions;
+using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data.Configurations;
 
 namespace PatchHound.Tests.Infrastructure;
@@ -31,5 +33,29 @@ public class CloudApplicationConfigurationTests
         var result = CloudApplicationConfiguration.DeserializeRedirectUris(storedValue);
 
         result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ModelConfiguration_DefinesEfWarningSuppressingMetadata()
+    {
+        using var db = TestDbContextFactory.CreateSystemContext();
+
+        var cloudApplication = db.Model.FindEntityType(typeof(CloudApplication));
+        var credential = db.Model.FindEntityType(typeof(CloudApplicationCredentialMetadata));
+        var businessLabel = db.Model.FindEntityType(typeof(BusinessLabel));
+
+        cloudApplication.Should().NotBeNull();
+        credential.Should().NotBeNull();
+        businessLabel.Should().NotBeNull();
+
+        cloudApplication!.FindProperty(nameof(CloudApplication.RedirectUris))!
+            .GetValueComparer()
+            .Should()
+            .NotBeNull();
+        credential!.GetDeclaredQueryFilters().Should().NotBeEmpty();
+        businessLabel!.FindProperty(nameof(BusinessLabel.WeightCategory))!
+            .Sentinel
+            .Should()
+            .Be((BusinessLabelWeightCategory)(-1));
     }
 }

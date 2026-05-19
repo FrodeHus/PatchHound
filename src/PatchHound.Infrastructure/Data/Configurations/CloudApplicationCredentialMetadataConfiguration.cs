@@ -19,6 +19,8 @@ public class CloudApplicationCredentialMetadataConfiguration
         builder.Property(x => x.Type).HasMaxLength(64).IsRequired();
         builder.Property(x => x.DisplayName).HasMaxLength(512);
 
+        builder.HasQueryFilter(x => x.Application!.ActiveInTenant);
+
         builder.ToTable("CloudApplicationCredentialMetadata");
     }
 }
