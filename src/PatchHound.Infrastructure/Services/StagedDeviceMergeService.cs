@@ -12,8 +12,7 @@ namespace PatchHound.Infrastructure.Services;
 /// Merges staged device + device-software-link rows into the canonical
 /// <see cref="Device"/>, <see cref="SoftwareProduct"/>, and
 /// <see cref="InstalledSoftware"/> tables. Runs under system context
-/// (uses <c>IgnoreQueryFilters</c>) and never touches legacy
-/// <c>Assets</c>/<c>DeviceSoftwareInstallations</c> tables.
+/// (uses <c>IgnoreQueryFilters</c>).
 /// </summary>
 public class StagedDeviceMergeService(
     PatchHoundDbContext db,

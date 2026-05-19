@@ -1478,37 +1478,6 @@ namespace PatchHound.Infrastructure.Migrations
                     b.ToTable("DeviceRules");
                 });
 
-            modelBuilder.Entity("PatchHound.Core.Entities.DeviceSoftwareInstallation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("DeviceAssetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("LastSeenAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("MissingSyncCount")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("SoftwareAssetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("DeviceAssetId", "SoftwareAssetId")
-                        .IsUnique();
-
-                    b.ToTable("DeviceSoftwareInstallations");
-                });
-
             modelBuilder.Entity("PatchHound.Core.Entities.DeviceTag", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5166,17 +5135,6 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasForeignKey("DeviceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.DeviceSoftwareInstallation", b =>
-                {
-                    b.HasOne("PatchHound.Core.Entities.Device", "DeviceAsset")
-                        .WithMany()
-                        .HasForeignKey("DeviceAssetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("DeviceAsset");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.DeviceTag", b =>
