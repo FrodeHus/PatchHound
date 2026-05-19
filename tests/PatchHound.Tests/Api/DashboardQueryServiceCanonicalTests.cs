@@ -178,6 +178,63 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
             .AffectedAssetCount.Should().Be(2);
     }
 
+    [Fact]
+    public async Task BuildRiskChangeBriefAsync_NullLimit_ReturnsAllAppearedAndResolvedItems()
+    {
+        var seed = await CanonicalSeed.PlantAsync(_db, _tenantId);
+        var now = DateTimeOffset.UtcNow;
+        var extraExposures = new List<DeviceVulnerabilityExposure>();
+
+        for (var i = 0; i < 3; i++)
+        {
+            var vulnerability = Vulnerability.Create(
+                "nvd",
+                $"CVE-2026-10{i}",
+                $"Additional vuln {i}",
+                "desc",
+                Severity.High,
+                8.0m,
+                null,
+                now);
+            _db.Vulnerabilities.Add(vulnerability);
+            await _db.SaveChangesAsync();
+
+            var exposure = DeviceVulnerabilityExposure.Observe(
+                _tenantId,
+                seed.DeviceA.Id,
+                vulnerability.Id,
+                seed.ProductA.Id,
+                seed.InstallA.Id,
+                seed.InstallA.Version,
+                ExposureMatchSource.Product,
+                now.AddMinutes(i),
+                runId: Guid.NewGuid());
+            _db.DeviceVulnerabilityExposures.Add(exposure);
+            extraExposures.Add(exposure);
+        }
+
+        await _db.SaveChangesAsync();
+
+        foreach (var exposure in new[] { seed.ExposureA, seed.ExposureB }.Concat(extraExposures))
+        {
+            var episode = ExposureEpisode.Open(_tenantId, exposure.Id, 1, now.AddHours(-1));
+            episode.Close(now);
+            _db.ExposureEpisodes.Add(episode);
+        }
+
+        await _db.SaveChangesAsync();
+
+        var svc = CreateSut();
+        var result = await svc.BuildRiskChangeBriefAsync(
+            _tenantId, _tenantId, limit: null, highCriticalOnly: false,
+            CancellationToken.None, cutoffHours: 24);
+
+        result.AppearedCount.Should().Be(5);
+        result.Appeared.Should().HaveCount(5);
+        result.ResolvedCount.Should().Be(5);
+        result.Resolved.Should().HaveCount(5);
+    }
+
     // ── Test 5 ──────────────────────────────────────────────────────────────
     [Fact]
     public async Task BuildRiskChangeBriefAsync_ExposureOutsideCutoff_NotInBrief()

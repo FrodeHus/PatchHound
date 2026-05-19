@@ -163,53 +163,61 @@ public class DashboardQueryService(
                 .ToList();
         }
 
+        var appearedItems = appeared.GroupBy(item => new { item.VulnerabilityId, item.ExternalId, item.Title, item.Severity })
+            .Select(group =>
+            {
+                var softwareProductId = group
+                    .Where(item => item.SoftwareProductId.HasValue)
+                    .Select(item => item.SoftwareProductId!.Value)
+                    .FirstOrDefault();
+                var caseId = softwareProductId != Guid.Empty && caseIdBySoftwareProductId.TryGetValue(softwareProductId, out var cid)
+                    ? cid : (Guid?)null;
+                return new DashboardRiskChangeItemDto(
+                    group.Key.VulnerabilityId,
+                    group.Key.ExternalId,
+                    group.Key.Title,
+                    group.Key.Severity,
+                    group.Select(item => item.DeviceId).Distinct().Count(),
+                    group.Max(item => item.ChangedAt),
+                    caseId
+                );
+            })
+            .OrderByDescending(item => item.ChangedAt)
+            .ToList();
+
+        var resolvedItems = resolved.GroupBy(item => new { item.VulnerabilityId, item.ExternalId, item.Title, item.Severity })
+            .Select(group =>
+            {
+                var softwareProductId = group
+                    .Where(item => item.SoftwareProductId.HasValue)
+                    .Select(item => item.SoftwareProductId!.Value)
+                    .FirstOrDefault();
+                var caseId = softwareProductId != Guid.Empty && caseIdBySoftwareProductId.TryGetValue(softwareProductId, out var cid)
+                    ? cid : (Guid?)null;
+                return new DashboardRiskChangeItemDto(
+                    group.Key.VulnerabilityId,
+                    group.Key.ExternalId,
+                    group.Key.Title,
+                    group.Key.Severity,
+                    group.Select(item => item.DeviceVulnerabilityExposureId).Distinct().Count(),
+                    group.Max(item => item.ChangedAt),
+                    caseId
+                );
+            })
+            .OrderByDescending(item => item.ChangedAt)
+            .ToList();
+
+        if (limit.HasValue)
+        {
+            appearedItems = appearedItems.Take(Math.Max(0, limit.Value)).ToList();
+            resolvedItems = resolvedItems.Take(Math.Max(0, limit.Value)).ToList();
+        }
+
         var deterministicBrief = new DashboardRiskChangeBriefDto(
             appeared.Select(item => item.VulnerabilityId).Distinct().Count(),
             resolved.Select(item => item.VulnerabilityId).Distinct().Count(),
-            appeared.GroupBy(item => new { item.VulnerabilityId, item.ExternalId, item.Title, item.Severity })
-                .Select(group =>
-                {
-                    var softwareProductId = group
-                        .Where(item => item.SoftwareProductId.HasValue)
-                        .Select(item => item.SoftwareProductId!.Value)
-                        .FirstOrDefault();
-                    var caseId = softwareProductId != Guid.Empty && caseIdBySoftwareProductId.TryGetValue(softwareProductId, out var cid)
-                        ? cid : (Guid?)null;
-                    return new DashboardRiskChangeItemDto(
-                        group.Key.VulnerabilityId,
-                        group.Key.ExternalId,
-                        group.Key.Title,
-                        group.Key.Severity,
-                        group.Select(item => item.DeviceId).Distinct().Count(),
-                        group.Max(item => item.ChangedAt),
-                        caseId
-                    );
-                })
-                .OrderByDescending(item => item.ChangedAt)
-                .Take(limit ?? 3)
-                .ToList(),
-            resolved.GroupBy(item => new { item.VulnerabilityId, item.ExternalId, item.Title, item.Severity })
-                .Select(group =>
-                {
-                    var softwareProductId = group
-                        .Where(item => item.SoftwareProductId.HasValue)
-                        .Select(item => item.SoftwareProductId!.Value)
-                        .FirstOrDefault();
-                    var caseId = softwareProductId != Guid.Empty && caseIdBySoftwareProductId.TryGetValue(softwareProductId, out var cid)
-                        ? cid : (Guid?)null;
-                    return new DashboardRiskChangeItemDto(
-                        group.Key.VulnerabilityId,
-                        group.Key.ExternalId,
-                        group.Key.Title,
-                        group.Key.Severity,
-                        group.Select(item => item.DeviceVulnerabilityExposureId).Distinct().Count(),
-                        group.Max(item => item.ChangedAt),
-                        caseId
-                    );
-                })
-                .OrderByDescending(item => item.ChangedAt)
-                .Take(limit ?? 3)
-                .ToList(),
+            appearedItems,
+            resolvedItems,
             null
         );
 

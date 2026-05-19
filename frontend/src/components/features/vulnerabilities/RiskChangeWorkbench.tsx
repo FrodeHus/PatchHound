@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, SearchIcon } from 'lucide-react'
@@ -48,11 +48,14 @@ const severityRank: Record<string, number> = {
   Low: 1,
 }
 
+const riskChangePageSize = 25
+
 export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
   const [search, setSearch] = useState('')
   const [changeType, setChangeType] = useState<ChangeType>('all')
   const [sortMode, setSortMode] = useState<SortMode>('recent')
   const [selectedSeverities, setSelectedSeverities] = useState<string[]>(['High', 'Critical'])
+  const [visibleRowCount, setVisibleRowCount] = useState(riskChangePageSize)
 
   const allRows = useMemo<RiskChangeRow[]>(
     () => [
@@ -129,6 +132,16 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
 
     return filters
   }, [changeType, search, selectedSeverities])
+
+  useEffect(() => {
+    setVisibleRowCount(riskChangePageSize)
+  }, [brief, changeType, search, selectedSeverities, sortMode])
+
+  const visibleRows = useMemo(
+    () => filteredRows.slice(0, visibleRowCount),
+    [filteredRows, visibleRowCount],
+  )
+  const hasMoreRows = visibleRows.length < filteredRows.length
 
   const summaryItems = useMemo(
     () => [
@@ -336,7 +349,7 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
 
       <DataTable
         columns={columns}
-        data={filteredRows}
+        data={visibleRows}
         getRowId={(row) => `${row.changeType}:${row.vulnerabilityId}`}
         emptyState={
           <DataTableEmptyState
@@ -345,6 +358,22 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
           />
         }
       />
+
+      {filteredRows.length > riskChangePageSize ? (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {visibleRows.length} of {filteredRows.length} changes
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!hasMoreRows}
+            onClick={() => setVisibleRowCount((current) => current + riskChangePageSize)}
+          >
+            {hasMoreRows ? `Load next ${riskChangePageSize}` : 'All changes loaded'}
+          </Button>
+        </div>
+      ) : null}
     </DataTableWorkbench>
   )
 }
