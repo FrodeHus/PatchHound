@@ -52,7 +52,7 @@ public class DashboardControllerExecutiveSummaryTests : IDisposable
         _dbContext.TenantRiskScoreSnapshots.Add(TenantRiskScoreSnapshot.Create(
             _tenantId,
             DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1),
-            700m,
+            500m,
             2,
             0,
             1));
@@ -63,7 +63,7 @@ public class DashboardControllerExecutiveSummaryTests : IDisposable
         dto.ExposureScore.Should().BeGreaterThan(0m);
         dto.ExecutiveExposure.Should().NotBeNull();
         dto.ExecutiveExposure!.Score.Should().Be(dto.ExposureScore);
-        dto.ExecutiveExposure.RiskLevel.Should().Be("High");
+        dto.ExecutiveExposure.RiskLevel.Should().Be("Critical");
         dto.ExecutiveExposure.ScoreDelta.Should().BeGreaterThan(0m);
         dto.ExecutiveExposure.Trend.Should().Be("Worsening");
         dto.ExecutiveExposure.Scope.Should().Be("Tenant");

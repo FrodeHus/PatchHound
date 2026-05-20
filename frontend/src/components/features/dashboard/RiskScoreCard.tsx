@@ -8,7 +8,7 @@ import { Sparkline } from '@/components/features/dashboard/Sparkline'
 import { fetchRiskScoreSummary, recalculateRiskScores } from '@/api/risk-score.functions'
 import type { RiskScoreSummary } from '@/api/risk-score.schemas'
 import { useTenantScope } from '@/components/layout/tenant-scope'
-import { riskScoreBand } from '@/lib/risk-scoring'
+import { tenantRiskScoreBand, TENANT_RISK_SCORE_THRESHOLDS } from '@/lib/risk-scoring'
 import { MetricInfoTooltip } from './MetricInfoTooltip'
 import { RiskScoreDetailDialog } from './RiskScoreDetailDialog'
 
@@ -108,9 +108,12 @@ export function RiskScoreCard({ isLoading: parentLoading, filters }: RiskScoreCa
         <div className={`space-y-5 p-5 lg:p-6 ${posture.heroPanelBg}`}>
           <div className="flex items-start justify-between gap-4">
                 <div className="space-y-3">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                    Current Risk Score
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      Current Risk Score
+                    </p>
+                    <InfoTooltip content={<RiskBandTooltipContent />} />
+                  </div>
                   <div className="flex flex-wrap items-end gap-3">
                     <p className="text-5xl font-semibold tracking-[-0.05em]">
                       {summary.overallScore.toFixed(0)}
@@ -335,6 +338,70 @@ function MetricTile({ label, tooltip, value, tone }: { label: string; tooltip: s
   )
 }
 
+function RiskBandTooltipContent() {
+  const rows: Array<{
+    band: string
+    range: string
+    tone: string
+    description: string
+  }> = [
+    {
+      band: 'Critical',
+      range: `≥ ${TENANT_RISK_SCORE_THRESHOLDS.critical}`,
+      tone: 'text-destructive',
+      description: 'Saturated High+ fleet, or significant penetration of critical-band assets.',
+    },
+    {
+      band: 'High',
+      range: `${TENANT_RISK_SCORE_THRESHOLDS.high}–${TENANT_RISK_SCORE_THRESHOLDS.critical - 1}`,
+      tone: 'text-tone-warning-foreground',
+      description: 'Meaningful critical share, or mixed-pressure fleet with widespread high-severity exposure.',
+    },
+    {
+      band: 'Medium',
+      range: `${TENANT_RISK_SCORE_THRESHOLDS.medium}–${TENANT_RISK_SCORE_THRESHOLDS.high - 1}`,
+      tone: 'text-chart-2',
+      description: 'A handful of critical findings in a mostly clean fleet, or some sustained High-band pressure.',
+    },
+    {
+      band: 'Low',
+      range: `1–${TENANT_RISK_SCORE_THRESHOLDS.medium - 1}`,
+      tone: 'text-chart-3',
+      description: 'Sparse exposure. Watch new drivers; maintain remediation velocity.',
+    },
+    {
+      band: 'None',
+      range: '0',
+      tone: 'text-muted-foreground',
+      description: 'No active exposure detected.',
+    },
+  ]
+
+  return (
+    <div className="space-y-2">
+      <p className="font-medium">Tenant risk bands</p>
+      <p className="text-xs text-muted-foreground">
+        Tenant score combines the worst single asset, the top-five asset average, and fleet-wide
+        severity shares. Higher fleet penetration of a severity band raises the score even when
+        the worst single asset is unchanged.
+      </p>
+      <div className="space-y-1.5 pt-1">
+        {rows.map((row) => (
+          <div key={row.band} className="flex gap-2">
+            <span className={`w-16 shrink-0 text-xs font-semibold uppercase tracking-wide ${row.tone}`}>
+              {row.band}
+            </span>
+            <span className="w-20 shrink-0 text-xs tabular-nums text-muted-foreground">
+              {row.range}
+            </span>
+            <span className="text-xs">{row.description}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function formatUtcTimestamp(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
@@ -345,7 +412,7 @@ function formatUtcTimestamp(value: string) {
 }
 
 function riskPosture(score: number) {
-  const band = riskScoreBand(score)
+  const band = tenantRiskScoreBand(score)
 
   if (band === 'critical') {
     return {

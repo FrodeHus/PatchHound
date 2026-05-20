@@ -315,17 +315,22 @@ public class RiskScoreService(
             .OrderByDescending(item => item.OverallScore)
             .ToListAsync(ct);
 
-        return CalculateTenantRisk(deviceScores.Select(item => new AssetRiskResult(
-            item.DeviceId,
-            item.OverallScore,
-            item.MaxEpisodeRiskScore,
-            item.CriticalCount,
-            item.HighCount,
-            item.MediumCount,
-            item.LowCount,
-            item.OpenEpisodeCount,
-            item.FactorsJson
-        )).ToList());
+        var totalDeviceCount = await dbContext.Devices.AsNoTracking()
+            .CountAsync(item => item.TenantId == tenantId, ct);
+
+        return CalculateTenantRisk(
+            deviceScores.Select(item => new AssetRiskResult(
+                item.DeviceId,
+                item.OverallScore,
+                item.MaxEpisodeRiskScore,
+                item.CriticalCount,
+                item.HighCount,
+                item.MediumCount,
+                item.LowCount,
+                item.OpenEpisodeCount,
+                item.FactorsJson
+            )).ToList(),
+            totalDeviceCount);
     }
 
     public async Task<TenantRiskResult> GetFilteredTenantRiskAsync(
@@ -336,30 +341,33 @@ public class RiskScoreService(
         CancellationToken ct
     )
     {
-        var query = dbContext.DeviceRiskScores.AsNoTracking()
-            .Where(item => item.TenantId == tenantId)
-            .Join(
-                dbContext.Devices.AsNoTracking().Where(item => item.TenantId == tenantId),
-                score => score.DeviceId,
-                device => device.Id,
-                (score, device) => new { score, device }
-            );
+        var devicesQuery = dbContext.Devices.AsNoTracking()
+            .Where(item => item.TenantId == tenantId);
 
         if (minAgeDays.HasValue)
         {
             var cutoff = DateTimeOffset.UtcNow.AddDays(-minAgeDays.Value);
-            query = query.Where(item => item.device.LastSeenAt == null || item.device.LastSeenAt <= cutoff);
+            devicesQuery = devicesQuery.Where(item => item.LastSeenAt == null || item.LastSeenAt <= cutoff);
         }
 
         if (!string.IsNullOrWhiteSpace(platform))
         {
-            query = query.Where(item => item.device.OsPlatform != null && item.device.OsPlatform.Contains(platform));
+            devicesQuery = devicesQuery.Where(item => item.OsPlatform != null && item.OsPlatform.Contains(platform));
         }
 
         if (!string.IsNullOrWhiteSpace(deviceGroup))
         {
-            query = query.Where(item => item.device.GroupName != null && item.device.GroupName == deviceGroup);
+            devicesQuery = devicesQuery.Where(item => item.GroupName != null && item.GroupName == deviceGroup);
         }
+
+        var query = dbContext.DeviceRiskScores.AsNoTracking()
+            .Where(item => item.TenantId == tenantId)
+            .Join(
+                devicesQuery,
+                score => score.DeviceId,
+                device => device.Id,
+                (score, device) => new { score, device }
+            );
 
         var filtered = await query
             .OrderByDescending(item => item.score.OverallScore)
@@ -376,7 +384,9 @@ public class RiskScoreService(
             ))
             .ToListAsync(ct);
 
-        return CalculateTenantRisk(filtered);
+        var filteredDeviceCount = await devicesQuery.CountAsync(ct);
+
+        return CalculateTenantRisk(filtered, filteredDeviceCount);
     }
 
     public async Task<List<TenantRiskScoreSnapshot>> GetRiskHistoryAsync(Guid tenantId, CancellationToken ct)
@@ -388,7 +398,7 @@ public class RiskScoreService(
             .ToListAsync(ct);
     }
 
-    public static TenantRiskResult CalculateTenantRisk(IReadOnlyList<AssetRiskResult> assetScores)
+    public static TenantRiskResult CalculateTenantRisk(IReadOnlyList<AssetRiskResult> assetScores, int totalDeviceCount)
     {
         if (assetScores.Count == 0)
         {
@@ -405,14 +415,22 @@ public class RiskScoreService(
         var mediumAssetCount = ordered.Count(item => item.OverallScore >= RiskBand.MediumThreshold && item.OverallScore < RiskBand.HighThreshold);
         var lowAssetCount = ordered.Count(item => item.OverallScore > 0m && item.OverallScore < RiskBand.MediumThreshold);
 
+        // Denominator falls back to scored assets if total fleet count is missing or smaller than
+        // the scored set, so shares stay in [0, 1] under bad inputs.
+        var denominator = Math.Max(totalDeviceCount, ordered.Count);
+        var criticalShare = ShareOf(criticalAssetCount, denominator);
+        var highShare = ShareOf(highAssetCount, denominator);
+        var mediumShare = ShareOf(mediumAssetCount, denominator);
+        var lowShare = ShareOf(lowAssetCount, denominator);
+
         var score = Math.Clamp(
             Math.Round(
-                (0.55m * maxAsset)
-                + (0.30m * topFiveAverage)
-                + Math.Min(criticalAssetCount * 18m, 90m)
-                + Math.Min(highAssetCount * 8m, 40m)
-                + Math.Min(mediumAssetCount * 2m, 10m)
-                + Math.Min(lowAssetCount * 0.5m, 5m),
+                (0.20m * maxAsset)
+                + (0.10m * topFiveAverage)
+                + (ConcaveShare(criticalShare) * 400m)
+                + (ConcaveShare(highShare) * 200m)
+                + (ConcaveShare(mediumShare) * 70m)
+                + (ConcaveShare(lowShare) * 30m),
                 2),
             0m,
             1000m);
@@ -425,6 +443,12 @@ public class RiskScoreService(
             ordered
         );
     }
+
+    private static decimal ShareOf(int count, int denominator) =>
+        denominator <= 0 ? 0m : Math.Clamp((decimal)count / denominator, 0m, 1m);
+
+    private static decimal ConcaveShare(decimal share) =>
+        share <= 0m ? 0m : (decimal)Math.Sqrt((double)share);
 
     private async Task<List<AssetRiskResult>> CalculateAssetScoresAsync(Guid tenantId, CancellationToken ct)
     {
@@ -852,7 +876,9 @@ public class RiskScoreService(
         CancellationToken ct
     )
     {
-        var tenantRisk = CalculateTenantRisk(assetScores);
+        var totalDeviceCount = await dbContext.Devices.AsNoTracking()
+            .CountAsync(item => item.TenantId == tenantId, ct);
+        var tenantRisk = CalculateTenantRisk(assetScores, totalDeviceCount);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var existing = await dbContext.TenantRiskScoreSnapshots
             .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Date == today, ct);
