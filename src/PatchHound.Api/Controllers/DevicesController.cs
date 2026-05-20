@@ -122,13 +122,18 @@ public class DevicesController : ControllerBase
             );
         if (!string.IsNullOrEmpty(filter.OnboardingStatus))
             query = query.Where(d => d.OnboardingStatus == filter.OnboardingStatus);
-        if (filter.CreatedWithinHours is int createdHours && createdHours > 0)
+        const int maxRecencyHours = 24 * 366 * 50;
+        if (filter.CreatedWithinHours is int createdHours)
         {
+            if (createdHours < 1 || createdHours > maxRecencyHours)
+                return BadRequest(new ProblemDetails { Title = $"CreatedWithinHours must be between 1 and {maxRecencyHours}." });
             var threshold = DateTimeOffset.UtcNow.AddHours(-createdHours);
             query = query.Where(d => d.CreatedAt >= threshold);
         }
-        if (filter.LastSeenWithinHours is int lastSeenHours && lastSeenHours > 0)
+        if (filter.LastSeenWithinHours is int lastSeenHours)
         {
+            if (lastSeenHours < 1 || lastSeenHours > maxRecencyHours)
+                return BadRequest(new ProblemDetails { Title = $"LastSeenWithinHours must be between 1 and {maxRecencyHours}." });
             var threshold = DateTimeOffset.UtcNow.AddHours(-lastSeenHours);
             query = query.Where(d => d.LastSeenAt != null && d.LastSeenAt >= threshold);
         }

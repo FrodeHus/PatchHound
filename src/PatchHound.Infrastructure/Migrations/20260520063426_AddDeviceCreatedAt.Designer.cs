@@ -1243,6 +1243,8 @@ namespace PatchHound.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "CreatedAt");
 
+                    b.HasIndex("TenantId", "LastSeenAt");
+
                     b.HasIndex("TenantId", "SourceSystemId", "ExternalId")
                         .IsUnique();
 

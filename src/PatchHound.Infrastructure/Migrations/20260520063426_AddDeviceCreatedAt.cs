@@ -22,11 +22,20 @@ namespace PatchHound.Infrastructure.Migrations
                 name: "IX_Devices_TenantId_CreatedAt",
                 table: "Devices",
                 columns: new[] { "TenantId", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Devices_TenantId_LastSeenAt",
+                table: "Devices",
+                columns: new[] { "TenantId", "LastSeenAt" });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropIndex(
+                name: "IX_Devices_TenantId_LastSeenAt",
+                table: "Devices");
+
             migrationBuilder.DropIndex(
                 name: "IX_Devices_TenantId_CreatedAt",
                 table: "Devices");
