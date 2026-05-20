@@ -418,6 +418,15 @@ public class SoftwareController(
             tenantSoftwareQuery = tenantSoftwareQuery.Where(_ => false);
         }
 
+        const int maxRecencyHours = 24 * 366 * 50;
+        if (filter.FirstAppearedWithinHours is int firstAppearedHours)
+        {
+            if (firstAppearedHours < 1 || firstAppearedHours > maxRecencyHours)
+                return BadRequest(new ProblemDetails { Title = $"FirstAppearedWithinHours must be between 1 and {maxRecencyHours}." });
+            var threshold = DateTimeOffset.UtcNow.AddHours(-firstAppearedHours);
+            tenantSoftwareQuery = tenantSoftwareQuery.Where(item => item.FirstSeenAt >= threshold);
+        }
+
         var totalCount = await tenantSoftwareQuery.CountAsync(ct);
 
         var rows = await tenantSoftwareQuery

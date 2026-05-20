@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Link } from '@tanstack/react-router'
 import { ExternalLinkIcon, SearchIcon } from "lucide-react";
 import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
+import { recentWindowLabel, recentWindowOptions } from '@/lib/recent-window'
 import { riskScoreTone } from '@/lib/risk-scoring'
 import { toneBadge } from '@/lib/tone-classes'
 
@@ -99,15 +100,6 @@ const criticalityOptions = ['Low', 'Medium', 'High', 'Critical']
 const healthStatusOptions = ['Active', 'Inactive', 'ImpairedCommunication', 'NoSensorData', 'NoSensorDataImpairedCommunication']
 const onboardingStatusOptions = ['Onboarded', 'CanBeOnboarded', 'Unsupported', 'InsufficientInfo']
 const riskBandOptions = ['None', 'Low', 'Medium', 'High', 'Critical']
-const recentWindowOptions: ReadonlyArray<{ label: string; value: number }> = [
-  { label: 'Last 24 hours', value: 24 },
-  { label: 'Last 48 hours', value: 48 },
-  { label: 'Last 3 days', value: 72 },
-  { label: 'Last 7 days', value: 168 },
-  { label: 'Last 30 days', value: 720 },
-]
-const recentWindowLabel = (value: number | '') =>
-  recentWindowOptions.find((option) => option.value === value)?.label ?? ''
 const ownershipFilterOptions = [
   { label: 'Any ownership', value: '' },
   { label: 'Assigned user', value: 'User' },

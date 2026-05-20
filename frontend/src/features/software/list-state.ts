@@ -3,6 +3,7 @@ type SoftwareListSearch = {
   category: string
   vulnerableOnly: boolean
   missedMaintenanceWindow: boolean
+  firstAppearedWithinHours: number | ''
   page: number
   pageSize: number
 }
@@ -13,6 +14,9 @@ export function buildSoftwareListRequest(search: SoftwareListSearch) {
     ...(search.category ? { category: search.category } : {}),
     ...(search.vulnerableOnly ? { vulnerableOnly: true } : {}),
     ...(search.missedMaintenanceWindow ? { missedMaintenanceWindow: true } : {}),
+    ...(typeof search.firstAppearedWithinHours === 'number' && search.firstAppearedWithinHours > 0
+      ? { firstAppearedWithinHours: search.firstAppearedWithinHours }
+      : {}),
     page: search.page,
     pageSize: search.pageSize,
   }
@@ -28,6 +32,7 @@ export const softwareQueryKeys = {
     search.category,
     search.vulnerableOnly,
     search.missedMaintenanceWindow,
+    search.firstAppearedWithinHours,
     search.page,
     search.pageSize,
   ] as const,

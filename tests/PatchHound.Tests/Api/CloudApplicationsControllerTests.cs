@@ -9,6 +9,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Tests.TestData;
+using System.Reflection;
 
 namespace PatchHound.Tests.Api;
 
@@ -141,6 +142,50 @@ public class CloudApplicationsControllerTests : IDisposable
         var stored = await _dbContext.CloudApplications.SingleAsync(item => item.Id == application.Id);
         stored.OwnerTeamId.Should().Be(ruleTeam.Id);
         stored.OwnerTeamRuleId.Should().Be(rule.Id);
+    }
+
+    [Fact]
+    public async Task List_FiltersByFirstAppearedWithinHours()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var recent = CloudApplication.Create(_tenantId, _sourceSystemId, "app-recent", "client-a", "Recent App", null, false, []);
+        var old = CloudApplication.Create(_tenantId, _sourceSystemId, "app-old", "client-b", "Old App", null, false, []);
+        ForceCreatedAt(old, now.AddDays(-30));
+
+        await _dbContext.AddRangeAsync(recent, old);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new CloudApplicationFilterQuery(FirstAppearedWithinHours: 24),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var payload = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<CloudApplicationListItemDto>>().Subject;
+        payload.TotalCount.Should().Be(1);
+        payload.Items.Single().Id.Should().Be(recent.Id);
+    }
+
+    [Fact]
+    public async Task List_FirstAppearedWithinHours_ReturnsBadRequest_WhenOutOfRange()
+    {
+        var action = await _controller.List(
+            new CloudApplicationFilterQuery(FirstAppearedWithinHours: int.MaxValue),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+        action.Result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    private static void ForceCreatedAt(CloudApplication application, DateTimeOffset value)
+    {
+        typeof(CloudApplication)
+            .GetProperty(
+                nameof(CloudApplication.CreatedAt),
+                BindingFlags.Public | BindingFlags.Instance
+            )!
+            .SetValue(application, value);
     }
 
     public void Dispose()

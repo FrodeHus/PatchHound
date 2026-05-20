@@ -9,6 +9,7 @@ describe('buildSoftwareListRequest', () => {
         category: 'Component',
         vulnerableOnly: true,
         missedMaintenanceWindow: false,
+        firstAppearedWithinHours: 168,
         page: 3,
         pageSize: 50,
       }),
@@ -16,6 +17,7 @@ describe('buildSoftwareListRequest', () => {
       search: 'contoso',
       category: 'Component',
       vulnerableOnly: true,
+      firstAppearedWithinHours: 168,
       page: 3,
       pageSize: 50,
     })
@@ -30,6 +32,7 @@ describe('softwareQueryKeys', () => {
         category: 'Component',
         vulnerableOnly: true,
         missedMaintenanceWindow: false,
+        firstAppearedWithinHours: 24,
         page: 1,
         pageSize: 25,
       }),
@@ -41,6 +44,7 @@ describe('softwareQueryKeys', () => {
       'Component',
       true,
       false,
+      24,
       1,
       25,
     ])

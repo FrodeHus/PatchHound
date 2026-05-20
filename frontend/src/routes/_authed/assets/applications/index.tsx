@@ -4,7 +4,19 @@ import { useState } from 'react'
 import { fetchCloudApplications } from '@/api/cloud-applications.functions'
 import type { CloudApplicationListItem } from '@/api/cloud-applications.schemas'
 import { useTenantScope } from '@/components/layout/tenant-scope'
-import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
+import {
+  baseListSearchSchema,
+  searchOptionalPositiveIntSchema,
+  searchStringSchema,
+} from '@/routes/-list-search'
+import { recentWindowOptions } from '@/lib/recent-window'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 import { DataTable } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
@@ -30,6 +42,7 @@ function ownerAssignmentTone(source: string) {
 const applicationsSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
   credentialFilter: searchStringSchema,
+  firstAppearedWithinHours: searchOptionalPositiveIntSchema,
 })
 
 type ApplicationsSearch = z.infer<typeof applicationsSearchSchema>
@@ -42,6 +55,10 @@ export const Route = createFileRoute('/_authed/assets/applications/')({
       data: {
         search: deps.search || undefined,
         credentialFilter: deps.credentialFilter || undefined,
+        firstAppearedWithinHours:
+          typeof deps.firstAppearedWithinHours === 'number'
+            ? deps.firstAppearedWithinHours
+            : undefined,
         page: deps.page,
         pageSize: deps.pageSize,
       },
@@ -183,6 +200,10 @@ function ApplicationsPage() {
         data: {
           search: search.search || undefined,
           credentialFilter: search.credentialFilter || undefined,
+          firstAppearedWithinHours:
+            typeof search.firstAppearedWithinHours === 'number'
+              ? search.firstAppearedWithinHours
+              : undefined,
           page: search.page,
           pageSize: search.pageSize,
         },
@@ -193,6 +214,7 @@ function ApplicationsPage() {
   const data = query.data ?? (canUseInitialData ? initialData : undefined)
   const items = data?.items ?? []
   const activeFilter = search.credentialFilter || ''
+  const firstAppearedFilter = search.firstAppearedWithinHours
 
   return (
     <div className="flex flex-col gap-4 p-6">
@@ -237,6 +259,27 @@ function ApplicationsPage() {
             Expiring soon
           </Button>
         </div>
+        <Select
+          value={firstAppearedFilter ? String(firstAppearedFilter) : 'all'}
+          onValueChange={(value) => {
+            searchActions.updateField(
+              'firstAppearedWithinHours',
+              value === 'all' ? '' : Number(value),
+            )
+          }}
+        >
+          <SelectTrigger className="h-8 w-[180px] text-sm">
+            <SelectValue placeholder="First appeared: any time" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">First appeared: any time</SelectItem>
+            {recentWindowOptions.map((option) => (
+              <SelectItem key={option.value} value={String(option.value)}>
+                First appeared: {option.label.replace(/^Last /, '')}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {data && (
           <span className="text-xs text-muted-foreground ml-auto">
             {data.totalCount.toLocaleString()} application{data.totalCount !== 1 ? 's' : ''}

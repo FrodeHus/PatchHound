@@ -10,6 +10,7 @@ export const fetchCloudApplications = createServerFn({ method: 'GET' })
     z.object({
       search: z.string().optional(),
       credentialFilter: z.string().optional(),
+      firstAppearedWithinHours: z.number().int().min(1).optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     }),
@@ -18,6 +19,9 @@ export const fetchCloudApplications = createServerFn({ method: 'GET' })
     const params = new URLSearchParams()
     if (data.search) params.set('search', data.search)
     if (data.credentialFilter) params.set('credentialFilter', data.credentialFilter)
+    if (data.firstAppearedWithinHours) {
+      params.set('firstAppearedWithinHours', String(data.firstAppearedWithinHours))
+    }
     params.set('page', String(data.page ?? 1))
     params.set('pageSize', String(data.pageSize ?? 25))
     const result = await apiGet(`/cloud-applications?${params}`, context)

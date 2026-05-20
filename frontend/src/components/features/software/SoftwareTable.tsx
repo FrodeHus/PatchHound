@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
+import { recentWindowLabel, recentWindowOptions } from '@/lib/recent-window'
 import { formatDate, startCase } from '@/lib/formatting'
 import { riskScoreTone } from '@/lib/risk-scoring'
 import { toneText } from '@/lib/tone-classes'
@@ -39,14 +40,17 @@ type SoftwareTableProps = {
   categoryFilter: string
   vulnerableOnly: boolean
   missedMaintenanceWindow: boolean
+  firstAppearedWithinHoursFilter: number | ''
   onSearchChange: (value: string) => void
   onCategoryFilterChange: (value: string) => void
   onVulnerableOnlyChange: (value: boolean) => void
   onMissedMaintenanceWindowChange: (value: boolean) => void
+  onFirstAppearedWithinHoursFilterChange: (value: number | '') => void
   onApplyStructuredFilters: (filters: {
     category: string
     vulnerableOnly: boolean
     missedMaintenanceWindow: boolean
+    firstAppearedWithinHours: number | ''
   }) => void
   onShowRiskDetail: (softwareProductId: string) => void
   onReturnToRuleControl: (tenantSoftwareId: string) => void
@@ -61,15 +65,18 @@ function getCurrentDraftFilters({
   categoryFilter,
   vulnerableOnly,
   missedMaintenanceWindow,
+  firstAppearedWithinHoursFilter,
 }: {
   categoryFilter: string
   vulnerableOnly: boolean
   missedMaintenanceWindow: boolean
+  firstAppearedWithinHoursFilter: number | ''
 }) {
   return {
     category: categoryFilter,
     vulnerableOnly,
     missedMaintenanceWindow,
+    firstAppearedWithinHours: firstAppearedWithinHoursFilter,
   }
 }
 
@@ -83,10 +90,12 @@ export function SoftwareTable({
   categoryFilter,
   vulnerableOnly,
   missedMaintenanceWindow,
+  firstAppearedWithinHoursFilter,
   onSearchChange,
   onCategoryFilterChange,
   onVulnerableOnlyChange,
   onMissedMaintenanceWindowChange,
+  onFirstAppearedWithinHoursFilterChange,
   onApplyStructuredFilters,
   onShowRiskDetail,
   onReturnToRuleControl,
@@ -105,10 +114,12 @@ export function SoftwareTable({
     category: string
     vulnerableOnly: boolean
     missedMaintenanceWindow: boolean
+    firstAppearedWithinHours: number | ''
   }>(() => getCurrentDraftFilters({
     categoryFilter,
     vulnerableOnly,
     missedMaintenanceWindow,
+    firstAppearedWithinHoursFilter,
   }))
 
   useEffect(() => {
@@ -127,6 +138,7 @@ export function SoftwareTable({
     categoryFilter,
     vulnerableOnly,
     missedMaintenanceWindow,
+    firstAppearedWithinHoursFilter,
   })
 
   const activeFilters = useMemo(
@@ -136,8 +148,15 @@ export function SoftwareTable({
         categoryFilter ? { key: 'category', label: `Category: ${categoryFilter}`, onClear: () => onCategoryFilterChange('') } : null,
         vulnerableOnly ? { key: 'vulnerable', label: 'Vulnerable only', onClear: () => onVulnerableOnlyChange(false) } : null,
         missedMaintenanceWindow ? { key: 'missedMaintenanceWindow', label: 'Missed maintenance window', onClear: () => onMissedMaintenanceWindowChange(false) } : null,
+        firstAppearedWithinHoursFilter
+          ? {
+              key: 'firstAppearedWithinHours',
+              label: `First appeared: ${recentWindowLabel(firstAppearedWithinHoursFilter)}`,
+              onClear: () => onFirstAppearedWithinHoursFilterChange(''),
+            }
+          : null,
       ].filter((item): item is NonNullable<typeof item> => item !== null),
-    [categoryFilter, missedMaintenanceWindow, onCategoryFilterChange, onMissedMaintenanceWindowChange, onSearchChange, onVulnerableOnlyChange, searchValue, vulnerableOnly],
+    [categoryFilter, firstAppearedWithinHoursFilter, missedMaintenanceWindow, onCategoryFilterChange, onFirstAppearedWithinHoursFilterChange, onMissedMaintenanceWindowChange, onSearchChange, onVulnerableOnlyChange, searchValue, vulnerableOnly],
   )
 
   const activeStructuredFilterCount = useMemo(
@@ -146,8 +165,9 @@ export function SoftwareTable({
         categoryFilter,
         vulnerableOnly ? 'vulnerable' : '',
         missedMaintenanceWindow ? 'missedMaintenanceWindow' : '',
+        firstAppearedWithinHoursFilter ? 'firstAppearedWithin' : '',
       ].filter(Boolean).length,
-    [categoryFilter, missedMaintenanceWindow, vulnerableOnly],
+    [categoryFilter, firstAppearedWithinHoursFilter, missedMaintenanceWindow, vulnerableOnly],
   )
 
   const columns = useMemo<ColumnDef<TenantSoftwareListItem>[]>(
@@ -343,6 +363,7 @@ export function SoftwareTable({
             category: "",
             vulnerableOnly: false,
             missedMaintenanceWindow: false,
+            firstAppearedWithinHours: "",
           });
         }}
         onApply={() => {
@@ -411,6 +432,44 @@ export function SoftwareTable({
             />
             <span>Missed maintenance window</span>
           </label>
+        </WorkbenchFilterSection>
+
+        <WorkbenchFilterSection
+          title="Recency"
+          description="Surface software that first appeared in this tenant within a recent window."
+        >
+          <DataTableField
+            label="First appeared"
+            hint="Software whose first observation in this tenant happened within the selected window."
+          >
+            <Select
+              value={
+                draftFilters.firstAppearedWithinHours
+                  ? String(draftFilters.firstAppearedWithinHours)
+                  : "all"
+              }
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  firstAppearedWithinHours:
+                    nextValue === "all" ? "" : Number(nextValue),
+                }));
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any time" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any time</SelectItem>
+                {recentWindowOptions.map((option) => (
+                  <SelectItem key={option.value} value={String(option.value)}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
         </WorkbenchFilterSection>
       </WorkbenchFilterDrawer>
 
