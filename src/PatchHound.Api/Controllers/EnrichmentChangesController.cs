@@ -159,7 +159,6 @@ public class EnrichmentChangesController : ControllerBase
     {
         return sourceKey.ToLowerInvariant() switch
         {
-            "defender" => "Microsoft Defender",
             EnrichmentSourceCatalog.DefenderSourceKey => "Microsoft Defender",
             EnrichmentSourceCatalog.NvdSourceKey => "NVD API",
             EnrichmentSourceCatalog.EndOfLifeSourceKey => "Software End of Life",

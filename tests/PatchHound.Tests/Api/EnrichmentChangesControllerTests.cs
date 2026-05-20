@@ -9,6 +9,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Tenants;
 using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
@@ -57,7 +58,7 @@ public class EnrichmentChangesControllerTests : IDisposable
             EnrichmentChangeScope.Tenant,
             _tenantId,
             entityId,
-            "defender",
+            EnrichmentSourceCatalog.DefenderSourceKey,
             "exploit.available",
             "Tenant exploit flag",
             changedAt
@@ -66,7 +67,7 @@ public class EnrichmentChangesControllerTests : IDisposable
             EnrichmentChangeScope.Tenant,
             otherTenantId,
             entityId,
-            "defender",
+            EnrichmentSourceCatalog.DefenderSourceKey,
             "hidden",
             "Other tenant",
             changedAt.AddMinutes(1)
@@ -142,7 +143,7 @@ public class EnrichmentChangesControllerTests : IDisposable
                 EnrichmentChangeScope.Global,
                 tenantId: null,
                 entityId,
-                "defender",
+                EnrichmentSourceCatalog.DefenderSourceKey,
                 "cvss.score",
                 "Wrong source",
                 changedAt
@@ -177,6 +178,44 @@ public class EnrichmentChangesControllerTests : IDisposable
 
         payload.Items.Should().ContainSingle()
             .Which.DisplayName.Should().Be("Matching");
+    }
+
+    [Fact]
+    public async Task List_ReturnsNullSourceDisplayNameForUnknownSourceKey()
+    {
+        var entityId = Guid.NewGuid();
+        var change = CreateChange(
+            EnrichmentChangeScope.Global,
+            tenantId: null,
+            entityId,
+            "unknown-source",
+            "summary",
+            "Unknown source",
+            DateTimeOffset.Parse("2026-05-20T08:15:00Z")
+        );
+
+        await _dbContext.EnrichmentChangeLogs.AddAsync(change);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new EnrichmentChangeFilterQuery(
+                EntityType: "Vulnerability",
+                EntityId: entityId,
+                SourceKey: null,
+                FieldPath: null,
+                FromDate: null,
+                ToDate: null
+            ),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var item = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<EnrichmentChangeDto>>().Subject
+            .Items.Should().ContainSingle().Subject;
+
+        item.SourceKey.Should().Be("unknown-source");
+        item.SourceDisplayName.Should().BeNull();
     }
 
     [Fact]
