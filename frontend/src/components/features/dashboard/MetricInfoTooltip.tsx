@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react'
 import { CircleQuestionMark } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-export function MetricInfoTooltip({ content }: { content: string }) {
+export function MetricInfoTooltip({ content }: { content: ReactNode }) {
   return (
     <Tooltip>
       <TooltipTrigger className="inline-flex items-center text-muted-foreground/80 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground">

@@ -92,13 +92,28 @@ public class RiskScoreServiceTests : IDisposable
                 new RiskScoreService.AssetRiskResult(Guid.NewGuid(), 810m, 800m, 0, 2, 0, 0, 2, "[]"),
                 new RiskScoreService.AssetRiskResult(Guid.NewGuid(), 120m, 120m, 0, 0, 0, 3, 3, "[]"),
                 new RiskScoreService.AssetRiskResult(Guid.NewGuid(), 85m, 85m, 0, 0, 0, 1, 1, "[]")
-            ]
+            ],
+            totalDeviceCount: 4
         );
 
         result.AssetCount.Should().Be(4);
         result.CriticalAssetCount.Should().Be(1);
         result.HighAssetCount.Should().Be(1);
-        result.OverallScore.Should().BeGreaterThan(700m);
+        result.OverallScore.Should().BeGreaterThan(400m);
+    }
+
+    [Fact]
+    public void CalculateTenantRisk_FleetSizeDilutesShare()
+    {
+        var assetScores = new[]
+        {
+            new RiskScoreService.AssetRiskResult(Guid.NewGuid(), 965m, 950m, 2, 0, 0, 0, 2, "[]"),
+        };
+
+        var smallFleet = RiskScoreService.CalculateTenantRisk(assetScores, totalDeviceCount: 4);
+        var largeFleet = RiskScoreService.CalculateTenantRisk(assetScores, totalDeviceCount: 2800);
+
+        smallFleet.OverallScore.Should().BeGreaterThan(largeFleet.OverallScore);
     }
 
     [Fact]
