@@ -3,7 +3,8 @@ type VulnerabilitiesListSearch = {
   severity: string
   status: string
   source: string
-  minAgeDays: string
+  ageOperator: string
+  ageHours: string
   publicExploitOnly: boolean
   knownExploitedOnly: boolean
   activeAlertOnly: boolean
@@ -14,12 +15,15 @@ type VulnerabilitiesListSearch = {
 }
 
 export function buildVulnerabilitiesListRequest(search: VulnerabilitiesListSearch) {
+  const hasAgeFilter = Boolean(search.ageOperator) && Boolean(search.ageHours)
   return {
     ...(search.search ? { search: search.search } : {}),
     ...(search.severity ? { severity: search.severity } : {}),
     ...(search.status ? { status: search.status } : {}),
     ...(search.source ? { source: search.source } : {}),
-    ...(search.minAgeDays ? { minAgeDays: Number(search.minAgeDays) } : {}),
+    ...(hasAgeFilter
+      ? { ageOperator: search.ageOperator, ageHours: Number(search.ageHours) }
+      : {}),
     ...(search.publicExploitOnly ? { publicExploitOnly: true } : {}),
     ...(search.knownExploitedOnly ? { knownExploitedOnly: true } : {}),
     ...(search.activeAlertOnly ? { activeAlertOnly: true } : {}),
@@ -40,7 +44,8 @@ export const vulnerabilityQueryKeys = {
     search.severity,
     search.status,
     search.source,
-    search.minAgeDays,
+    search.ageOperator,
+    search.ageHours,
     search.publicExploitOnly,
     search.knownExploitedOnly,
     search.activeAlertOnly,
