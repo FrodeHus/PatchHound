@@ -61,10 +61,17 @@ public class VulnerabilitiesController : ControllerBase
             query = query.Where(v =>
                 v.Title.Contains(filter.Search) || v.ExternalId.Contains(filter.Search)
             );
-        if (filter.MinAgeDays.HasValue)
+        if (filter.AgeHours.HasValue && !string.IsNullOrEmpty(filter.AgeOperator))
         {
-            var cutoff = DateTimeOffset.UtcNow.AddDays(-filter.MinAgeDays.Value);
-            query = query.Where(v => v.PublishedDate <= cutoff);
+            var cutoff = DateTimeOffset.UtcNow.AddHours(-filter.AgeHours.Value);
+            if (string.Equals(filter.AgeOperator, "older", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(v => v.PublishedDate <= cutoff);
+            }
+            else if (string.Equals(filter.AgeOperator, "newer", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(v => v.PublishedDate >= cutoff);
+            }
         }
         if (filter.PublicExploitOnly == true)
             query = query.Where(v =>
