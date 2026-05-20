@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, SearchIcon } from 'lucide-react'
@@ -133,9 +133,12 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
     return filters
   }, [changeType, search, selectedSeverities])
 
-  useEffect(() => {
+  const filterKey = `${changeType}|${search}|${selectedSeverities.join(',')}|${sortMode}|${brief.appearedCount}|${brief.resolvedCount}`
+  const [lastFilterKey, setLastFilterKey] = useState(filterKey)
+  if (lastFilterKey !== filterKey) {
+    setLastFilterKey(filterKey)
     setVisibleRowCount(riskChangePageSize)
-  }, [brief, changeType, search, selectedSeverities, sortMode])
+  }
 
   const visibleRows = useMemo(
     () => filteredRows.slice(0, visibleRowCount),

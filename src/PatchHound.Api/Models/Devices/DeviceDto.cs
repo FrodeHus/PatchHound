@@ -108,7 +108,9 @@ public record DeviceFilterQuery(
     string? RiskBand = null,
     string? Tag = null,
     Guid? BusinessLabelId = null,
-    string? OnboardingStatus = null
+    string? OnboardingStatus = null,
+    int? CreatedWithinHours = null,
+    int? LastSeenWithinHours = null
 );
 
 public record UpdateDeviceBusinessLabelsRequest(

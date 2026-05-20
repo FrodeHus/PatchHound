@@ -56,6 +56,8 @@ type DeviceManagementTableProps = {
   riskBandFilter: string;
   tagFilter: string;
   unassignedOnly: boolean;
+  createdWithinHoursFilter: number | '';
+  lastSeenWithinHoursFilter: number | '';
   onSearchChange: (search: string) => void;
   onCriticalityFilterChange: (criticality: string) => void;
   onBusinessLabelFilterChange: (businessLabelId: string) => void;
@@ -66,6 +68,8 @@ type DeviceManagementTableProps = {
   onRiskBandFilterChange: (riskBand: string) => void;
   onTagFilterChange: (tag: string) => void;
   onUnassignedOnlyChange: (value: boolean) => void;
+  onCreatedWithinHoursFilterChange: (value: number | '') => void;
+  onLastSeenWithinHoursFilterChange: (value: number | '') => void;
   onApplyStructuredFilters: (filters: {
     criticality: string;
     businessLabelId: string;
@@ -76,6 +80,8 @@ type DeviceManagementTableProps = {
     riskBand: string;
     tag: string;
     unassignedOnly: boolean;
+    createdWithinHours: number | '';
+    lastSeenWithinHours: number | '';
   }) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
@@ -93,6 +99,15 @@ const criticalityOptions = ['Low', 'Medium', 'High', 'Critical']
 const healthStatusOptions = ['Active', 'Inactive', 'ImpairedCommunication', 'NoSensorData', 'NoSensorDataImpairedCommunication']
 const onboardingStatusOptions = ['Onboarded', 'CanBeOnboarded', 'Unsupported', 'InsufficientInfo']
 const riskBandOptions = ['None', 'Low', 'Medium', 'High', 'Critical']
+const recentWindowOptions: ReadonlyArray<{ label: string; value: number }> = [
+  { label: 'Last 24 hours', value: 24 },
+  { label: 'Last 48 hours', value: 48 },
+  { label: 'Last 3 days', value: 72 },
+  { label: 'Last 7 days', value: 168 },
+  { label: 'Last 30 days', value: 720 },
+]
+const recentWindowLabel = (value: number | '') =>
+  recentWindowOptions.find((option) => option.value === value)?.label ?? ''
 const ownershipFilterOptions = [
   { label: 'Any ownership', value: '' },
   { label: 'Assigned user', value: 'User' },
@@ -109,6 +124,8 @@ function getCurrentDraftFilters({
   riskBandFilter,
   tagFilter,
   unassignedOnly,
+  createdWithinHoursFilter,
+  lastSeenWithinHoursFilter,
 }: {
   criticalityFilter: string
   businessLabelIdFilter: string
@@ -119,6 +136,8 @@ function getCurrentDraftFilters({
   riskBandFilter: string
   tagFilter: string
   unassignedOnly: boolean
+  createdWithinHoursFilter: number | ''
+  lastSeenWithinHoursFilter: number | ''
 }) {
   return {
     criticality: criticalityFilter,
@@ -130,6 +149,8 @@ function getCurrentDraftFilters({
     riskBand: riskBandFilter,
     tag: tagFilter,
     unassignedOnly,
+    createdWithinHours: createdWithinHoursFilter,
+    lastSeenWithinHours: lastSeenWithinHoursFilter,
   }
 }
 
@@ -154,6 +175,8 @@ export function DeviceManagementTable({
   riskBandFilter,
   tagFilter,
   unassignedOnly,
+  createdWithinHoursFilter,
+  lastSeenWithinHoursFilter,
   onSearchChange,
   onCriticalityFilterChange,
   onBusinessLabelFilterChange,
@@ -164,6 +187,8 @@ export function DeviceManagementTable({
   onRiskBandFilterChange,
   onTagFilterChange,
   onUnassignedOnlyChange,
+  onCreatedWithinHoursFilterChange,
+  onLastSeenWithinHoursFilterChange,
   onApplyStructuredFilters,
   onPageChange,
   onPageSizeChange,
@@ -189,6 +214,8 @@ export function DeviceManagementTable({
     riskBandFilter,
     tagFilter,
     unassignedOnly,
+    createdWithinHoursFilter,
+    lastSeenWithinHoursFilter,
   }));
 
   useEffect(() => {
@@ -213,6 +240,8 @@ export function DeviceManagementTable({
     riskBandFilter,
     tagFilter,
     unassignedOnly,
+    createdWithinHoursFilter,
+    lastSeenWithinHoursFilter,
   });
 
   const selectedBusinessLabelName = useMemo(
@@ -318,16 +347,38 @@ export function DeviceManagementTable({
               },
             }
           : null,
+        createdWithinHoursFilter
+          ? {
+              key: "createdWithinHours",
+              label: `Added: ${recentWindowLabel(createdWithinHoursFilter)}`,
+              onClear: () => {
+                onCreatedWithinHoursFilterChange("");
+              },
+            }
+          : null,
+        lastSeenWithinHoursFilter
+          ? {
+              key: "lastSeenWithinHours",
+              label: `Last seen: ${recentWindowLabel(lastSeenWithinHoursFilter)}`,
+              onClear: () => {
+                onLastSeenWithinHoursFilterChange("");
+              },
+            }
+          : null,
       ].filter((value): value is NonNullable<typeof value> => value !== null),
     [
       businessLabelIdFilter,
+      createdWithinHoursFilter,
       criticalityFilter,
       deviceGroupFilter,
       healthStatusFilter,
+      lastSeenWithinHoursFilter,
       onBusinessLabelFilterChange,
+      onCreatedWithinHoursFilterChange,
       onCriticalityFilterChange,
       onDeviceGroupFilterChange,
       onHealthStatusFilterChange,
+      onLastSeenWithinHoursFilterChange,
       onOnboardingStatusFilterChange,
       onOwnerTypeFilterChange,
       onRiskBandFilterChange,
@@ -356,12 +407,16 @@ export function DeviceManagementTable({
         riskBandFilter,
         tagFilter,
         unassignedOnly ? "unassigned" : "",
+        createdWithinHoursFilter ? "createdWithin" : "",
+        lastSeenWithinHoursFilter ? "lastSeenWithin" : "",
       ].filter(Boolean).length,
     [
       businessLabelIdFilter,
+      createdWithinHoursFilter,
       criticalityFilter,
       deviceGroupFilter,
       healthStatusFilter,
+      lastSeenWithinHoursFilter,
       onboardingStatusFilter,
       ownerTypeFilter,
       riskBandFilter,
@@ -668,6 +723,8 @@ export function DeviceManagementTable({
             riskBand: "",
             tag: "",
             unassignedOnly: false,
+            createdWithinHours: "",
+            lastSeenWithinHours: "",
           });
         }}
         onApply={() => {
@@ -895,6 +952,77 @@ export function DeviceManagementTable({
               placeholder="Filter by tag"
               className="h-10 rounded-xl border-border/70 bg-background/80"
             />
+          </DataTableField>
+        </WorkbenchFilterSection>
+
+        <WorkbenchFilterSection
+          title="Recency"
+          description="Surface devices that first appeared in PatchHound or were last reported by a source within a recent window."
+        >
+          <DataTableField
+            label="First added"
+            hint="Devices whose first ingest happened within the selected window."
+          >
+            <Select
+              value={
+                draftFilters.createdWithinHours
+                  ? String(draftFilters.createdWithinHours)
+                  : "all"
+              }
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  createdWithinHours:
+                    nextValue === "all" ? "" : Number(nextValue),
+                }));
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any time" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any time</SelectItem>
+                {recentWindowOptions.map((option) => (
+                  <SelectItem key={option.value} value={String(option.value)}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+
+          <DataTableField
+            label="Last seen"
+            hint="Devices last reported by their source system within the selected window."
+          >
+            <Select
+              value={
+                draftFilters.lastSeenWithinHours
+                  ? String(draftFilters.lastSeenWithinHours)
+                  : "all"
+              }
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  lastSeenWithinHours:
+                    nextValue === "all" ? "" : Number(nextValue),
+                }));
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any time" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any time</SelectItem>
+                {recentWindowOptions.map((option) => (
+                  <SelectItem key={option.value} value={String(option.value)}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </DataTableField>
         </WorkbenchFilterSection>
       </WorkbenchFilterDrawer>

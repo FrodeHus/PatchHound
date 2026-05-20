@@ -62,6 +62,8 @@ export function DeviceHealthCard({ healthBreakdown, isLoading }: DeviceHealthCar
                         riskBand: '',
                         tag: '',
                         unassignedOnly: false,
+                        createdWithinHours: '',
+                        lastSeenWithinHours: '',
                         page: 1,
                         pageSize: 25,
                       }}

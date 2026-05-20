@@ -44,6 +44,7 @@ public class Device
     public string? DeviceValue { get; private set; }
     public decimal? ExposureImpactScore { get; private set; }
     public bool ActiveInTenant { get; private set; } = true;
+    public DateTimeOffset CreatedAt { get; private set; }
     public string Metadata { get; private set; } = "{}";
 
     private Device() { }
@@ -104,6 +105,7 @@ public class Device
             CriticalityUpdatedAt = DateTimeOffset.UtcNow,
             OwnerType = OwnerType.User,
             ActiveInTenant = true,
+            CreatedAt = DateTimeOffset.UtcNow,
         };
     }
 

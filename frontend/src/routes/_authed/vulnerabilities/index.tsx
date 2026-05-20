@@ -73,7 +73,6 @@ function VulnerabilitiesPage() {
         searchValue={search.search}
         severityFilter={search.severity}
         statusFilter={search.status}
-        sourceFilter={search.source}
         minAgeDays={search.minAgeDays}
         publicExploitOnly={search.publicExploitOnly}
         knownExploitedOnly={search.knownExploitedOnly}
@@ -93,9 +92,6 @@ function VulnerabilitiesPage() {
         }}
         onStatusFilterChange={(value) => {
           searchActions.updateField('status', value)
-        }}
-        onSourceFilterChange={(value) => {
-          searchActions.updateField('source', value)
         }}
         onPageChange={(page) => {
           searchActions.updatePage(page)
@@ -125,7 +121,6 @@ function VulnerabilitiesPage() {
           searchActions.updateFields({
             severity: filters.severity,
             status: filters.status,
-            source: filters.source,
             minAgeDays: filters.minAgeDays,
             publicExploitOnly: filters.publicExploitOnly,
             knownExploitedOnly: filters.knownExploitedOnly,

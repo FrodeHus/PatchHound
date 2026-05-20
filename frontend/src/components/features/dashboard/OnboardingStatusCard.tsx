@@ -62,6 +62,8 @@ export function OnboardingStatusCard({ onboardingBreakdown, isLoading }: Onboard
                         riskBand: '',
                         tag: '',
                         unassignedOnly: false,
+                        createdWithinHours: '',
+                        lastSeenWithinHours: '',
                         page: 1,
                         pageSize: 25,
                       }}
