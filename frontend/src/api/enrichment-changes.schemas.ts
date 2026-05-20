@@ -2,14 +2,24 @@ import { z } from 'zod'
 import { isoDateTimeSchema } from './common.schemas'
 import { pagedResponseMetaSchema } from './pagination.schemas'
 
-export const enrichmentChangeValueSchema = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.record(z.string(), z.unknown()),
-  z.array(z.unknown()),
-  z.null(),
-])
+export type EnrichmentChangeJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: EnrichmentChangeJsonValue }
+  | EnrichmentChangeJsonValue[]
+
+export const enrichmentChangeValueSchema: z.ZodType<EnrichmentChangeJsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(enrichmentChangeValueSchema),
+    z.record(z.string(), enrichmentChangeValueSchema),
+  ]),
+)
 
 export const enrichmentChangeSchema = z.object({
   id: z.string().uuid(),

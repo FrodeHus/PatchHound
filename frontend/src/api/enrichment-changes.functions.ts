@@ -3,26 +3,8 @@ import { authMiddleware } from '@/server/middleware'
 import { apiGet } from '@/server/api'
 import {
   pagedEnrichmentChangeSchema,
-  type EnrichmentChange,
-  type PagedEnrichmentChanges,
 } from './enrichment-changes.schemas'
 import { z } from 'zod'
-
-type SerializedUnknown = NonNullable<unknown>
-type SerializedEnrichmentChangeValue =
-  | string
-  | number
-  | boolean
-  | Record<string, SerializedUnknown>
-  | SerializedUnknown[]
-  | null
-type SerializedEnrichmentChange = Omit<EnrichmentChange, 'oldValue' | 'newValue'> & {
-  oldValue: SerializedEnrichmentChangeValue
-  newValue: SerializedEnrichmentChangeValue
-}
-type SerializedPagedEnrichmentChanges = Omit<PagedEnrichmentChanges, 'items'> & {
-  items: SerializedEnrichmentChange[]
-}
 
 export const fetchEnrichmentChanges = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
@@ -48,5 +30,5 @@ export const fetchEnrichmentChanges = createServerFn({ method: 'GET' })
     if (data.fieldPath) params.set('fieldPath', data.fieldPath)
 
     const response = await apiGet(`/enrichment-changes?${params.toString()}`, context)
-    return pagedEnrichmentChangeSchema.parse(response) as unknown as SerializedPagedEnrichmentChanges
+    return pagedEnrichmentChangeSchema.parse(response)
   })
