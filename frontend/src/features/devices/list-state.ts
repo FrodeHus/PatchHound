@@ -9,6 +9,8 @@ export type DevicesListSearch = {
   riskBand: string
   tag: string
   unassignedOnly: boolean
+  createdWithinHours: number | ''
+  lastSeenWithinHours: number | ''
   page: number
   pageSize: number
 }
@@ -25,6 +27,12 @@ export function buildDevicesListRequest(search: DevicesListSearch) {
     ...(search.riskBand ? { riskBand: search.riskBand } : {}),
     ...(search.tag ? { tag: search.tag } : {}),
     ...(search.unassignedOnly ? { unassignedOnly: true } : {}),
+    ...(typeof search.createdWithinHours === 'number' && search.createdWithinHours > 0
+      ? { createdWithinHours: search.createdWithinHours }
+      : {}),
+    ...(typeof search.lastSeenWithinHours === 'number' && search.lastSeenWithinHours > 0
+      ? { lastSeenWithinHours: search.lastSeenWithinHours }
+      : {}),
     page: search.page,
     pageSize: search.pageSize,
   }
@@ -46,6 +54,8 @@ export const deviceQueryKeys = {
     search.riskBand,
     search.tag,
     search.unassignedOnly,
+    search.createdWithinHours,
+    search.lastSeenWithinHours,
     search.page,
     search.pageSize,
   ] as const,

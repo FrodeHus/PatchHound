@@ -122,6 +122,16 @@ public class DevicesController : ControllerBase
             );
         if (!string.IsNullOrEmpty(filter.OnboardingStatus))
             query = query.Where(d => d.OnboardingStatus == filter.OnboardingStatus);
+        if (filter.CreatedWithinHours is int createdHours && createdHours > 0)
+        {
+            var threshold = DateTimeOffset.UtcNow.AddHours(-createdHours);
+            query = query.Where(d => d.CreatedAt >= threshold);
+        }
+        if (filter.LastSeenWithinHours is int lastSeenHours && lastSeenHours > 0)
+        {
+            var threshold = DateTimeOffset.UtcNow.AddHours(-lastSeenHours);
+            query = query.Where(d => d.LastSeenAt != null && d.LastSeenAt >= threshold);
+        }
 
         var rankedQuery = query.Select(d => new
         {

@@ -27,6 +27,8 @@ export const fetchDevices = createServerFn({ method: 'GET' })
       riskBand: z.string().optional(),
       tag: z.string().optional(),
       onboardingStatus: z.string().optional(),
+      createdWithinHours: z.number().int().min(1).optional(),
+      lastSeenWithinHours: z.number().int().min(1).optional(),
     }),
   )
   .handler(async ({ context, data: filters }) => {

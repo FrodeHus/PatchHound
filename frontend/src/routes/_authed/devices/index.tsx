@@ -18,7 +18,12 @@ import {
   deviceQueryKeys,
   type DevicesListSearch,
 } from '@/features/devices/list-state'
-import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
+import {
+  baseListSearchSchema,
+  searchBooleanSchema,
+  searchOptionalPositiveIntSchema,
+  searchStringSchema,
+} from '@/routes/-list-search'
 import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
 const devicesSearchSchema = baseListSearchSchema.extend({
@@ -32,6 +37,8 @@ const devicesSearchSchema = baseListSearchSchema.extend({
   riskBand: searchStringSchema,
   tag: searchStringSchema,
   unassignedOnly: searchBooleanSchema,
+  createdWithinHours: searchOptionalPositiveIntSchema,
+  lastSeenWithinHours: searchOptionalPositiveIntSchema,
 })
 
 export const Route = createFileRoute('/_authed/devices/')({
@@ -151,6 +158,8 @@ function DevicesPage() {
         riskBandFilter={deviceSearch.riskBand}
         tagFilter={deviceSearch.tag}
         unassignedOnly={deviceSearch.unassignedOnly}
+        createdWithinHoursFilter={deviceSearch.createdWithinHours}
+        lastSeenWithinHoursFilter={deviceSearch.lastSeenWithinHours}
         page={devices.page}
         pageSize={devices.pageSize}
         totalPages={devices.totalPages}
@@ -194,6 +203,14 @@ function DevicesPage() {
           searchActions.updateField('unassignedOnly', value)
           setSelectedDeviceId(null)
         }}
+        onCreatedWithinHoursFilterChange={(value) => {
+          searchActions.updateField('createdWithinHours', value)
+          setSelectedDeviceId(null)
+        }}
+        onLastSeenWithinHoursFilterChange={(value) => {
+          searchActions.updateField('lastSeenWithinHours', value)
+          setSelectedDeviceId(null)
+        }}
         onApplyStructuredFilters={(filters) => {
           searchActions.updateFields({
             criticality: filters.criticality,
@@ -205,6 +222,8 @@ function DevicesPage() {
             riskBand: filters.riskBand,
             tag: filters.tag,
             unassignedOnly: filters.unassignedOnly,
+            createdWithinHours: filters.createdWithinHours,
+            lastSeenWithinHours: filters.lastSeenWithinHours,
           })
           setSelectedDeviceId(null)
         }}
@@ -227,6 +246,8 @@ function DevicesPage() {
             riskBand: '',
             tag: '',
             unassignedOnly: false,
+            createdWithinHours: '',
+            lastSeenWithinHours: '',
           })
           setSelectedDeviceId(null)
         }}
