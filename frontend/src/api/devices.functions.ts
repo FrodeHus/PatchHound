@@ -17,7 +17,6 @@ export const fetchDevices = createServerFn({ method: 'GET' })
       criticality: z.string().optional(),
       businessLabelId: z.string().uuid().optional(),
       ownerType: z.string().optional(),
-      deviceGroup: z.string().optional(),
       unassignedOnly: z.boolean().optional(),
       tenantId: z.string().optional(),
       search: z.string().optional(),
@@ -29,12 +28,21 @@ export const fetchDevices = createServerFn({ method: 'GET' })
       onboardingStatus: z.string().optional(),
       createdWithinHours: z.number().int().min(1).optional(),
       lastSeenWithinHours: z.number().int().min(1).optional(),
+      deviceGroups: z.string().optional(),
     }),
   )
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters)
     const data = await apiGet(`/devices?${params.toString()}`, context)
     return pagedDevicesSchema.parse(data)
+  })
+
+export const fetchDeviceGroups = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({}).optional())
+  .handler(async ({ context }) => {
+    const data = await apiGet('/devices/groups', context)
+    return z.array(z.string()).parse(data)
   })
 
 export const fetchDeviceDetail = createServerFn({ method: 'GET' })

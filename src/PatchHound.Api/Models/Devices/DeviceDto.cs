@@ -99,7 +99,6 @@ public record DeviceExposureDto(
 public record DeviceFilterQuery(
     string? Criticality = null,
     string? OwnerType = null,
-    string? DeviceGroup = null,
     bool? UnassignedOnly = null,
     Guid? OwnerId = null,
     Guid? TenantId = null,
@@ -110,7 +109,8 @@ public record DeviceFilterQuery(
     Guid? BusinessLabelId = null,
     string? OnboardingStatus = null,
     int? CreatedWithinHours = null,
-    int? LastSeenWithinHours = null
+    int? LastSeenWithinHours = null,
+    string? DeviceGroups = null
 );
 
 public record UpdateDeviceBusinessLabelsRequest(

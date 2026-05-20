@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Link } from '@tanstack/react-router'
 import { ExternalLinkIcon, SearchIcon } from "lucide-react";
 import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
@@ -51,7 +52,8 @@ type DeviceManagementTableProps = {
   businessLabelIdFilter: string;
   availableBusinessLabels: BusinessLabel[];
   ownerTypeFilter: string;
-  deviceGroupFilter: string;
+  selectedDeviceGroups: string[];
+  availableDeviceGroups: string[];
   healthStatusFilter: string;
   onboardingStatusFilter: string;
   riskBandFilter: string;
@@ -63,7 +65,7 @@ type DeviceManagementTableProps = {
   onCriticalityFilterChange: (criticality: string) => void;
   onBusinessLabelFilterChange: (businessLabelId: string) => void;
   onOwnerTypeFilterChange: (ownerType: string) => void;
-  onDeviceGroupFilterChange: (deviceGroup: string) => void;
+  onDeviceGroupsChange: (values: string[]) => void;
   onHealthStatusFilterChange: (healthStatus: string) => void;
   onOnboardingStatusFilterChange: (onboardingStatus: string) => void;
   onRiskBandFilterChange: (riskBand: string) => void;
@@ -75,7 +77,7 @@ type DeviceManagementTableProps = {
     criticality: string;
     businessLabelId: string;
     ownerType: string;
-    deviceGroup: string;
+    deviceGroups: string[];
     healthStatus: string;
     onboardingStatus: string;
     riskBand: string;
@@ -110,7 +112,7 @@ function getCurrentDraftFilters({
   criticalityFilter,
   businessLabelIdFilter,
   ownerTypeFilter,
-  deviceGroupFilter,
+  selectedDeviceGroups,
   healthStatusFilter,
   onboardingStatusFilter,
   riskBandFilter,
@@ -122,7 +124,7 @@ function getCurrentDraftFilters({
   criticalityFilter: string
   businessLabelIdFilter: string
   ownerTypeFilter: string
-  deviceGroupFilter: string
+  selectedDeviceGroups: string[]
   healthStatusFilter: string
   onboardingStatusFilter: string
   riskBandFilter: string
@@ -135,7 +137,7 @@ function getCurrentDraftFilters({
     criticality: criticalityFilter,
     businessLabelId: businessLabelIdFilter,
     ownerType: ownerTypeFilter,
-    deviceGroup: deviceGroupFilter,
+    deviceGroups: selectedDeviceGroups,
     healthStatus: healthStatusFilter,
     onboardingStatus: onboardingStatusFilter,
     riskBand: riskBandFilter,
@@ -161,7 +163,8 @@ export function DeviceManagementTable({
   businessLabelIdFilter,
   availableBusinessLabels,
   ownerTypeFilter,
-  deviceGroupFilter,
+  selectedDeviceGroups,
+  availableDeviceGroups,
   healthStatusFilter,
   onboardingStatusFilter,
   riskBandFilter,
@@ -173,7 +176,7 @@ export function DeviceManagementTable({
   onCriticalityFilterChange,
   onBusinessLabelFilterChange,
   onOwnerTypeFilterChange,
-  onDeviceGroupFilterChange,
+  onDeviceGroupsChange,
   onHealthStatusFilterChange,
   onOnboardingStatusFilterChange,
   onRiskBandFilterChange,
@@ -200,7 +203,7 @@ export function DeviceManagementTable({
     criticalityFilter,
     businessLabelIdFilter,
     ownerTypeFilter,
-    deviceGroupFilter,
+    selectedDeviceGroups,
     healthStatusFilter,
     onboardingStatusFilter,
     riskBandFilter,
@@ -226,7 +229,7 @@ export function DeviceManagementTable({
     criticalityFilter,
     businessLabelIdFilter,
     ownerTypeFilter,
-    deviceGroupFilter,
+    selectedDeviceGroups,
     healthStatusFilter,
     onboardingStatusFilter,
     riskBandFilter,
@@ -285,12 +288,15 @@ export function DeviceManagementTable({
               },
             }
           : null,
-        deviceGroupFilter
+        selectedDeviceGroups.length > 0
           ? {
-              key: "deviceGroup",
-              label: `Device Group: ${deviceGroupFilter}`,
+              key: "deviceGroups",
+              label:
+                selectedDeviceGroups.length === 1
+                  ? `Group: ${selectedDeviceGroups[0]}`
+                  : `Groups: ${selectedDeviceGroups.length} selected`,
               onClear: () => {
-                onDeviceGroupFilterChange("");
+                onDeviceGroupsChange([]);
               },
             }
           : null,
@@ -362,13 +368,13 @@ export function DeviceManagementTable({
       businessLabelIdFilter,
       createdWithinHoursFilter,
       criticalityFilter,
-      deviceGroupFilter,
+      selectedDeviceGroups,
       healthStatusFilter,
       lastSeenWithinHoursFilter,
       onBusinessLabelFilterChange,
       onCreatedWithinHoursFilterChange,
       onCriticalityFilterChange,
-      onDeviceGroupFilterChange,
+      onDeviceGroupsChange,
       onHealthStatusFilterChange,
       onLastSeenWithinHoursFilterChange,
       onOnboardingStatusFilterChange,
@@ -393,7 +399,7 @@ export function DeviceManagementTable({
         criticalityFilter,
         businessLabelIdFilter,
         ownerTypeFilter,
-        deviceGroupFilter,
+        selectedDeviceGroups.length > 0 ? "deviceGroups" : "",
         healthStatusFilter,
         onboardingStatusFilter,
         riskBandFilter,
@@ -406,7 +412,7 @@ export function DeviceManagementTable({
       businessLabelIdFilter,
       createdWithinHoursFilter,
       criticalityFilter,
-      deviceGroupFilter,
+      selectedDeviceGroups,
       healthStatusFilter,
       lastSeenWithinHoursFilter,
       onboardingStatusFilter,
@@ -709,7 +715,7 @@ export function DeviceManagementTable({
             criticality: "",
             businessLabelId: "",
             ownerType: "",
-            deviceGroup: "",
+            deviceGroups: [],
             healthStatus: "",
             onboardingStatus: "",
             riskBand: "",
@@ -759,20 +765,42 @@ export function DeviceManagementTable({
           </DataTableField>
 
           <DataTableField
-            label="Device Group"
-            hint="Matches Defender device group name or immutable group ID."
+            label="Device Groups"
+            hint="Restrict the list to one or more known device groups for this tenant."
           >
-            <Input
-              value={draftFilters.deviceGroup}
-              onChange={(event) => {
-                setDraftFilters((current) => ({
-                  ...current,
-                  deviceGroup: event.target.value,
-                }));
-              }}
-              placeholder="Filter device group"
-              className="h-10 rounded-xl border-border/70 bg-background/80"
-            />
+            {availableDeviceGroups.length === 0 ? (
+              <p className="rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm text-muted-foreground">
+                No device groups are available for this tenant.
+              </p>
+            ) : (
+              <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                {availableDeviceGroups.map((groupName) => {
+                  const checked = draftFilters.deviceGroups.includes(groupName);
+                  return (
+                    <label
+                      key={groupName}
+                      className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-2 text-sm"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(nextChecked) => {
+                          setDraftFilters((current) => ({
+                            ...current,
+                            deviceGroups:
+                              nextChecked === true
+                                ? [...current.deviceGroups, groupName]
+                                : current.deviceGroups.filter(
+                                    (entry) => entry !== groupName,
+                                  ),
+                          }));
+                        }}
+                      />
+                      <span className="min-w-0 truncate">{groupName}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </DataTableField>
         </WorkbenchFilterSection>
 

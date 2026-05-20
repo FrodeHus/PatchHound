@@ -301,6 +301,52 @@ public class DevicesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task List_FiltersByDeviceGroups_ExactMatchAny()
+    {
+        var workstation = CreateDevice("device-w", "Workstation", Criticality.Medium);
+        SetGroup(workstation, "Workstations");
+        var server = CreateDevice("device-s", "Server", Criticality.High);
+        SetGroup(server, "Tier 0 Servers");
+        var laptop = CreateDevice("device-l", "Laptop", Criticality.Low);
+        SetGroup(laptop, "Laptops");
+
+        await _dbContext.AddRangeAsync(workstation, server, laptop);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new DeviceFilterQuery(DeviceGroups: "Workstations,Tier 0 Servers"),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var payload = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<DeviceDto>>().Subject;
+        payload.TotalCount.Should().Be(2);
+        payload.Items.Select(item => item.Id).Should().BeEquivalentTo(new[] { workstation.Id, server.Id });
+    }
+
+    [Fact]
+    public async Task ListDeviceGroups_ReturnsDistinctSortedGroups()
+    {
+        var workstation = CreateDevice("device-w", "Workstation", Criticality.Medium);
+        SetGroup(workstation, "Workstations");
+        var server = CreateDevice("device-s", "Server", Criticality.High);
+        SetGroup(server, "Tier 0 Servers");
+        var anotherWorkstation = CreateDevice("device-w2", "Workstation 2", Criticality.Medium);
+        SetGroup(anotherWorkstation, "Workstations");
+        var ungrouped = CreateDevice("device-u", "Ungrouped", Criticality.Low);
+
+        await _dbContext.AddRangeAsync(workstation, server, anotherWorkstation, ungrouped);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.ListDeviceGroups(CancellationToken.None);
+
+        var groups = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeAssignableTo<IReadOnlyList<string>>().Subject;
+        groups.Should().Equal("Tier 0 Servers", "Workstations");
+    }
+
+    [Fact]
     public async Task List_RecencyFilter_ReturnsBadRequest_WhenOutOfRange()
     {
         var device = CreateDevice("device-a", "Device A", Criticality.Medium);
@@ -665,6 +711,21 @@ public class DevicesControllerTests : IDisposable
                 BindingFlags.Public | BindingFlags.Instance
             )!
             .SetValue(device, value);
+    }
+
+    private static void SetGroup(Device device, string groupName)
+    {
+        device.UpdateInventoryDetails(
+            computerDnsName: null,
+            healthStatus: null,
+            osPlatform: null,
+            osVersion: null,
+            externalRiskLabel: null,
+            lastSeenAt: null,
+            lastIpAddress: null,
+            aadDeviceId: null,
+            groupName: groupName
+        );
     }
 
     private static void SetLastSeen(Device device, DateTimeOffset lastSeenAt)

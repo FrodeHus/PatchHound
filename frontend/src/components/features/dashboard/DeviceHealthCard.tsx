@@ -56,7 +56,7 @@ export function DeviceHealthCard({ healthBreakdown, isLoading }: DeviceHealthCar
                         criticality: '',
                         businessLabelId: '',
                         ownerType: '',
-                        deviceGroup: '',
+                        deviceGroups: '',
                         healthStatus: status,
                         onboardingStatus: '',
                         riskBand: '',

@@ -6,6 +6,7 @@ import {
   assignDeviceOwner,
   assignDeviceSecurityProfile,
   fetchDeviceDetail,
+  fetchDeviceGroups,
   fetchDevices,
   setDeviceCriticality,
 } from '@/api/devices.functions'
@@ -31,7 +32,7 @@ const devicesSearchSchema = baseListSearchSchema.extend({
   criticality: searchStringSchema,
   businessLabelId: searchStringSchema,
   ownerType: searchStringSchema,
-  deviceGroup: searchStringSchema,
+  deviceGroups: searchStringSchema,
   healthStatus: searchStringSchema,
   onboardingStatus: searchStringSchema,
   riskBand: searchStringSchema,
@@ -45,11 +46,12 @@ export const Route = createFileRoute('/_authed/devices/')({
   validateSearch: devicesSearchSchema,
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    const [devices, businessLabels] = await Promise.all([
+    const [devices, businessLabels, deviceGroups] = await Promise.all([
       fetchDevices({ data: buildDevicesListRequest(deps) }),
       fetchBusinessLabels({ data: {} }),
+      fetchDeviceGroups({ data: {} }),
     ])
-    return { devices, businessLabels }
+    return { devices, businessLabels, deviceGroups }
   },
   component: DevicesPage,
 })
@@ -75,8 +77,14 @@ function DevicesPage() {
     queryFn: () => fetchBusinessLabels({ data: {} }),
     initialData: canUseInitialData ? initialData.businessLabels : undefined,
   })
+  const deviceGroupsQuery = useQuery({
+    queryKey: ['device-groups', selectedTenantId],
+    queryFn: () => fetchDeviceGroups({ data: {} }),
+    initialData: canUseInitialData ? initialData.deviceGroups : undefined,
+  })
   const devices = devicesQuery.data ?? (canUseInitialData ? initialData.devices : undefined)
   const businessLabels = businessLabelsQuery.data ?? (canUseInitialData ? initialData.businessLabels : [])
+  const availableDeviceGroups = deviceGroupsQuery.data ?? (canUseInitialData ? initialData.deviceGroups : [])
   const ownerMutation = useMutation({
     mutationFn: async (payload: { deviceId: string; ownerType: 'User' | 'Team'; ownerId: string }) => {
       await assignDeviceOwner({
@@ -152,7 +160,8 @@ function DevicesPage() {
         businessLabelIdFilter={deviceSearch.businessLabelId}
         availableBusinessLabels={businessLabels}
         ownerTypeFilter={deviceSearch.ownerType}
-        deviceGroupFilter={deviceSearch.deviceGroup}
+        selectedDeviceGroups={parseDeviceGroups(deviceSearch.deviceGroups)}
+        availableDeviceGroups={availableDeviceGroups}
         healthStatusFilter={deviceSearch.healthStatus}
         onboardingStatusFilter={deviceSearch.onboardingStatus}
         riskBandFilter={deviceSearch.riskBand}
@@ -179,8 +188,8 @@ function DevicesPage() {
           searchActions.updateField('businessLabelId', businessLabelId)
           setSelectedDeviceId(null)
         }}
-        onDeviceGroupFilterChange={(deviceGroup) => {
-          searchActions.updateField('deviceGroup', deviceGroup)
+        onDeviceGroupsChange={(values) => {
+          searchActions.updateField('deviceGroups', values.join(','))
           setSelectedDeviceId(null)
         }}
         onHealthStatusFilterChange={(healthStatus) => {
@@ -216,7 +225,7 @@ function DevicesPage() {
             criticality: filters.criticality,
             businessLabelId: filters.businessLabelId,
             ownerType: filters.ownerType,
-            deviceGroup: filters.deviceGroup,
+            deviceGroups: filters.deviceGroups.join(','),
             healthStatus: filters.healthStatus,
             onboardingStatus: filters.onboardingStatus,
             riskBand: filters.riskBand,
@@ -240,7 +249,7 @@ function DevicesPage() {
             criticality: '',
             businessLabelId: '',
             ownerType: '',
-            deviceGroup: '',
+            deviceGroups: '',
             healthStatus: '',
             onboardingStatus: '',
             riskBand: '',
@@ -271,4 +280,12 @@ function DevicesPage() {
       />
     </section>
   )
+}
+
+function parseDeviceGroups(value: string) {
+  if (!value) return []
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
 }

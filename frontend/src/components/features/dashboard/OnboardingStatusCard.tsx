@@ -56,7 +56,7 @@ export function OnboardingStatusCard({ onboardingBreakdown, isLoading }: Onboard
                         criticality: '',
                         businessLabelId: '',
                         ownerType: '',
-                        deviceGroup: '',
+                        deviceGroups: '',
                         healthStatus: '',
                         onboardingStatus: status,
                         riskBand: '',
