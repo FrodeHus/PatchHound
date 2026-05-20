@@ -27,6 +27,8 @@ Add a dedicated `EnrichmentChangeLog` persistence model and expose it through a 
 
 This avoids overloading the audit table with worker noise while still giving users a quick, trustworthy answer for changes like `CvssScore: 7.5 -> 8.8` from Defender or NVD.
 
+The model must support both global and tenant-scoped provenance. `Vulnerability` is a global canonical entity: values such as severity, CVSS score, CVSS vector, and published date are global even though references and exposure context can be tenant-specific. Those global vulnerability value changes should be written once as global enrichment changes. Future tenant-local enrichment, such as tenant-specific software metadata or asset annotations, can write tenant-scoped rows.
+
 ## Data Model
 
 Create a new canonical entity:
@@ -35,7 +37,8 @@ Create a new canonical entity:
 public class EnrichmentChangeLog
 {
     public Guid Id { get; private set; }
-    public Guid TenantId { get; private set; }
+    public string Scope { get; private set; } = null!; // Global or Tenant
+    public Guid? TenantId { get; private set; }
     public string EntityType { get; private set; } = null!;
     public Guid EntityId { get; private set; }
     public string SourceKey { get; private set; } = null!;
@@ -54,10 +57,15 @@ public class EnrichmentChangeLog
 
 Indexes:
 
-- `(TenantId, EntityType, EntityId, ChangedAt DESC)` for entity sheets and timelines.
-- `(TenantId, SourceKey, ChangedAt DESC)` for source-level troubleshooting.
+- `(Scope, TenantId, EntityType, EntityId, ChangedAt DESC)` for entity sheets and timelines.
+- `(Scope, TenantId, SourceKey, ChangedAt DESC)` for source-level troubleshooting.
 - `EnrichmentRunId` for drilling from run history into changed entities.
 - `EnrichmentJobId` for exact job provenance.
+
+Scope rules:
+
+- `Scope = Global`, `TenantId = null`: canonical global entity values, including `Vulnerability.CvssScore`, `Vulnerability.CvssVector`, `Vulnerability.VendorSeverity`, and `Vulnerability.PublishedDate`.
+- `Scope = Tenant`, `TenantId = {tenantId}`: tenant-specific enriched fields on tenant-owned entities or tenant-local projections.
 
 Retention should initially match the operational data retention policy. If formal retention requirements emerge later, add a configured retention job rather than mixing these records into the user audit table.
 
@@ -119,6 +127,8 @@ Response DTO:
 ```ts
 type EnrichmentChangeDto = {
   id: string
+  scope: 'Global' | 'Tenant'
+  tenantId: string | null
   entityType: string
   entityId: string
   sourceKey: string
@@ -136,7 +146,12 @@ type EnrichmentChangeDto = {
 }
 ```
 
-The endpoint should enforce tenant isolation by `TenantId`. For global canonical entities like `Vulnerability`, use the job tenant or requesting tenant context when writing and querying change rows. A CVE enriched for multiple tenants can therefore have tenant-local provenance, which matches source availability and UI access boundaries.
+The endpoint should return global rows plus tenant-scoped rows visible to the active tenant:
+
+- Global rows are visible when the requesting user can access the entity's detail page.
+- Tenant rows are visible only when `TenantId` matches the active tenant or another tenant the user is authorized to inspect.
+
+For `Vulnerability`, CVSS score, CVSS vector, vendor severity, and published date changes are global rows. The enrichment job tenant can still be useful context through `EnrichmentJobId`, but it should not become the change row scope for global vulnerability values.
 
 ## UI Design
 
@@ -208,7 +223,8 @@ Backend tests:
 - Writer records one row per changed scalar field.
 - Writer records no row for unchanged fields.
 - Old and new values are serialized predictably.
-- Tenant filtering prevents cross-tenant reads.
+- Global rows are visible without tenant duplication when the user can access the entity.
+- Tenant filtering prevents cross-tenant reads for tenant-scoped rows.
 - Vulnerability enrichment records CVSS and severity changes with source/run/job provenance.
 
 Frontend tests:
@@ -232,5 +248,5 @@ Frontend tests:
 ## Initial Decisions
 
 - Enrichment provenance writes are best-effort initially. A logging failure should be recorded as a structured error but should not fail an otherwise successful enrichment job.
-- Global canonical vulnerability changes are written as tenant-local rows using the enrichment job tenant. This keeps API access and source availability tenant scoped.
+- Global canonical vulnerability value changes are written once as global rows with `TenantId = null`. Future tenant-local enrichment changes use tenant-scoped rows.
 - The first UI ships as a separate reusable sheet. Renaming the audit tab to `Activity` and composing audit plus enrichment events can follow after the sheet is working.
