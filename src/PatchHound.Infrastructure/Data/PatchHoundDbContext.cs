@@ -56,6 +56,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         Set<EnrichmentSourceConfiguration>();
     public DbSet<EnrichmentJob> EnrichmentJobs => Set<EnrichmentJob>();
     public DbSet<EnrichmentRun> EnrichmentRuns => Set<EnrichmentRun>();
+    public DbSet<EnrichmentChangeLog> EnrichmentChangeLogs => Set<EnrichmentChangeLog>();
     public DbSet<NvdCveCache> NvdCveCache => Set<NvdCveCache>();
     public DbSet<NvdFeedCheckpoint> NvdFeedCheckpoints => Set<NvdFeedCheckpoint>();
     public DbSet<TenantSlaConfiguration> TenantSlaConfigurations => Set<TenantSlaConfiguration>();
@@ -317,6 +318,17 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         modelBuilder
             .Entity<EnrichmentJob>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<EnrichmentChangeLog>()
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (e.Scope == EnrichmentChangeScope.Global && e.TenantId == null)
+                || (
+                    e.Scope == EnrichmentChangeScope.Tenant
+                    && e.TenantId != null
+                    && AccessibleTenantIds.Contains(e.TenantId.Value)
+                )
+            );
         modelBuilder
             .Entity<TenantSlaConfiguration>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
