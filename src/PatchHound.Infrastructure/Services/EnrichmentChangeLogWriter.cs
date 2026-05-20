@@ -60,6 +60,10 @@ public sealed class EnrichmentChangeLogWriter(
         {
             await db.SaveChangesAsync(ct);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogError(
