@@ -166,18 +166,20 @@ public static class DependencyInjection
         services.Configure<SmtpOptions>(configuration.GetSection("Smtp"));
 
         // AI Report Providers
+        //
+        // HttpClient timeout here is a safety ceiling that protects against the request hanging
+        // indefinitely (network/socket-level issues). The user-facing per-request timeout is
+        // applied in TenantAiTextGenerationService from TenantAiProfile.TimeoutSeconds.
+        var aiSafetyCeiling = TimeSpan.FromMinutes(5);
         services
             .AddHttpClient<OllamaAiProvider>()
-            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(3))
-            .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 4, requestTimeout: aiSafetyCeiling);
         services
             .AddHttpClient<AzureOpenAiProvider>()
-            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(3))
-            .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 4, requestTimeout: aiSafetyCeiling);
         services
             .AddHttpClient<OpenAiProvider>()
-            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(3))
-            .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 4, requestTimeout: aiSafetyCeiling);
         services.AddScoped<IAiReportProvider>(sp => sp.GetRequiredService<OllamaAiProvider>());
         services.AddScoped<IAiReportProvider>(sp => sp.GetRequiredService<AzureOpenAiProvider>());
         services.AddScoped<IAiReportProvider>(sp => sp.GetRequiredService<OpenAiProvider>());

@@ -53,10 +53,23 @@ public class TenantAiTextGenerationService
             );
         }
 
+        var timeoutSeconds = resolvedProfile.Profile.TimeoutSeconds;
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        if (timeoutSeconds > 0)
+        {
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+        }
+
         string content;
         try
         {
-            content = await provider.GenerateTextAsync(request, resolvedProfile, ct);
+            content = await provider.GenerateTextAsync(request, resolvedProfile, timeoutCts.Token);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            return Result<AiTextGenerationResult>.Failure(
+                $"AI generation timed out after {timeoutSeconds}s (per-profile TimeoutSeconds)."
+            );
         }
         catch (Exception ex)
         {

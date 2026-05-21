@@ -35,9 +35,11 @@ internal static class ExternalHttpResiliencePolicies
 
     public static IHttpClientBuilder AddExternalHttpPolicies(
         this IHttpClientBuilder builder,
-        int maxConnectionsPerServer
+        int maxConnectionsPerServer,
+        TimeSpan? requestTimeout = null
     )
     {
+        var effectiveTimeout = requestTimeout ?? DefaultRequestTimeout;
         return builder
             .ConfigurePrimaryHttpMessageHandler(() =>
                 new SocketsHttpHandler
@@ -49,7 +51,7 @@ internal static class ExternalHttpResiliencePolicies
                     ConnectTimeout = ConnectTimeout,
                 }
             )
-            .ConfigureHttpClient(client => client.Timeout = DefaultRequestTimeout)
+            .ConfigureHttpClient(client => client.Timeout = effectiveTimeout)
             .AddPolicyHandler(
                 (serviceProvider, _) =>
                 {
