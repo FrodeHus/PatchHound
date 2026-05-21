@@ -114,6 +114,7 @@ public static class DependencyInjection
         services.AddScoped<NormalizedSoftwareProjectionService>();
         services.AddScoped<CycloneDxSupplyChainImportService>();
         services.AddScoped<EnrichmentJobEnqueuer>();
+        services.AddScoped<IEnrichmentChangeLogWriter, EnrichmentChangeLogWriter>();
         services.AddScoped<IngestionStateCache>();
         services.AddScoped<TenantSnapshotResolver>();
         services.AddScoped<IEnrichmentSourceRunner, DefenderVulnerabilityEnrichmentRunner>();
