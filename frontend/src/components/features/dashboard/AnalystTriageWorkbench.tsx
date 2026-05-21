@@ -47,7 +47,7 @@ export function AnalystTriageWorkbench({ items, summary, isLoading }: Props) {
           </div>
           <Button
             variant="outline"
-            render={<Link to="/vulnerabilities" search={{ page: 1, pageSize: 25, search: '', severity: '', status: '', source: '', ageOperator: '', ageHours: '', publicExploitOnly: false, knownExploitedOnly: false, activeAlertOnly: false, presentOnly: false }} />}
+            render={<Link to="/vulnerabilities" search={{ page: 1, pageSize: 25, search: '', severity: '', status: '', source: '', ageOperator: '', ageHours: '', publicExploitOnly: false, knownExploitedOnly: false, activeAlertOnly: false, presentOnly: false, hasAssessmentOnly: false }} />}
           >
             Open vulnerability workbench
           </Button>

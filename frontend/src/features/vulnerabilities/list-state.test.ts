@@ -15,6 +15,7 @@ describe('buildVulnerabilitiesListRequest', () => {
         knownExploitedOnly: false,
         activeAlertOnly: true,
         presentOnly: false,
+        hasAssessmentOnly: false,
         page: 2,
         pageSize: 50,
       }),
@@ -24,6 +25,30 @@ describe('buildVulnerabilitiesListRequest', () => {
       activeAlertOnly: true,
       page: 2,
       pageSize: 50,
+    })
+  })
+
+  it('includes hasAssessmentOnly when enabled', () => {
+    expect(
+      buildVulnerabilitiesListRequest({
+        search: '',
+        severity: '',
+        status: '',
+        source: '',
+        ageOperator: '',
+        ageHours: '',
+        publicExploitOnly: false,
+        knownExploitedOnly: false,
+        activeAlertOnly: false,
+        presentOnly: false,
+        hasAssessmentOnly: true,
+        page: 1,
+        pageSize: 25,
+      }),
+    ).toEqual({
+      hasAssessmentOnly: true,
+      page: 1,
+      pageSize: 25,
     })
   })
 })
@@ -42,6 +67,7 @@ describe('vulnerabilityQueryKeys', () => {
       knownExploitedOnly: false,
       activeAlertOnly: false,
       presentOnly: false,
+      hasAssessmentOnly: false,
       page: 1,
       pageSize: 25,
     })
@@ -57,6 +83,7 @@ describe('vulnerabilityQueryKeys', () => {
       '',
       '',
       '',
+      false,
       false,
       false,
       false,

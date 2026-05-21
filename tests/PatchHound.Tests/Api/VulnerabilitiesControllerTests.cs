@@ -270,6 +270,51 @@ public class VulnerabilitiesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task List_HasAssessmentOnly_ReturnsOnlyVulnerabilitiesWithAssessment()
+    {
+        var assessed = Vulnerability.Create("nvd", "CVE-2026-0401", "Assessed vulnerability",
+            "desc", Severity.High, 8.1m, null, DateTimeOffset.UtcNow.AddDays(-2));
+        var unassessed = Vulnerability.Create("nvd", "CVE-2026-0402", "Unassessed vulnerability",
+            "desc", Severity.High, 7.4m, null, DateTimeOffset.UtcNow.AddDays(-1));
+        _dbContext.Vulnerabilities.AddRange(assessed, unassessed);
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.VulnerabilityPatchAssessments.Add(VulnerabilityPatchAssessment.Create(
+            assessed.Id,
+            "Patch within the next maintenance window.",
+            "High",
+            "Vendor-confirmed patch published.",
+            "normal",
+            "30 days",
+            "Vendor advisory available.",
+            "[]",
+            "[]",
+            "[]",
+            "Default AI",
+            null,
+            DateTimeOffset.UtcNow));
+        await _dbContext.SaveChangesAsync();
+
+        var filteredAction = await _controller.List(
+            new VulnerabilityFilterQuery(HasAssessmentOnly: true),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+        var filteredPayload = filteredAction.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<VulnerabilityDto>>().Subject;
+        filteredPayload.Items.Should().ContainSingle(item => item.Id == assessed.Id);
+
+        var unfilteredAction = await _controller.List(
+            new VulnerabilityFilterQuery(),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+        var unfilteredPayload = unfilteredAction.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<VulnerabilityDto>>().Subject;
+        unfilteredPayload.Items.Select(item => item.Id).Should().BeEquivalentTo(new[] { assessed.Id, unassessed.Id });
+    }
+
+    [Fact]
     public async Task Get_ReturnsCanonicalVulnerabilityWithThreatAssessment()
     {
         var vuln = Vulnerability.Create("nvd", "CVE-2026-0200", "Exploited vulnerability",

@@ -9,6 +9,7 @@ type VulnerabilitiesListSearch = {
   knownExploitedOnly: boolean
   activeAlertOnly: boolean
   presentOnly: boolean
+  hasAssessmentOnly: boolean
   remediationCaseIds?: string
   page: number
   pageSize: number
@@ -28,6 +29,7 @@ export function buildVulnerabilitiesListRequest(search: VulnerabilitiesListSearc
     ...(search.knownExploitedOnly ? { knownExploitedOnly: true } : {}),
     ...(search.activeAlertOnly ? { activeAlertOnly: true } : {}),
     ...(search.presentOnly ? { presentOnly: true } : {}),
+    ...(search.hasAssessmentOnly ? { hasAssessmentOnly: true } : {}),
     ...(search.remediationCaseIds ? { remediationCaseIds: search.remediationCaseIds } : {}),
     page: search.page,
     pageSize: search.pageSize,
@@ -50,6 +52,7 @@ export const vulnerabilityQueryKeys = {
     search.knownExploitedOnly,
     search.activeAlertOnly,
     search.presentOnly,
+    search.hasAssessmentOnly,
     ...(search.remediationCaseIds ? [search.remediationCaseIds] : []),
     search.page,
     search.pageSize,

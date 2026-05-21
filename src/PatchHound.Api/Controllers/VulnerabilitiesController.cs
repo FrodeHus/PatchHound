@@ -100,6 +100,10 @@ public class VulnerabilitiesController : ControllerBase
                     && e.Status == ExposureStatus.Open
                 )
             );
+        if (filter.HasAssessmentOnly == true)
+            query = query.Where(v =>
+                _dbContext.VulnerabilityPatchAssessments.Any(a => a.VulnerabilityId == v.Id)
+            );
         var remediationCaseIds = ParseGuidList(filter.RemediationCaseIds);
         if (remediationCaseIds.Count > 0)
         {
