@@ -79,7 +79,9 @@ public class TenantAiProfilesControllerTests : IDisposable
                 true,
                 5,
                 "",
-                "secret-value"
+                "secret-value",
+                null,
+                null
             ),
             CancellationToken.None
         );
@@ -192,7 +194,47 @@ public class TenantAiProfilesControllerTests : IDisposable
                 true,
                 5,
                 "",
-                "secret-value"
+                "secret-value",
+                null,
+                null
+            ),
+            CancellationToken.None
+        );
+
+        action.Result.Should().BeOfType<BadRequestObjectResult>();
+        (await _dbContext.TenantAiProfiles.CountAsync()).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("2")]
+    [InlineData("0")]
+    [InlineData("Bogus")]
+    public async Task Create_InvalidResponseFormat_ReturnsBadRequest(string responseFormat)
+    {
+        var action = await _controller.Create(
+            new SaveTenantAiProfileRequest(
+                "Default",
+                "OpenAi",
+                true,
+                true,
+                "gpt-4.1-mini",
+                "Prompt",
+                0.2m,
+                1.0m,
+                1200,
+                60,
+                "https://api.openai.com/v1",
+                "",
+                "",
+                "",
+                false,
+                "Disabled",
+                true,
+                5,
+                "",
+                "secret-value",
+                null,
+                responseFormat
             ),
             CancellationToken.None
         );
@@ -237,7 +279,9 @@ public class TenantAiProfilesControllerTests : IDisposable
                 true,
                 5,
                 "",
-                ""
+                "",
+                null,
+                null
             ),
             CancellationToken.None
         );

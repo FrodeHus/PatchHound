@@ -170,20 +170,24 @@ public class OpenAiProvider : IAiReportProvider
             $"{profile.Profile.BaseUrl.TrimEnd('/')}/chat/completions"
         );
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", profile.ApiKey);
-        request.Content = JsonContent.Create(
-            new
+        var payload = new Dictionary<string, object?>
+        {
+            ["model"] = profile.Profile.Model,
+            ["messages"] = new[]
             {
-                model = profile.Profile.Model,
-                messages = new[]
-                {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = userPrompt },
-                },
-                temperature = decimal.ToDouble(profile.Profile.Temperature),
-                top_p = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
-                max_completion_tokens = maxTokens,
-            }
-        );
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userPrompt },
+            },
+            ["temperature"] = decimal.ToDouble(profile.Profile.Temperature),
+            ["top_p"] = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
+            ["max_completion_tokens"] = maxTokens,
+        };
+        if (profile.Profile.ResponseFormat == TenantAiResponseFormat.Json)
+        {
+            payload["response_format"] = new { type = "json_object" };
+        }
+
+        request.Content = JsonContent.Create(payload);
 
         using var response = await _httpClient.SendAsync(request, ct);
         var body = await response.Content.ReadAsStringAsync(ct);
@@ -236,27 +240,31 @@ public class OpenAiProvider : IAiReportProvider
             $"{profile.Profile.BaseUrl.TrimEnd('/')}/responses"
         );
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", profile.ApiKey);
-        httpRequest.Content = JsonContent.Create(
-            new
+        var payload = new Dictionary<string, object?>
+        {
+            ["model"] = profile.Profile.Model,
+            ["input"] = new object[]
             {
-                model = profile.Profile.Model,
-                input = new object[]
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userPrompt },
+            },
+            ["tools"] = new object[]
+            {
+                new
                 {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = userPrompt },
+                    type = "web_search_preview",
                 },
-                tools = new object[]
-                {
-                    new
-                    {
-                        type = "web_search_preview",
-                    },
-                },
-                temperature = decimal.ToDouble(profile.Profile.Temperature),
-                top_p = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
-                max_output_tokens = maxTokens,
-            }
-        );
+            },
+            ["temperature"] = decimal.ToDouble(profile.Profile.Temperature),
+            ["top_p"] = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
+            ["max_output_tokens"] = maxTokens,
+        };
+        if (profile.Profile.ResponseFormat == TenantAiResponseFormat.Json)
+        {
+            payload["text"] = new { format = new { type = "json_object" } };
+        }
+
+        httpRequest.Content = JsonContent.Create(payload);
 
         using var response = await _httpClient.SendAsync(httpRequest, ct);
         var body = await response.Content.ReadAsStringAsync(ct);

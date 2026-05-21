@@ -16,6 +16,8 @@ public class TenantAiProfile
     public decimal? TopP { get; private set; }
     public int MaxOutputTokens { get; private set; }
     public int TimeoutSeconds { get; private set; }
+    public int? NumCtx { get; private set; }
+    public TenantAiResponseFormat ResponseFormat { get; private set; }
     public string BaseUrl { get; private set; } = string.Empty;
     public string DeploymentName { get; private set; } = string.Empty;
     public string ApiVersion { get; private set; } = string.Empty;
@@ -55,7 +57,9 @@ public class TenantAiProfile
         TenantAiWebResearchMode webResearchMode = TenantAiWebResearchMode.Disabled,
         bool includeCitations = true,
         int maxResearchSources = 5,
-        string allowedDomains = ""
+        string allowedDomains = "",
+        int? numCtx = null,
+        TenantAiResponseFormat responseFormat = TenantAiResponseFormat.None
     )
     {
         var now = DateTimeOffset.UtcNow;
@@ -73,6 +77,8 @@ public class TenantAiProfile
             TopP = topP,
             MaxOutputTokens = maxOutputTokens,
             TimeoutSeconds = timeoutSeconds,
+            NumCtx = ValidateNumCtx(numCtx),
+            ResponseFormat = responseFormat,
             BaseUrl = baseUrl.Trim(),
             DeploymentName = deploymentName.Trim(),
             ApiVersion = apiVersion.Trim(),
@@ -108,7 +114,9 @@ public class TenantAiProfile
         TenantAiWebResearchMode webResearchMode,
         bool includeCitations,
         int maxResearchSources,
-        string allowedDomains
+        string allowedDomains,
+        int? numCtx,
+        TenantAiResponseFormat responseFormat
     )
     {
         Name = name.Trim();
@@ -120,6 +128,8 @@ public class TenantAiProfile
         TopP = topP;
         MaxOutputTokens = maxOutputTokens;
         TimeoutSeconds = timeoutSeconds;
+        NumCtx = ValidateNumCtx(numCtx);
+        ResponseFormat = responseFormat;
         BaseUrl = baseUrl.Trim();
         DeploymentName = deploymentName.Trim();
         ApiVersion = apiVersion.Trim();
@@ -150,5 +160,20 @@ public class TenantAiProfile
         LastValidationStatus = TenantAiProfileValidationStatus.Unknown;
         LastValidationError = string.Empty;
         UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    private static int? ValidateNumCtx(int? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+        if (value < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(value),
+                "NumCtx must be a positive integer when provided.");
+        }
+        return value;
     }
 }

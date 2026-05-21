@@ -24,7 +24,9 @@ public record TenantAiProfileDto(
     bool HasSecret,
     DateTimeOffset? LastValidatedAt,
     string LastValidationStatus,
-    string LastValidationError
+    string LastValidationError,
+    int? NumCtx,
+    string ResponseFormat
 );
 
 public record SaveTenantAiProfileRequest(
@@ -47,7 +49,9 @@ public record SaveTenantAiProfileRequest(
     bool IncludeCitations,
     int MaxResearchSources,
     string AllowedDomains,
-    string ApiKey
+    string ApiKey,
+    int? NumCtx,
+    string? ResponseFormat
 );
 
 public record TenantAiProfileValidationResultDto(

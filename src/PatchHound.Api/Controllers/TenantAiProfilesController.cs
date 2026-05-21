@@ -98,7 +98,9 @@ public class TenantAiProfilesController : ControllerBase
             webResearchMode: ResolveWebResearchMode(request),
             includeCitations: request.IncludeCitations,
             maxResearchSources: request.MaxResearchSources,
-            allowedDomains: request.AllowedDomains
+            allowedDomains: request.AllowedDomains,
+            numCtx: request.NumCtx,
+            responseFormat: ResolveResponseFormat(request.ResponseFormat)
         );
 
         var secretRef = BuildSecretRef(tenantId, profile.Id);
@@ -128,7 +130,9 @@ public class TenantAiProfilesController : ControllerBase
                 ResolveWebResearchMode(request),
                 request.IncludeCitations,
                 request.MaxResearchSources,
-                request.AllowedDomains
+                request.AllowedDomains,
+                request.NumCtx,
+                ResolveResponseFormat(request.ResponseFormat)
             );
         }
 
@@ -158,7 +162,9 @@ public class TenantAiProfilesController : ControllerBase
                 ResolveWebResearchMode(request),
                 request.IncludeCitations,
                 request.MaxResearchSources,
-                request.AllowedDomains
+                request.AllowedDomains,
+                request.NumCtx,
+                ResolveResponseFormat(request.ResponseFormat)
             );
         }
 
@@ -241,7 +247,9 @@ public class TenantAiProfilesController : ControllerBase
             ResolveWebResearchMode(request),
             request.IncludeCitations,
             request.MaxResearchSources,
-            request.AllowedDomains
+            request.AllowedDomains,
+            request.NumCtx,
+            ResolveResponseFormat(request.ResponseFormat)
         );
         profile.ResetValidation();
 
@@ -292,7 +300,9 @@ public class TenantAiProfilesController : ControllerBase
             profile.WebResearchMode,
             profile.IncludeCitations,
             profile.MaxResearchSources,
-            profile.AllowedDomains
+            profile.AllowedDomains,
+            profile.NumCtx,
+            profile.ResponseFormat
         );
 
         await _dbContext.SaveChangesAsync(ct);
@@ -402,7 +412,9 @@ public class TenantAiProfilesController : ControllerBase
                 profile.WebResearchMode,
                 profile.IncludeCitations,
                 profile.MaxResearchSources,
-                profile.AllowedDomains
+                profile.AllowedDomains,
+                profile.NumCtx,
+                profile.ResponseFormat
             );
         }
     }
@@ -452,6 +464,16 @@ public class TenantAiProfilesController : ControllerBase
         if (request.TimeoutSeconds <= 0)
         {
             return new ProblemDetails { Title = "Timeout seconds must be greater than 0." };
+        }
+
+        if (request.NumCtx is int ctx && ctx <= 0)
+        {
+            return new ProblemDetails { Title = "Num ctx must be greater than 0 when provided." };
+        }
+
+        if (!TryParseResponseFormat(request.ResponseFormat, out _))
+        {
+            return new ProblemDetails { Title = "Response format must be 'None' or 'Json'." };
         }
 
         if (request.IsDefault && !request.IsEnabled)
@@ -544,8 +566,41 @@ public class TenantAiProfilesController : ControllerBase
             !string.IsNullOrWhiteSpace(profile.SecretRef),
             profile.LastValidatedAt,
             profile.LastValidationStatus.ToString(),
-            profile.LastValidationError
+            profile.LastValidationError,
+            profile.NumCtx,
+            profile.ResponseFormat.ToString()
         );
+
+    private static TenantAiResponseFormat ResolveResponseFormat(string? value) =>
+        TryParseResponseFormat(value, out var parsed) ? parsed : TenantAiResponseFormat.None;
+
+    private static bool TryParseResponseFormat(string? value, out TenantAiResponseFormat result)
+    {
+        result = TenantAiResponseFormat.None;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        // Reject numeric strings ("0", "1", "2") - the public API contract is the named enum values only.
+        if (int.TryParse(value, out _))
+        {
+            return false;
+        }
+
+        if (!Enum.TryParse<TenantAiResponseFormat>(value, ignoreCase: true, out var parsed))
+        {
+            return false;
+        }
+
+        if (!Enum.IsDefined(typeof(TenantAiResponseFormat), parsed))
+        {
+            return false;
+        }
+
+        result = parsed;
+        return true;
+    }
 
     private static TenantAiWebResearchMode ResolveWebResearchMode(
         SaveTenantAiProfileRequest request

@@ -165,24 +165,34 @@ public class OllamaAiProvider : IAiReportProvider
             HttpMethod.Post,
             $"{NormalizeBaseUrl(profile.Profile.BaseUrl)}/generate"
         );
-        request.Content = JsonContent.Create(
-            new
-            {
-                model = profile.Profile.Model,
-                stream = false,
-                keep_alive = string.IsNullOrWhiteSpace(profile.Profile.KeepAlive)
-                    ? null
-                    : profile.Profile.KeepAlive,
-                system = systemPrompt,
-                prompt,
-                options = new
-                {
-                    temperature = decimal.ToDouble(profile.Profile.Temperature),
-                    top_p = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
-                    num_predict = maxTokens,
-                },
-            }
-        );
+        var options = new Dictionary<string, object?>
+        {
+            ["temperature"] = decimal.ToDouble(profile.Profile.Temperature),
+            ["top_p"] = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
+            ["num_predict"] = maxTokens,
+        };
+        if (profile.Profile.NumCtx is int numCtx)
+        {
+            options["num_ctx"] = numCtx;
+        }
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["model"] = profile.Profile.Model,
+            ["stream"] = false,
+            ["keep_alive"] = string.IsNullOrWhiteSpace(profile.Profile.KeepAlive)
+                ? null
+                : profile.Profile.KeepAlive,
+            ["system"] = systemPrompt,
+            ["prompt"] = prompt,
+            ["options"] = options,
+        };
+        if (profile.Profile.ResponseFormat == TenantAiResponseFormat.Json)
+        {
+            payload["format"] = "json";
+        }
+
+        request.Content = JsonContent.Create(payload);
 
         using var response = await _httpClient.SendAsync(request, ct);
         var body = await response.Content.ReadAsStringAsync(ct);
@@ -225,21 +235,25 @@ public class OllamaAiProvider : IAiReportProvider
             HttpMethod.Post,
             $"{NormalizeOpenAiBaseUrl(profile.Profile.BaseUrl)}/chat/completions"
         );
-        request.Content = JsonContent.Create(
-            new
+        var payload = new Dictionary<string, object?>
+        {
+            ["model"] = profile.Profile.Model,
+            ["messages"] = new object[]
             {
-                model = profile.Profile.Model,
-                messages = new object[]
-                {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = prompt },
-                },
-                stream = false,
-                temperature = decimal.ToDouble(profile.Profile.Temperature),
-                top_p = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
-                max_tokens = maxTokens,
-            }
-        );
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = prompt },
+            },
+            ["stream"] = false,
+            ["temperature"] = decimal.ToDouble(profile.Profile.Temperature),
+            ["top_p"] = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
+            ["max_tokens"] = maxTokens,
+        };
+        if (profile.Profile.ResponseFormat == TenantAiResponseFormat.Json)
+        {
+            payload["response_format"] = new { type = "json_object" };
+        }
+
+        request.Content = JsonContent.Create(payload);
 
         using var response = await _httpClient.SendAsync(request, ct);
         var body = await response.Content.ReadAsStringAsync(ct);

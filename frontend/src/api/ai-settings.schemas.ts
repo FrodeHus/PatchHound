@@ -26,6 +26,8 @@ export const tenantAiProfileSchema = z.object({
   lastValidatedAt: nullableIsoDateTimeSchema,
   lastValidationStatus: z.string(),
   lastValidationError: z.string(),
+  numCtx: z.number().int().positive().nullable(),
+  responseFormat: z.enum(['None', 'Json']),
 })
 
 export const saveTenantAiProfileSchema = z.object({
@@ -50,6 +52,8 @@ export const saveTenantAiProfileSchema = z.object({
   maxResearchSources: z.number().int().positive(),
   allowedDomains: z.string(),
   apiKey: z.string(),
+  numCtx: z.number().int().positive().nullable().optional(),
+  responseFormat: z.enum(['None', 'Json']).optional(),
 })
 
 export const tenantAiProfileValidationSchema = z.object({
