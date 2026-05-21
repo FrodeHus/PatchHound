@@ -15,7 +15,8 @@ const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   severity: searchStringSchema,
   status: searchStringSchema,
   source: searchStringSchema,
-  minAgeDays: searchStringSchema,
+  ageOperator: searchStringSchema,
+  ageHours: searchStringSchema,
   publicExploitOnly: searchBooleanSchema,
   knownExploitedOnly: searchBooleanSchema,
   activeAlertOnly: searchBooleanSchema,
@@ -73,8 +74,8 @@ function VulnerabilitiesPage() {
         searchValue={search.search}
         severityFilter={search.severity}
         statusFilter={search.status}
-        sourceFilter={search.source}
-        minAgeDays={search.minAgeDays}
+        ageOperator={search.ageOperator}
+        ageHours={search.ageHours}
         publicExploitOnly={search.publicExploitOnly}
         knownExploitedOnly={search.knownExploitedOnly}
         activeAlertOnly={search.activeAlertOnly}
@@ -94,17 +95,14 @@ function VulnerabilitiesPage() {
         onStatusFilterChange={(value) => {
           searchActions.updateField('status', value)
         }}
-        onSourceFilterChange={(value) => {
-          searchActions.updateField('source', value)
-        }}
         onPageChange={(page) => {
           searchActions.updatePage(page)
         }}
         onPageSizeChange={(nextPageSize) => {
           searchActions.updatePageSize(nextPageSize)
         }}
-        onMinAgeDaysChange={(value) => {
-          searchActions.updateField('minAgeDays', value)
+        onAgeFilterChange={(operator, hours) => {
+          searchActions.updateFields({ ageOperator: operator, ageHours: hours })
         }}
         onPublicExploitOnlyChange={(value) => {
           searchActions.updateField('publicExploitOnly', value)
@@ -125,8 +123,8 @@ function VulnerabilitiesPage() {
           searchActions.updateFields({
             severity: filters.severity,
             status: filters.status,
-            source: filters.source,
-            minAgeDays: filters.minAgeDays,
+            ageOperator: filters.ageOperator,
+            ageHours: filters.ageHours,
             publicExploitOnly: filters.publicExploitOnly,
             knownExploitedOnly: filters.knownExploitedOnly,
             activeAlertOnly: filters.activeAlertOnly,
@@ -140,7 +138,8 @@ function VulnerabilitiesPage() {
             severity: '',
             status: vulnerabilityStatusOptions[0],
             source: '',
-            minAgeDays: '',
+            ageOperator: '',
+            ageHours: '',
             publicExploitOnly: false,
             knownExploitedOnly: false,
             activeAlertOnly: false,

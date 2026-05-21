@@ -14,6 +14,8 @@ public class DeviceConfiguration : IEntityTypeConfiguration<Device>
         builder.HasIndex(d => d.TenantId);
         builder.HasIndex(d => d.SecurityProfileId);
         builder.HasIndex(d => new { d.TenantId, d.ActiveInTenant });
+        builder.HasIndex(d => new { d.TenantId, d.CreatedAt });
+        builder.HasIndex(d => new { d.TenantId, d.LastSeenAt });
 
         builder.Property(d => d.ExternalId).HasMaxLength(256).IsRequired();
         builder.Property(d => d.Name).HasMaxLength(256).IsRequired();

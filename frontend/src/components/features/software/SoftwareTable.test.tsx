@@ -40,10 +40,12 @@ describe('SoftwareTable', () => {
         categoryFilter=""
         vulnerableOnly={false}
         missedMaintenanceWindow={false}
+        firstAppearedWithinHoursFilter=""
         onSearchChange={() => {}}
         onCategoryFilterChange={() => {}}
         onVulnerableOnlyChange={() => {}}
         onMissedMaintenanceWindowChange={() => {}}
+        onFirstAppearedWithinHoursFilterChange={() => {}}
         onApplyStructuredFilters={() => {}}
         onShowRiskDetail={() => {}}
         onReturnToRuleControl={() => {}}
@@ -71,10 +73,12 @@ describe('SoftwareTable', () => {
         categoryFilter=""
         vulnerableOnly={false}
         missedMaintenanceWindow={false}
+        firstAppearedWithinHoursFilter=""
         onSearchChange={() => {}}
         onCategoryFilterChange={() => {}}
         onVulnerableOnlyChange={() => {}}
         onMissedMaintenanceWindowChange={() => {}}
+        onFirstAppearedWithinHoursFilterChange={() => {}}
         onApplyStructuredFilters={() => {}}
         onShowRiskDetail={() => {}}
         onReturnToRuleControl={onReturnToRuleControl}

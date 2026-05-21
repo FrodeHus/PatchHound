@@ -49,6 +49,15 @@ public class CloudApplicationsController(
         else if (filter.CredentialFilter == "expiring-soon")
             query = query.Where(a => a.Credentials.Any(c => c.ExpiresAt >= now && c.ExpiresAt <= soonThreshold));
 
+        const int maxRecencyHours = 24 * 366 * 50;
+        if (filter.FirstAppearedWithinHours is int firstAppearedHours)
+        {
+            if (firstAppearedHours < 1 || firstAppearedHours > maxRecencyHours)
+                return BadRequest(new ProblemDetails { Title = $"FirstAppearedWithinHours must be between 1 and {maxRecencyHours}." });
+            var threshold = now.AddHours(-firstAppearedHours);
+            query = query.Where(a => a.CreatedAt >= threshold);
+        }
+
         var totalCount = await query.CountAsync(ct);
 
         var apps = await query
@@ -245,5 +254,6 @@ public class CloudApplicationsController(
 
 public record CloudApplicationFilterQuery(
     string? Search = null,
-    string? CredentialFilter = null
+    string? CredentialFilter = null,
+    int? FirstAppearedWithinHours = null
 );

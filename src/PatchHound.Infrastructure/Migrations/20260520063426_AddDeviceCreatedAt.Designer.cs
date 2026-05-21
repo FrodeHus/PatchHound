@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PatchHound.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PatchHound.Infrastructure.Data;
 namespace PatchHound.Infrastructure.Migrations
 {
     [DbContext(typeof(PatchHoundDbContext))]
-    partial class PatchHoundDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260520063426_AddDeviceCreatedAt")]
+    partial class AddDeviceCreatedAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1600,87 +1603,6 @@ namespace PatchHound.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("DeviceVulnerabilityExposures");
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.EnrichmentChangeLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ChangeReason")
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
-
-                    b.Property<DateTimeOffset>("ChangedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("Confidence")
-                        .HasPrecision(6, 4)
-                        .HasColumnType("numeric(6,4)");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<Guid?>("EnrichmentJobId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("EnrichmentRunId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("EntityId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<string>("FieldPath")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<string>("NewValueJson")
-                        .HasColumnType("text");
-
-                    b.Property<string>("OldValueJson")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("SourceKey")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ValueKind")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EnrichmentJobId");
-
-                    b.HasIndex("EnrichmentRunId");
-
-                    b.HasIndex("Scope", "TenantId", "SourceKey", "ChangedAt");
-
-                    b.HasIndex("Scope", "TenantId", "EntityType", "EntityId", "ChangedAt");
-
-                    b.ToTable("EnrichmentChangeLog", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_EnrichmentChangeLog_Scope_TenantId", "(\"Scope\" = 'Global' AND \"TenantId\" IS NULL) OR (\"Scope\" = 'Tenant' AND \"TenantId\" IS NOT NULL)");
-                        });
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.EnrichmentJob", b =>

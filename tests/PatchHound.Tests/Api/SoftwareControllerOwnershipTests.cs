@@ -243,6 +243,41 @@ public class SoftwareControllerOwnershipTests : IDisposable
         dto.OwnerAssignmentSource.Should().Be("Manual");
     }
 
+    [Fact]
+    public async Task List_FiltersByFirstAppearedWithinHours()
+    {
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var oldProduct = SoftwareProduct.Create("Acme", "Acme Tool", null);
+        var now = DateTimeOffset.UtcNow;
+        var recent = SoftwareTenantRecord.Create(_tenantId, null, product.Id, now.AddHours(-12), now);
+        var old = SoftwareTenantRecord.Create(_tenantId, null, oldProduct.Id, now.AddDays(-30), now);
+
+        await _dbContext.AddRangeAsync(product, oldProduct, recent, old);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new TenantSoftwareFilterQuery(FirstAppearedWithinHours: 24),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var payload = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<TenantSoftwareListItemDto>>().Subject;
+        payload.TotalCount.Should().Be(1);
+        payload.Items.Single().Id.Should().Be(recent.Id);
+    }
+
+    [Fact]
+    public async Task List_FirstAppearedWithinHours_ReturnsBadRequest_WhenOutOfRange()
+    {
+        var action = await _controller.List(
+            new TenantSoftwareFilterQuery(FirstAppearedWithinHours: int.MaxValue),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+        action.Result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

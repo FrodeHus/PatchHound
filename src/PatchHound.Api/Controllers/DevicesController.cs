@@ -103,10 +103,12 @@ public class DevicesController : ControllerBase
                 || (d.ComputerDnsName != null && d.ComputerDnsName.Contains(filter.Search))
                 || d.ExternalId.Contains(filter.Search)
             );
-        if (!string.IsNullOrEmpty(filter.DeviceGroup))
+        var selectedGroups = (filter.DeviceGroups ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToArray();
+        if (selectedGroups.Length > 0)
             query = query.Where(d =>
-                (d.GroupName != null && d.GroupName.Contains(filter.DeviceGroup))
-                || (d.GroupId != null && d.GroupId.Contains(filter.DeviceGroup))
+                d.GroupName != null && selectedGroups.Contains(d.GroupName)
             );
         if (!string.IsNullOrEmpty(filter.HealthStatus))
             query = query.Where(d => d.HealthStatus == filter.HealthStatus);
@@ -122,6 +124,21 @@ public class DevicesController : ControllerBase
             );
         if (!string.IsNullOrEmpty(filter.OnboardingStatus))
             query = query.Where(d => d.OnboardingStatus == filter.OnboardingStatus);
+        const int maxRecencyHours = 24 * 366 * 50;
+        if (filter.CreatedWithinHours is int createdHours)
+        {
+            if (createdHours < 1 || createdHours > maxRecencyHours)
+                return BadRequest(new ProblemDetails { Title = $"CreatedWithinHours must be between 1 and {maxRecencyHours}." });
+            var threshold = DateTimeOffset.UtcNow.AddHours(-createdHours);
+            query = query.Where(d => d.CreatedAt >= threshold);
+        }
+        if (filter.LastSeenWithinHours is int lastSeenHours)
+        {
+            if (lastSeenHours < 1 || lastSeenHours > maxRecencyHours)
+                return BadRequest(new ProblemDetails { Title = $"LastSeenWithinHours must be between 1 and {maxRecencyHours}." });
+            var threshold = DateTimeOffset.UtcNow.AddHours(-lastSeenHours);
+            query = query.Where(d => d.LastSeenAt != null && d.LastSeenAt >= threshold);
+        }
 
         var rankedQuery = query.Select(d => new
         {
@@ -285,6 +302,24 @@ public class DevicesController : ControllerBase
                 pagination.BoundedPageSize
             )
         );
+    }
+
+    [HttpGet("groups")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
+    public async Task<ActionResult<IReadOnlyList<string>>> ListDeviceGroups(CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var groups = await _dbContext.Devices
+            .AsNoTracking()
+            .Where(d => d.TenantId == currentTenantId && d.GroupName != null && d.GroupName != "")
+            .Select(d => d.GroupName!)
+            .Distinct()
+            .OrderBy(name => name)
+            .ToListAsync(ct);
+
+        return Ok(groups);
     }
 
     [HttpGet("{id:guid}")]

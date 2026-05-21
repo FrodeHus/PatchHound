@@ -1789,7 +1789,12 @@ public class DashboardController : ControllerBase
             ))
             .ToListAsync(ct);
 
-        var tenantRisk = RiskScoreService.CalculateTenantRisk(assetScores);
+        var totalDeviceCount = filteredAssetIds is not null
+            ? await filteredAssetIds.CountAsync(ct)
+            : await _dbContext.Devices.AsNoTracking()
+                .CountAsync(device => device.TenantId == tenantId, ct);
+
+        var tenantRisk = RiskScoreService.CalculateTenantRisk(assetScores, totalDeviceCount);
         var scoreDelta = hasFilters
             ? null
             : await CalculateTenantRiskDeltaAsync(tenantId, tenantRisk.OverallScore, ct);
@@ -1951,7 +1956,7 @@ public class DashboardController : ControllerBase
 
     private static string DescribeRiskLevel(decimal score)
     {
-        var riskBand = RiskBand.FromScore(score);
+        var riskBand = TenantRiskBand.FromScore(score);
 
         return riskBand switch
         {

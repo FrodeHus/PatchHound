@@ -18,3 +18,7 @@ export const searchBooleanTrueSchema = z
   .union([z.boolean(), z.enum(['true', 'false'])])
   .transform((value) => value === true || value === 'true')
   .catch(true)
+
+export const searchOptionalPositiveIntSchema = z
+  .union([z.coerce.number().int().min(1), z.literal('')])
+  .catch('' as const)

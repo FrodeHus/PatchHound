@@ -6,7 +6,12 @@ import { SoftwareRiskDetailDialog } from '@/components/features/software/Softwar
 import { SoftwareTable } from '@/components/features/software/SoftwareTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { buildSoftwareListRequest, softwareQueryKeys } from '@/features/software/list-state'
-import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
+import {
+  baseListSearchSchema,
+  searchBooleanSchema,
+  searchOptionalPositiveIntSchema,
+  searchStringSchema,
+} from '@/routes/-list-search'
 import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 import { toast } from 'sonner'
 
@@ -15,6 +20,7 @@ const softwareSearchSchema = baseListSearchSchema.extend({
   category: searchStringSchema,
   vulnerableOnly: searchBooleanSchema,
   missedMaintenanceWindow: searchBooleanSchema,
+  firstAppearedWithinHours: searchOptionalPositiveIntSchema,
 })
 
 export const Route = createFileRoute('/_authed/software/')({
@@ -68,6 +74,7 @@ function SoftwareIndexPage() {
         categoryFilter={search.category}
         vulnerableOnly={search.vulnerableOnly}
         missedMaintenanceWindow={search.missedMaintenanceWindow}
+        firstAppearedWithinHoursFilter={search.firstAppearedWithinHours}
         onSearchChange={(value) => {
           searchActions.updateField('search', value)
         }}
@@ -80,11 +87,15 @@ function SoftwareIndexPage() {
         onMissedMaintenanceWindowChange={(value) => {
           searchActions.updateField('missedMaintenanceWindow', value)
         }}
+        onFirstAppearedWithinHoursFilterChange={(value) => {
+          searchActions.updateField('firstAppearedWithinHours', value)
+        }}
         onApplyStructuredFilters={(filters) => {
           searchActions.updateFields({
             category: filters.category,
             vulnerableOnly: filters.vulnerableOnly,
             missedMaintenanceWindow: filters.missedMaintenanceWindow,
+            firstAppearedWithinHours: filters.firstAppearedWithinHours,
           })
         }}
         onShowRiskDetail={setSelectedRiskSoftwareId}
@@ -103,6 +114,7 @@ function SoftwareIndexPage() {
             category: '',
             vulnerableOnly: false,
             missedMaintenanceWindow: false,
+            firstAppearedWithinHours: '',
           })
         }}
       />

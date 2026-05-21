@@ -61,10 +61,22 @@ public class VulnerabilitiesController : ControllerBase
             query = query.Where(v =>
                 v.Title.Contains(filter.Search) || v.ExternalId.Contains(filter.Search)
             );
-        if (filter.MinAgeDays.HasValue)
+        if (filter.AgeHours is > 0 && !string.IsNullOrEmpty(filter.AgeOperator))
         {
-            var cutoff = DateTimeOffset.UtcNow.AddDays(-filter.MinAgeDays.Value);
-            query = query.Where(v => v.PublishedDate <= cutoff);
+            var isOlder = string.Equals(filter.AgeOperator, "older", StringComparison.OrdinalIgnoreCase);
+            var isNewer = string.Equals(filter.AgeOperator, "newer", StringComparison.OrdinalIgnoreCase);
+            if (!isOlder && !isNewer)
+            {
+                return BadRequest($"Unsupported ageOperator '{filter.AgeOperator}'. Expected 'older' or 'newer'.");
+            }
+            var cutoff = DateTimeOffset.UtcNow.AddHours(-filter.AgeHours.Value);
+            query = isOlder
+                ? query.Where(v => v.PublishedDate <= cutoff)
+                : query.Where(v => v.PublishedDate >= cutoff);
+        }
+        else if (filter.AgeHours.HasValue || !string.IsNullOrEmpty(filter.AgeOperator))
+        {
+            return BadRequest("ageOperator and a positive ageHours must be provided together.");
         }
         if (filter.PublicExploitOnly == true)
             query = query.Where(v =>

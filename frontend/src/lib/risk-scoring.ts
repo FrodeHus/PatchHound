@@ -16,10 +16,30 @@ export const RISK_SCORE_RANGES = {
   critical: '850-1000',
 } as const
 
+export const TENANT_RISK_SCORE_THRESHOLDS = {
+  medium: 200,
+  high: 400,
+  critical: 600,
+} as const
+
+export const TENANT_RISK_SCORE_RANGES = {
+  low: '1-199',
+  medium: '200-399',
+  high: '400-599',
+  critical: '600-1000',
+} as const
+
 export function riskScoreBand(score: number): RiskScoreBand {
   if (score >= RISK_SCORE_THRESHOLDS.critical) return 'critical'
   if (score >= RISK_SCORE_THRESHOLDS.high) return 'high'
   if (score >= RISK_SCORE_THRESHOLDS.medium) return 'medium'
+  return 'low'
+}
+
+export function tenantRiskScoreBand(score: number): RiskScoreBand {
+  if (score >= TENANT_RISK_SCORE_THRESHOLDS.critical) return 'critical'
+  if (score >= TENANT_RISK_SCORE_THRESHOLDS.high) return 'high'
+  if (score >= TENANT_RISK_SCORE_THRESHOLDS.medium) return 'medium'
   return 'low'
 }
 

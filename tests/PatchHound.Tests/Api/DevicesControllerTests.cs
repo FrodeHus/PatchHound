@@ -250,6 +250,125 @@ public class DevicesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task List_FiltersByCreatedWithinHours()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var recent = CreateDevice("device-recent", "Recent", Criticality.Medium);
+        ForceCreatedAt(recent, now.AddHours(-2));
+        var midWindow = CreateDevice("device-mid", "Mid", Criticality.Medium);
+        ForceCreatedAt(midWindow, now.AddHours(-36));
+        var old = CreateDevice("device-old", "Old", Criticality.Medium);
+        ForceCreatedAt(old, now.AddDays(-10));
+
+        await _dbContext.AddRangeAsync(recent, midWindow, old);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new DeviceFilterQuery(CreatedWithinHours: 24),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var payload = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<DeviceDto>>().Subject;
+        payload.TotalCount.Should().Be(1);
+        payload.Items.Single().Id.Should().Be(recent.Id);
+    }
+
+    [Fact]
+    public async Task List_FiltersByLastSeenWithinHours()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var recent = CreateDevice("device-recent", "Recent", Criticality.Medium);
+        SetLastSeen(recent, now.AddHours(-12));
+        var stale = CreateDevice("device-stale", "Stale", Criticality.Medium);
+        SetLastSeen(stale, now.AddDays(-5));
+        var neverSeen = CreateDevice("device-never", "Never", Criticality.Medium);
+
+        await _dbContext.AddRangeAsync(recent, stale, neverSeen);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new DeviceFilterQuery(LastSeenWithinHours: 72),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var payload = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<DeviceDto>>().Subject;
+        payload.TotalCount.Should().Be(1);
+        payload.Items.Single().Id.Should().Be(recent.Id);
+    }
+
+    [Fact]
+    public async Task List_FiltersByDeviceGroups_ExactMatchAny()
+    {
+        var workstation = CreateDevice("device-w", "Workstation", Criticality.Medium);
+        SetGroup(workstation, "Workstations");
+        var server = CreateDevice("device-s", "Server", Criticality.High);
+        SetGroup(server, "Tier 0 Servers");
+        var laptop = CreateDevice("device-l", "Laptop", Criticality.Low);
+        SetGroup(laptop, "Laptops");
+
+        await _dbContext.AddRangeAsync(workstation, server, laptop);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new DeviceFilterQuery(DeviceGroups: "Workstations,Tier 0 Servers"),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var payload = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeOfType<PagedResponse<DeviceDto>>().Subject;
+        payload.TotalCount.Should().Be(2);
+        payload.Items.Select(item => item.Id).Should().BeEquivalentTo(new[] { workstation.Id, server.Id });
+    }
+
+    [Fact]
+    public async Task ListDeviceGroups_ReturnsDistinctSortedGroups()
+    {
+        var workstation = CreateDevice("device-w", "Workstation", Criticality.Medium);
+        SetGroup(workstation, "Workstations");
+        var server = CreateDevice("device-s", "Server", Criticality.High);
+        SetGroup(server, "Tier 0 Servers");
+        var anotherWorkstation = CreateDevice("device-w2", "Workstation 2", Criticality.Medium);
+        SetGroup(anotherWorkstation, "Workstations");
+        var ungrouped = CreateDevice("device-u", "Ungrouped", Criticality.Low);
+
+        await _dbContext.AddRangeAsync(workstation, server, anotherWorkstation, ungrouped);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.ListDeviceGroups(CancellationToken.None);
+
+        var groups = action.Result.Should().BeOfType<OkObjectResult>().Subject
+            .Value.Should().BeAssignableTo<IReadOnlyList<string>>().Subject;
+        groups.Should().Equal("Tier 0 Servers", "Workstations");
+    }
+
+    [Fact]
+    public async Task List_RecencyFilter_ReturnsBadRequest_WhenOutOfRange()
+    {
+        var device = CreateDevice("device-a", "Device A", Criticality.Medium);
+        await _dbContext.AddRangeAsync(device);
+        await _dbContext.SaveChangesAsync();
+
+        var tooLarge = await _controller.List(
+            new DeviceFilterQuery(CreatedWithinHours: int.MaxValue),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+        tooLarge.Result.Should().BeOfType<BadRequestObjectResult>();
+
+        var nonPositive = await _controller.List(
+            new DeviceFilterQuery(LastSeenWithinHours: 0),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+        nonPositive.Result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
     public async Task List_CountsOnlyOpenVulnerabilities()
     {
         var device = CreateDevice("device-a", "Device A", Criticality.High);
@@ -582,6 +701,45 @@ public class DevicesControllerTests : IDisposable
     private Device CreateDevice(string externalId, string name, Criticality criticality)
     {
         return Device.Create(_tenantId, _sourceSystemId, externalId, name, criticality);
+    }
+
+    private static void ForceCreatedAt(Device device, DateTimeOffset value)
+    {
+        typeof(Device)
+            .GetProperty(
+                nameof(Device.CreatedAt),
+                BindingFlags.Public | BindingFlags.Instance
+            )!
+            .SetValue(device, value);
+    }
+
+    private static void SetGroup(Device device, string groupName)
+    {
+        device.UpdateInventoryDetails(
+            computerDnsName: null,
+            healthStatus: null,
+            osPlatform: null,
+            osVersion: null,
+            externalRiskLabel: null,
+            lastSeenAt: null,
+            lastIpAddress: null,
+            aadDeviceId: null,
+            groupName: groupName
+        );
+    }
+
+    private static void SetLastSeen(Device device, DateTimeOffset lastSeenAt)
+    {
+        device.UpdateInventoryDetails(
+            computerDnsName: null,
+            healthStatus: null,
+            osPlatform: null,
+            osVersion: null,
+            externalRiskLabel: null,
+            lastSeenAt: lastSeenAt,
+            lastIpAddress: null,
+            aadDeviceId: null
+        );
     }
 
     // Phase 1 bridge: force Device.Id to a specific value so tests that rely on
