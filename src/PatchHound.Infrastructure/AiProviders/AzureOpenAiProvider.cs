@@ -161,13 +161,6 @@ public class AzureOpenAiProvider : IAiReportProvider
         return content.Trim();
     }
 
-    private static string BuildUserPrompt(AiTextGenerationRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.ExternalContext))
-        {
-            return request.UserPrompt;
-        }
-
-        return $"{request.UserPrompt}\n\nExternal research context:\n{request.ExternalContext}";
-    }
+    private static string BuildUserPrompt(AiTextGenerationRequest request) =>
+        AiProviderPromptBuilder.BuildUserPrompt(request);
 }

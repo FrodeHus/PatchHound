@@ -314,13 +314,6 @@ public class OpenAiProvider : IAiReportProvider
         throw new InvalidOperationException("OpenAI responses API did not contain output text.");
     }
 
-    private static string BuildUserPrompt(AiTextGenerationRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.ExternalContext))
-        {
-            return request.UserPrompt;
-        }
-
-        return $"{request.UserPrompt}\n\nExternal research context:\n{request.ExternalContext}";
-    }
+    private static string BuildUserPrompt(AiTextGenerationRequest request) =>
+        AiProviderPromptBuilder.BuildUserPrompt(request);
 }
