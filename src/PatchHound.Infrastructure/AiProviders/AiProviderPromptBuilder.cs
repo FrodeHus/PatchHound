@@ -1,10 +1,11 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Models;
 
 namespace PatchHound.Infrastructure.AiProviders;
 
-internal static class AiProviderPromptBuilder
+internal static partial class AiProviderPromptBuilder
 {
     public static string BuildReportPrompt(AiReportGenerationRequest request)
     {
