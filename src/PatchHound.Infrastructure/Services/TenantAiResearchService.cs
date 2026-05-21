@@ -10,6 +10,8 @@ public class TenantAiResearchService(
     ExternalWebSearchResearchProvider externalWebSearchProvider
 ) : ITenantAiResearchService
 {
+    private const int MaxCombinedContextChars = 12000;
+
     public async Task<Result<AiWebResearchBundle>> ResearchAsync(
         TenantAiProfileResolved profile,
         AiWebResearchRequest request,
@@ -60,12 +62,22 @@ public class TenantAiResearchService(
 
         return Result<AiWebResearchBundle>.Success(
             new AiWebResearchBundle(
-                string.Join("\n\n", contexts),
+                Truncate(string.Join("\n\n", contexts), MaxCombinedContextChars),
                 sources.GroupBy(item => item.Url, StringComparer.OrdinalIgnoreCase)
                     .Select(group => group.First())
                     .Take(request.MaxSources)
                     .ToList()
             )
         );
+    }
+
+    private static string Truncate(string value, int maxChars)
+    {
+        if (value.Length <= maxChars)
+        {
+            return value;
+        }
+
+        return value[..maxChars].TrimEnd() + "\n[truncated]";
     }
 }

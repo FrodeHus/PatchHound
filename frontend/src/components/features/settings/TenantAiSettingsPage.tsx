@@ -917,12 +917,17 @@ function AiProfileEditorPage({
                           {draft.providerType === 'OpenAi' ? (
                             <SelectItem value="ProviderNative">Provider native</SelectItem>
                           ) : null}
+                          <SelectItem value="LocalVulnerabilityIntel">Local vulnerability intel</SelectItem>
                           <SelectItem value="PatchHoundManaged">PatchHound managed</SelectItem>
                         </SelectContent>
                       </Select>
                       {draft.webResearchMode === 'PatchHoundManaged' ? (
                         <p className="mt-2 text-xs leading-5 text-muted-foreground">
                           PatchHound-managed external research sends search queries and fetched public pages through the configured research service.
+                        </p>
+                      ) : draft.webResearchMode === 'LocalVulnerabilityIntel' ? (
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                          Local vulnerability intel uses PatchHound and NVD cache data only. It does not perform external HTTP research.
                         </p>
                       ) : null}
                     </Field>

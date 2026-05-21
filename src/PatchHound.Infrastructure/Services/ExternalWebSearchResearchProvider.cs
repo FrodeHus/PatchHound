@@ -11,6 +11,9 @@ namespace PatchHound.Infrastructure.Services;
 
 public partial class ExternalWebSearchResearchProvider
 {
+    private const int MaxSnippetChars = 1800;
+    private const int MaxContextChars = 6000;
+
     private readonly HttpClient _httpClient;
     private readonly AiResearchOptions _options;
 
@@ -182,7 +185,7 @@ public partial class ExternalWebSearchResearchProvider
                     continue;
                 }
 
-                var proxiedUrl = $"https://r.jina.ai/http://{sourceUri.Host}{sourceUri.PathAndQuery}";
+                var proxiedUrl = $"https://r.jina.ai/http://{sourceUri.Authority}{sourceUri.PathAndQuery}";
                 using var response = await _httpClient.GetAsync(proxiedUrl, ct);
                 if (!response.IsSuccessStatusCode)
                 {
@@ -212,23 +215,59 @@ public partial class ExternalWebSearchResearchProvider
             return false;
         }
 
+        if (uri.IsLoopback || IsInternalHostName(uri.Host))
+        {
+            return false;
+        }
+
         if (uri.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6)
         {
             if (
                 IPAddress.TryParse(uri.Host, out var address)
-                && (
-                    IPAddress.IsLoopback(address)
-                    || address.IsIPv6LinkLocal
-                    || address.IsIPv6SiteLocal
-                    || IsPrivateIpv4(address)
-                )
+                && IsNonPublicAddress(address)
             )
             {
                 return false;
             }
         }
 
-        return !uri.IsLoopback;
+        return true;
+    }
+
+    private static bool IsInternalHostName(string host)
+    {
+        var normalized = host.TrimEnd('.').ToLowerInvariant();
+        return normalized is "localhost"
+            || normalized.EndsWith(".localhost", StringComparison.Ordinal)
+            || normalized.EndsWith(".local", StringComparison.Ordinal)
+            || normalized.EndsWith(".internal", StringComparison.Ordinal);
+    }
+
+    private static bool IsNonPublicAddress(IPAddress address)
+    {
+        if (IPAddress.IsLoopback(address))
+        {
+            return true;
+        }
+
+        if (address.Equals(IPAddress.Any)
+            || address.Equals(IPAddress.IPv6Any)
+            || address.Equals(IPAddress.None)
+            || address.Equals(IPAddress.IPv6None))
+        {
+            return true;
+        }
+
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            var bytes = address.GetAddressBytes();
+            return address.IsIPv6LinkLocal
+                || address.IsIPv6SiteLocal
+                || address.IsIPv6Multicast
+                || (bytes[0] & 0xfe) == 0xfc;
+        }
+
+        return IsPrivateIpv4(address);
     }
 
     private static bool IsPrivateIpv4(IPAddress address)
@@ -241,7 +280,10 @@ public partial class ExternalWebSearchResearchProvider
         var bytes = address.GetAddressBytes();
         return bytes[0] == 10
             || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
-            || (bytes[0] == 192 && bytes[1] == 168);
+            || (bytes[0] == 192 && bytes[1] == 168)
+            || (bytes[0] == 169 && bytes[1] == 254)
+            || bytes[0] == 0
+            || bytes[0] >= 224;
     }
 
     private static string ExtractSourceSnippet(string body)
@@ -254,7 +296,7 @@ public partial class ExternalWebSearchResearchProvider
             .Where(line => !line.StartsWith("Markdown Content:", StringComparison.OrdinalIgnoreCase))
             .Take(40);
 
-        return string.Join('\n', lines);
+        return Truncate(string.Join('\n', lines), MaxSnippetChars);
     }
 
     private static string BuildContext(
@@ -295,7 +337,17 @@ public partial class ExternalWebSearchResearchProvider
             }
         }
 
-        return builder.ToString().Trim();
+        return Truncate(builder.ToString().Trim(), MaxContextChars);
+    }
+
+    private static string Truncate(string value, int maxChars)
+    {
+        if (value.Length <= maxChars)
+        {
+            return value;
+        }
+
+        return value[..maxChars].TrimEnd() + "\n[truncated]";
     }
 
     [GeneratedRegex(@"\[(?<title>[^\]]+)\]\((?<url>https?://[^)]+)\)", RegexOptions.IgnoreCase)]
