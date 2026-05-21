@@ -27,6 +27,30 @@ describe('buildVulnerabilitiesListRequest', () => {
       pageSize: 50,
     })
   })
+
+  it('includes hasAssessmentOnly when enabled', () => {
+    expect(
+      buildVulnerabilitiesListRequest({
+        search: '',
+        severity: '',
+        status: '',
+        source: '',
+        ageOperator: '',
+        ageHours: '',
+        publicExploitOnly: false,
+        knownExploitedOnly: false,
+        activeAlertOnly: false,
+        presentOnly: false,
+        hasAssessmentOnly: true,
+        page: 1,
+        pageSize: 25,
+      }),
+    ).toEqual({
+      hasAssessmentOnly: true,
+      page: 1,
+      pageSize: 25,
+    })
+  })
 })
 
 describe('vulnerabilityQueryKeys', () => {
