@@ -471,8 +471,7 @@ public class TenantAiProfilesController : ControllerBase
             return new ProblemDetails { Title = "Num ctx must be greater than 0 when provided." };
         }
 
-        if (!string.IsNullOrWhiteSpace(request.ResponseFormat)
-            && !Enum.TryParse<TenantAiResponseFormat>(request.ResponseFormat, true, out _))
+        if (!TryParseResponseFormat(request.ResponseFormat, out _))
         {
             return new ProblemDetails { Title = "Response format must be 'None' or 'Json'." };
         }
@@ -572,16 +571,35 @@ public class TenantAiProfilesController : ControllerBase
             profile.ResponseFormat.ToString()
         );
 
-    private static TenantAiResponseFormat ResolveResponseFormat(string? value)
+    private static TenantAiResponseFormat ResolveResponseFormat(string? value) =>
+        TryParseResponseFormat(value, out var parsed) ? parsed : TenantAiResponseFormat.None;
+
+    private static bool TryParseResponseFormat(string? value, out TenantAiResponseFormat result)
     {
+        result = TenantAiResponseFormat.None;
         if (string.IsNullOrWhiteSpace(value))
         {
-            return TenantAiResponseFormat.None;
+            return true;
         }
 
-        return Enum.TryParse<TenantAiResponseFormat>(value, true, out var parsed)
-            ? parsed
-            : TenantAiResponseFormat.None;
+        // Reject numeric strings ("0", "1", "2") - the public API contract is the named enum values only.
+        if (int.TryParse(value, out _))
+        {
+            return false;
+        }
+
+        if (!Enum.TryParse<TenantAiResponseFormat>(value, ignoreCase: true, out var parsed))
+        {
+            return false;
+        }
+
+        if (!Enum.IsDefined(typeof(TenantAiResponseFormat), parsed))
+        {
+            return false;
+        }
+
+        result = parsed;
+        return true;
     }
 
     private static TenantAiWebResearchMode ResolveWebResearchMode(
