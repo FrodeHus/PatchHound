@@ -47,7 +47,7 @@ export const saveTenantAiProfileSchema = z.object({
   apiVersion: z.string(),
   keepAlive: z.string(),
   allowExternalResearch: z.boolean(),
-  webResearchMode: z.enum(['Disabled', 'ProviderNative', 'PatchHoundManaged']),
+  webResearchMode: z.enum(['Disabled', 'ProviderNative', 'PatchHoundManaged', 'LocalVulnerabilityIntel']),
   includeCitations: z.boolean(),
   maxResearchSources: z.number().int().positive(),
   allowedDomains: z.string(),
