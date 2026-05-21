@@ -893,7 +893,7 @@ function AiProfileEditorPage({
                   <div className="space-y-1">
                     <span className="text-sm font-medium text-foreground">Allow external web research</span>
                     <p className="text-sm text-muted-foreground">
-                      Use recent external context when supported by the provider or by PatchHound-managed research.
+                      Use recent external context when supported by the provider or by PatchHound-managed research. Vulnerability assessments always use local PatchHound intel first.
                     </p>
                   </div>
                 </label>
@@ -917,9 +917,19 @@ function AiProfileEditorPage({
                           {draft.providerType === 'OpenAi' ? (
                             <SelectItem value="ProviderNative">Provider native</SelectItem>
                           ) : null}
+                          <SelectItem value="LocalVulnerabilityIntel">Local vulnerability intel</SelectItem>
                           <SelectItem value="PatchHoundManaged">PatchHound managed</SelectItem>
                         </SelectContent>
                       </Select>
+                      {draft.webResearchMode === 'PatchHoundManaged' ? (
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                          PatchHound-managed external research sends search queries and fetched public pages through the configured research service.
+                        </p>
+                      ) : draft.webResearchMode === 'LocalVulnerabilityIntel' ? (
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                          Local vulnerability intel uses PatchHound and NVD cache data only. It does not perform external HTTP research.
+                        </p>
+                      ) : null}
                     </Field>
 
                     <Field label="Max research sources" tooltip="Upper bound for external sources added to the research context.">

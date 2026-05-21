@@ -128,8 +128,11 @@ public static class DependencyInjection
         services.AddScoped<ExecutiveDashboardBriefingService>();
         services.AddScoped<IRiskChangeBriefAiSummaryService, RiskChangeBriefAiSummaryService>();
         services.AddScoped<ITenantAiConfigurationResolver, TenantAiConfigurationResolver>();
+        services.Configure<AiResearchOptions>(configuration.GetSection(AiResearchOptions.SectionName));
+        services.AddScoped<LocalVulnerabilityIntelResearchProvider>();
+        services.AddScoped<ITenantAiResearchService, TenantAiResearchService>();
         services
-            .AddHttpClient<ITenantAiResearchService, TenantAiResearchService>()
+            .AddHttpClient<ExternalWebSearchResearchProvider>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();
