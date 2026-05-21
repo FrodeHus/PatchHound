@@ -206,6 +206,45 @@ public class TenantAiProfilesControllerTests : IDisposable
     }
 
     [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(3601)]
+    [InlineData(int.MaxValue)]
+    public async Task Create_TimeoutSecondsOutOfRange_ReturnsBadRequest(int timeoutSeconds)
+    {
+        var action = await _controller.Create(
+            new SaveTenantAiProfileRequest(
+                "Default",
+                "OpenAi",
+                true,
+                true,
+                "gpt-4.1-mini",
+                "Prompt",
+                0.2m,
+                1.0m,
+                1200,
+                timeoutSeconds,
+                "https://api.openai.com/v1",
+                "",
+                "",
+                "",
+                false,
+                "Disabled",
+                true,
+                5,
+                "",
+                "secret-value",
+                null,
+                null
+            ),
+            CancellationToken.None
+        );
+
+        action.Result.Should().BeOfType<BadRequestObjectResult>();
+        (await _dbContext.TenantAiProfiles.CountAsync()).Should().Be(0);
+    }
+
+    [Theory]
     [InlineData("2")]
     [InlineData("0")]
     [InlineData("Bogus")]

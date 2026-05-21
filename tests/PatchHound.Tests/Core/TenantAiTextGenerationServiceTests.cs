@@ -48,6 +48,38 @@ public class TenantAiTextGenerationServiceTests
     }
 
     [Fact]
+    public async Task GenerateResolvedAsync_ClampsAbsurdProfileTimeoutToOneHour()
+    {
+        // A TimeoutSeconds value that overflows CancelAfter's TimeSpan limit must not
+        // bubble out as ArgumentOutOfRangeException. The service clamps internally.
+        var tenantId = Guid.NewGuid();
+        var profile = TenantAiProfileFactory.Create(tenantId, timeoutSeconds: int.MaxValue);
+        var resolved = new TenantAiProfileResolved(profile, "secret");
+
+        var provider = Substitute.For<IAiReportProvider>();
+        provider.ProviderType.Returns(TenantAiProviderType.OpenAi);
+        provider
+            .GenerateTextAsync(Arg.Any<AiTextGenerationRequest>(), Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult("ok"));
+
+        var service = new TenantAiTextGenerationService([provider], Substitute.For<ITenantAiConfigurationResolver>());
+
+        var act = async () => await service.GenerateResolvedAsync(
+            resolved,
+            new AiTextGenerationRequest(
+                SystemPrompt: string.Empty,
+                UserPrompt: "test",
+                ExternalContext: null,
+                UseProviderNativeWebResearch: false,
+                MaxResearchSources: 0,
+                IncludeCitations: false,
+                MaxOutputTokens: 100),
+            CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
     public async Task GenerateResolvedAsync_OuterCancellationPropagatesAsGenericFailure()
     {
         var tenantId = Guid.NewGuid();
