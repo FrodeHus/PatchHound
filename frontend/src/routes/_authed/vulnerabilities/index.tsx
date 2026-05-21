@@ -21,6 +21,7 @@ const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   knownExploitedOnly: searchBooleanSchema,
   activeAlertOnly: searchBooleanSchema,
   presentOnly: searchBooleanTrueSchema,
+  hasAssessmentOnly: searchBooleanSchema,
   remediationCaseIds: searchStringSchema.optional(),
 })
 
@@ -80,6 +81,7 @@ function VulnerabilitiesPage() {
         knownExploitedOnly={search.knownExploitedOnly}
         activeAlertOnly={search.activeAlertOnly}
         presentOnly={search.presentOnly}
+        hasAssessmentOnly={search.hasAssessmentOnly}
         selectedRemediationCaseIds={parseRemediationCaseIds(search.remediationCaseIds ?? '')}
         remediationOptions={(remediationOptionsQuery.data?.items ?? []).map((item) => ({
           remediationCaseId: item.remediationCaseId,
@@ -116,6 +118,9 @@ function VulnerabilitiesPage() {
         onPresentOnlyChange={(value) => {
           searchActions.updateField('presentOnly', value)
         }}
+        onHasAssessmentOnlyChange={(value) => {
+          searchActions.updateField('hasAssessmentOnly', value)
+        }}
         onRemediationCaseIdsChange={(value) => {
           searchActions.updateField('remediationCaseIds', value.join(','))
         }}
@@ -129,6 +134,7 @@ function VulnerabilitiesPage() {
             knownExploitedOnly: filters.knownExploitedOnly,
             activeAlertOnly: filters.activeAlertOnly,
             presentOnly: filters.presentOnly,
+            hasAssessmentOnly: filters.hasAssessmentOnly,
             remediationCaseIds: filters.remediationCaseIds.join(','),
           })
         }}
@@ -144,6 +150,7 @@ function VulnerabilitiesPage() {
             knownExploitedOnly: false,
             activeAlertOnly: false,
             presentOnly: true,
+            hasAssessmentOnly: false,
             remediationCaseIds: '',
           })
         }}
