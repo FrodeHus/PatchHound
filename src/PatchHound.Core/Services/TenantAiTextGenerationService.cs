@@ -53,10 +53,30 @@ public class TenantAiTextGenerationService
             );
         }
 
+        // Clamp at one hour: well above the AI HttpClient ceiling (5 min) so it's
+        // effectively dead code, but it guarantees CancelAfter cannot throw on a
+        // pathological value from legacy data.
+        const int maxTimeoutSeconds = 3600;
+        var rawTimeoutSeconds = resolvedProfile.Profile.TimeoutSeconds;
+        var timeoutSeconds = rawTimeoutSeconds > 0
+            ? Math.Min(rawTimeoutSeconds, maxTimeoutSeconds)
+            : 0;
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        if (timeoutSeconds > 0)
+        {
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+        }
+
         string content;
         try
         {
-            content = await provider.GenerateTextAsync(request, resolvedProfile, ct);
+            content = await provider.GenerateTextAsync(request, resolvedProfile, timeoutCts.Token);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            return Result<AiTextGenerationResult>.Failure(
+                $"AI generation timed out after {timeoutSeconds}s (per-profile TimeoutSeconds)."
+            );
         }
         catch (Exception ex)
         {

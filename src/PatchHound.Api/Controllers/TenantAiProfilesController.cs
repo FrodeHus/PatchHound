@@ -461,9 +461,9 @@ public class TenantAiProfilesController : ControllerBase
             return new ProblemDetails { Title = "Max output tokens must be greater than 0." };
         }
 
-        if (request.TimeoutSeconds <= 0)
+        if (request.TimeoutSeconds <= 0 || request.TimeoutSeconds > 3600)
         {
-            return new ProblemDetails { Title = "Timeout seconds must be greater than 0." };
+            return new ProblemDetails { Title = "Timeout seconds must be between 1 and 3600." };
         }
 
         if (request.NumCtx is int ctx && ctx <= 0)
