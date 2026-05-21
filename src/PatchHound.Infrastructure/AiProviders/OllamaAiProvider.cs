@@ -300,15 +300,8 @@ public class OllamaAiProvider : IAiReportProvider
             : $"{normalized}/api";
     }
 
-    private static string BuildUserPrompt(AiTextGenerationRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.ExternalContext))
-        {
-            return request.UserPrompt;
-        }
-
-        return $"{request.UserPrompt}\n\nExternal research context:\n{request.ExternalContext}";
-    }
+    private static string BuildUserPrompt(AiTextGenerationRequest request) =>
+        AiProviderPromptBuilder.BuildUserPrompt(request);
 
     private static string NormalizeOpenAiBaseUrl(string baseUrl)
     {

@@ -1,14 +1,19 @@
 # PatchHound
 
-PatchHound is a self-hosted vulnerability operations platform. It pulls security findings into one system, tracks remediation work, keeps an audit trail, and supports optional Microsoft Sentinel forwarding.
+PatchHound is a self-hosted vulnerability operations platform for turning security findings into tracked remediation work. It ingests vulnerability and asset data, normalizes software exposure, prioritizes risk across tenants, supports AI-assisted vulnerability assessments, and keeps an auditable workflow from detection through closure.
 
-## What It Covers
+## Features
 
-- Vulnerability and asset ingestion
-- Multi-tenant remediation workflows
-- Risk scoring across assets, software, and tenants
-- Audit logging and background processing
-- ASP.NET Core backend with a React frontend
+- **Vulnerability and asset ingestion** from tenant-configured sources, with checkpointed runs, staged merges, device activity refresh, and enrichment jobs.
+- **Authenticated scan runner support** for collecting host-level software evidence through the `PatchHound.Puppy` runner and folding those results into the same inventory and exposure model.
+- **Canonical software exposure modeling** that links installed software, vulnerability applicability, affected devices, version cohorts, and remediation cases.
+- **Risk scoring** across vulnerabilities, devices, software, remediation cases, teams, and tenants, including threat and exposure signals such as CVSS, EPSS, exploit indicators, device criticality, and remediation posture.
+- **AI-supported vulnerability assessments** that evaluate patch urgency, recommend emergency or normal patching timelines, capture confidence and rationale, list similar vulnerabilities, suggest compensating controls, and preserve references for analyst review.
+- **Emergency patch workflows** that surface AI assessment results in remediation context, apply urgency-aware risk floors, and notify security and technical managers when immediate action is required.
+- **Multi-tenant remediation workflows** with stage ownership, approvals, recurrence handling, patching tasks, risk acceptance, alternate mitigation, and auto-closure when exposure is resolved.
+- **Executive and operational dashboards** for tenant risk, new and resolved vulnerabilities, aging, software exposure, remediation status, and risk-change summaries.
+- **Audit and notification pipeline** with optional Microsoft Sentinel forwarding through the Logs Ingestion API.
+- **Secret-backed operations** using OpenBao for source credentials, AI provider configuration, notification delivery secrets, and scan credentials.
 
 ## Screenshots
 
@@ -24,12 +29,24 @@ PatchHound is a self-hosted vulnerability operations platform. It pulls security
 
 ![Remediation workflow](images/remediation-workflow.png)
 
+**Software exposure**
+
+![Software view](images/software-view.png)
+
+**Operations dashboard**
+
+![Operations dashboard](images/operations-dashboard.png)
+
 ## Stack
 
 - Backend: .NET, ASP.NET Core, EF Core, SignalR
-- Frontend: React, TanStack Start, Vite
+- Worker: .NET background services for ingestion, enrichment, vulnerability assessment, SLA checks, workflows, authenticated scans, and NVD synchronization
+- Runner: `PatchHound.Puppy` for tenant-side authenticated scanning
+- Frontend: React 19, TanStack Start/Router, TanStack Query, Vite, Radix UI, Tailwind CSS
 - Database: PostgreSQL
-- Secrets: OpenBao
+- Identity: Microsoft Entra ID
+- Secrets: OpenBao KV v2
+- Integrations: Microsoft Defender-style ingestion sources, NVD enrichment, AI providers, Microsoft Sentinel forwarding
 
 ## Quick Start
 
@@ -62,6 +79,12 @@ dotnet run --project src/PatchHound.Api
 dotnet run --project src/PatchHound.Worker
 ```
 
+Runner:
+
+```bash
+dotnet run --project src/PatchHound.Puppy
+```
+
 Frontend:
 
 ```bash
@@ -82,6 +105,8 @@ npm run dev
 - [Create an ingestion source](docs/CREATE_INGESTION_SOURCE.md)
 - [Adding an ingestion source](docs/tutorials/add-ingestion-source.md)
 - [Risk score calculation](docs/risk-score-calculation.md)
+- [Scoring model reference](docs/SCORING.md)
+- [Database diagram](docs/database-diagram.md)
 - [Testing conventions](docs/testing-conventions.md)
 - [Ingestion flow](INGESTION_FLOW.md)
 - [Remediation flow](REMEDIATION_FLOW.md)
