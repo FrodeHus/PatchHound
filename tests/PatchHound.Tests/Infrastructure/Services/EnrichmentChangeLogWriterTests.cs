@@ -96,6 +96,29 @@ public class EnrichmentChangeLogWriterTests : IDisposable
     }
 
     [Fact]
+    public async Task WriteScalarChangesAsync_can_stage_rows_without_saving()
+    {
+        var writer = CreateWriter(_db);
+
+        await writer.WriteScalarChangesAsync(
+            CreateChangeSet(EnrichmentChangeScope.Global, null),
+            [EnrichmentScalarChange.String("lifecycle.status", "Lifecycle status", "Active", "EOL")],
+            CancellationToken.None,
+            saveChanges: false
+        );
+
+        (await _db.EnrichmentChangeLogs.IgnoreQueryFilters().CountAsync()).Should().Be(0);
+        _db.ChangeTracker
+            .Entries<EnrichmentChangeLog>()
+            .Should()
+            .ContainSingle(entry => entry.State == EntityState.Added);
+
+        await _db.SaveChangesAsync();
+
+        (await _db.EnrichmentChangeLogs.IgnoreQueryFilters().CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
     public async Task WriteScalarChangesAsync_detaches_added_change_rows_when_save_fails()
     {
         await using var failingDb = new ThrowingSaveChangesDbContext(CreateOptions());

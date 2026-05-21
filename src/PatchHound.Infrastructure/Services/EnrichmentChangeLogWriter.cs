@@ -18,7 +18,8 @@ public sealed class EnrichmentChangeLogWriter(
     public async Task WriteScalarChangesAsync(
         EnrichmentChangeSet changeSet,
         IReadOnlyCollection<EnrichmentScalarChange> changes,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool saveChanges = true)
     {
         var addedLogs = new List<EnrichmentChangeLog>();
 
@@ -52,6 +53,11 @@ public sealed class EnrichmentChangeLogWriter(
         }
 
         if (addedLogs.Count == 0)
+        {
+            return;
+        }
+
+        if (!saveChanges)
         {
             return;
         }

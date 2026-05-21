@@ -22,7 +22,7 @@ describe('EnrichmentChangesSheet', () => {
           id: '11111111-1111-1111-1111-111111111111',
           scope: 'Global',
           tenantId: null,
-          entityType: 'vulnerabilities',
+          entityType: 'Vulnerability',
           entityId: '22222222-2222-2222-2222-222222222222',
           sourceKey: 'microsoft-defender',
           sourceDisplayName: 'Microsoft Defender',
@@ -54,7 +54,7 @@ describe('EnrichmentChangesSheet', () => {
     expect(screen.getByText('8.8')).toBeInTheDocument()
     expect(fetchEnrichmentChangesMock).toHaveBeenCalledWith({
       data: {
-        entityType: 'vulnerabilities',
+        entityType: 'Vulnerability',
         entityId: '22222222-2222-2222-2222-222222222222',
         page: 1,
         pageSize: 30,
@@ -91,7 +91,7 @@ function renderSheet() {
   return render(
     <QueryClientProvider client={queryClient}>
       <EnrichmentChangesSheet
-        entityType="vulnerabilities"
+        entityType="Vulnerability"
         entityId="22222222-2222-2222-2222-222222222222"
         entityLabel="CVE-2026-1234"
       />

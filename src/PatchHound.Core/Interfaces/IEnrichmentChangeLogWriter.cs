@@ -7,7 +7,8 @@ public interface IEnrichmentChangeLogWriter
     Task WriteScalarChangesAsync(
         EnrichmentChangeSet changeSet,
         IReadOnlyCollection<EnrichmentScalarChange> changes,
-        CancellationToken ct);
+        CancellationToken ct,
+        bool saveChanges = true);
 }
 
 public sealed record EnrichmentChangeSet(
