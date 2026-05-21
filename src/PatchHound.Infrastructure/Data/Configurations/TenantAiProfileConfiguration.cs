@@ -34,5 +34,9 @@ public class TenantAiProfileConfiguration : IEntityTypeConfiguration<TenantAiPro
         builder.Property(item => item.LastValidationError).HasMaxLength(1024).IsRequired();
         builder.Property(item => item.Temperature).HasPrecision(4, 2);
         builder.Property(item => item.TopP).HasPrecision(4, 2);
+        builder
+            .Property(item => item.ResponseFormat)
+            .HasConversion<string>()
+            .HasMaxLength(16);
     }
 }

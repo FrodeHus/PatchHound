@@ -114,19 +114,23 @@ public class AzureOpenAiProvider : IAiReportProvider
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         request.Headers.Add("api-key", profile.ApiKey);
-        request.Content = JsonContent.Create(
-            new
+        var payload = new Dictionary<string, object?>
+        {
+            ["messages"] = new[]
             {
-                messages = new[]
-                {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = userPrompt },
-                },
-                temperature = decimal.ToDouble(profile.Profile.Temperature),
-                top_p = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
-                max_tokens = maxTokens,
-            }
-        );
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userPrompt },
+            },
+            ["temperature"] = decimal.ToDouble(profile.Profile.Temperature),
+            ["top_p"] = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
+            ["max_tokens"] = maxTokens,
+        };
+        if (profile.Profile.ResponseFormat == TenantAiResponseFormat.Json)
+        {
+            payload["response_format"] = new { type = "json_object" };
+        }
+
+        request.Content = JsonContent.Create(payload);
 
         using var response = await _httpClient.SendAsync(request, ct);
         var body = await response.Content.ReadAsStringAsync(ct);

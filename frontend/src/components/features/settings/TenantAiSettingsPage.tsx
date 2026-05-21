@@ -121,6 +121,8 @@ function createEmptyProfile(): SaveTenantAiProfile {
     maxResearchSources: 5,
     allowedDomains: '',
     apiKey: '',
+    numCtx: null,
+    responseFormat: 'None',
   }
 }
 
@@ -147,6 +149,8 @@ function toDraft(profile: TenantAiProfile): SaveTenantAiProfile {
     maxResearchSources: profile.maxResearchSources,
     allowedDomains: profile.allowedDomains,
     apiKey: '',
+    numCtx: profile.numCtx,
+    responseFormat: profile.responseFormat,
   }
 }
 
@@ -724,12 +728,31 @@ function AiProfileEditorPage({
               ) : null}
 
               {draft.providerType === 'Ollama' ? (
-                <Field label="Keep alive" tooltip="Optional Ollama keep-alive value, for example 5m.">
-                  <Input
-                    value={draft.keepAlive}
-                    onChange={(event) => onDraftChange((current) => ({ ...current, keepAlive: event.target.value }))}
-                  />
-                </Field>
+                <>
+                  <Field label="Keep alive" tooltip="Optional Ollama keep-alive value, for example 5m.">
+                    <Input
+                      value={draft.keepAlive}
+                      onChange={(event) => onDraftChange((current) => ({ ...current, keepAlive: event.target.value }))}
+                    />
+                  </Field>
+                  <Field
+                    label="Context window (num_ctx)"
+                    tooltip="Optional Ollama context size in tokens. Leave blank to use the model default (often 2048, which silently truncates long prompts). 8192 is a safe choice for vuln assessment prompts."
+                  >
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Model default"
+                      value={draft.numCtx ?? ''}
+                      onChange={(event) =>
+                        onDraftChange((current) => ({
+                          ...current,
+                          numCtx: event.target.value === '' ? null : Number(event.target.value),
+                        }))
+                      }
+                    />
+                  </Field>
+                </>
               ) : null}
 
               {draft.providerType !== 'Ollama' ? (
@@ -811,6 +834,28 @@ function AiProfileEditorPage({
                     }))
                   }
                 />
+              </Field>
+              <Field
+                label="Response format"
+                tooltip="Force the provider to return strict JSON. Recommended for structured assessment jobs that parse the response."
+              >
+                <Select
+                  value={draft.responseFormat ?? 'None'}
+                  onValueChange={(value) =>
+                    onDraftChange((current) => ({
+                      ...current,
+                      responseFormat: value as SaveTenantAiProfile['responseFormat'],
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="None">Free text</SelectItem>
+                    <SelectItem value="Json">JSON</SelectItem>
+                  </SelectContent>
+                </Select>
               </Field>
             </div>
           </FormSection>

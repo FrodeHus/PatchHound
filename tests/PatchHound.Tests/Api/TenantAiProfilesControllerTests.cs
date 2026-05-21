@@ -79,7 +79,9 @@ public class TenantAiProfilesControllerTests : IDisposable
                 true,
                 5,
                 "",
-                "secret-value"
+                "secret-value",
+                null,
+                null
             ),
             CancellationToken.None
         );
@@ -192,7 +194,9 @@ public class TenantAiProfilesControllerTests : IDisposable
                 true,
                 5,
                 "",
-                "secret-value"
+                "secret-value",
+                null,
+                null
             ),
             CancellationToken.None
         );
@@ -237,7 +241,9 @@ public class TenantAiProfilesControllerTests : IDisposable
                 true,
                 5,
                 "",
-                ""
+                "",
+                null,
+                null
             ),
             CancellationToken.None
         );
