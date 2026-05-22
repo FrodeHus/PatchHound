@@ -32,7 +32,7 @@ Use conservative runtime settings for vulnerability analysis. The goal is stable
 | Context window (`num_ctx`) | `8192` | Useful for PatchHound prompts with vulnerability and tenant context. Increase only if the host has enough memory. |
 | Keep alive | `5m` | Keeps the model warm after requests. |
 
-Keep the default PatchHound system prompt unless you have a specific operating requirement. It includes guardrails for treating vulnerability data as data, not instructions.
+PatchHound owns the security prompt used for assessment jobs. Operators should not rely on tenant profile prompt editing for model-control directives because the prompt is part of PatchHound's security boundary.
 
 ## Run a Local Model with Ollama
 
@@ -51,13 +51,37 @@ ollama serve
 In another terminal, pull and test the recommended Q5_K_M GGUF model:
 
 ```bash
-ollama pull hf.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q5_K_M
-ollama run hf.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q5_K_M
+ollama pull hf.co/Qwen/Qwen3-32B-GGUF:Q5_K_M
+ollama run hf.co/Qwen/Qwen3-32B-GGUF:Q5_K_M
 ```
 
-`UD-Q5_K_M` is a sensible local-analysis default because it preserves more quality than smaller 4-bit quantizations while still being much more practical than full precision. Use a lower quantization only when memory pressure matters more than answer quality.
+`Q5_K_M` is a sensible local-analysis default because it preserves more quality than smaller 4-bit quantizations while still being much more practical than full precision. Use a lower quantization only when memory pressure matters more than answer quality.
 
 Large Qwen models need substantial RAM or VRAM. If the model is too slow or fails to load, use a smaller model with the same profile settings before changing PatchHound.
+
+Qwen 3 models can enable reasoning output by default. PatchHound automatically appends Qwen's prompt-level `/no_think` directive for Ollama models whose name contains `qwen3`, so the model spends its output budget on the final answer. You can verify the behavior directly against Ollama:
+
+```bash
+curl http://localhost:11434/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "hf.co/Qwen/Qwen3-32B-GGUF:Q5_K_M",
+    "stream": false,
+    "prompt": "Return exactly: OK\n\n/no_think"
+  }'
+```
+
+The expected response should contain:
+
+```json
+{"response":"OK"}
+```
+
+Avoid using `hf.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q5_K_M` with Ollama unless your installed Ollama version explicitly supports the `qwen35moe` architecture. On unsupported versions, Ollama fails during model load with:
+
+```text
+llama_model_load: error loading model: error loading model architecture: unknown model architecture: 'qwen35moe'
+```
 
 ## Expose Ollama to PatchHound
 
@@ -89,7 +113,7 @@ In `Admin -> Platform -> AI`, create a new profile with:
 | --- | --- |
 | Provider | `Ollama` |
 | Profile name | `Local Qwen analysis` |
-| Model | `hf.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q5_K_M` |
+| Model | `hf.co/Qwen/Qwen3-32B-GGUF:Q5_K_M` |
 | Base URL | `http://localhost:11434`, `http://host.docker.internal:11434`, or the reachable Ollama URL |
 | Keep alive | `5m` |
 | Context window (`num_ctx`) | `8192` |
@@ -111,8 +135,12 @@ You can also select **List models** after saving the profile. PatchHound calls O
 If validation says the model was not found, run the pull command on the Ollama host:
 
 ```bash
-ollama pull hf.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q5_K_M
+ollama pull hf.co/Qwen/Qwen3-32B-GGUF:Q5_K_M
 ```
+
+If Ollama reports `unknown model architecture: 'qwen35moe'`, the selected model is not compatible with the installed Ollama runtime. Use `hf.co/Qwen/Qwen3-32B-GGUF:Q5_K_M` or an official Ollama library tag such as `qwen3:30b-a3b-instruct-2507-q4_K_M` instead.
+
+If Ollama returns `200 OK` but PatchHound reports `Ollama response did not contain generated content`, inspect the raw Ollama response. Qwen 3 models may put the generated JSON in Ollama's top-level `thinking` field while leaving `response` empty. PatchHound adds `/no_think` automatically for `qwen3` model names and falls back to `thinking` when `response` is empty; if the issue persists, use a non-thinking/instruct model or increase **Max output tokens**.
 
 If PatchHound cannot reach Ollama, verify the profile Base URL from the PatchHound API container or host. For Docker deployments, `localhost` inside a container means the container itself, not the physical host.
 

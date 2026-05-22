@@ -133,7 +133,8 @@ public class OllamaAiProvider : IAiReportProvider
         CancellationToken ct
     )
     {
-        var nativeResponse = await SendNativeGenerateAsync(profile, systemPrompt, prompt, maxTokens, ct);
+        var ollamaPrompt = BuildOllamaPrompt(profile.Profile.Model, prompt);
+        var nativeResponse = await SendNativeGenerateAsync(profile, systemPrompt, ollamaPrompt, maxTokens, ct);
         if (nativeResponse.IsSuccess)
         {
             return nativeResponse.Content;
@@ -144,7 +145,7 @@ public class OllamaAiProvider : IAiReportProvider
             throw new HttpRequestException(nativeResponse.ErrorMessage);
         }
 
-        var openAiResponse = await SendOpenAiCompatibleChatAsync(profile, systemPrompt, prompt, maxTokens, ct);
+        var openAiResponse = await SendOpenAiCompatibleChatAsync(profile, systemPrompt, ollamaPrompt, maxTokens, ct);
         if (openAiResponse.IsSuccess)
         {
             return openAiResponse.Content;
@@ -210,7 +211,11 @@ public class OllamaAiProvider : IAiReportProvider
         }
 
         using var document = JsonDocument.Parse(body);
-        var content = document.RootElement.GetProperty("response").GetString();
+        var content = GetOllamaGeneratedContent(document.RootElement);
+        if (TryGetOllamaErrorPayload(content, out var ollamaError))
+        {
+            return ProviderCallResult.Failure(null, $"Ollama returned an error payload: {ollamaError}");
+        }
 
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -221,6 +226,47 @@ public class OllamaAiProvider : IAiReportProvider
         }
 
         return ProviderCallResult.Success(content.Trim());
+    }
+
+    private static bool TryGetOllamaErrorPayload(string? content, out string error)
+    {
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(content);
+            if (
+                document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("error", out var errorElement)
+            )
+            {
+                error = errorElement.GetString() ?? "unknown error";
+                return true;
+            }
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        return false;
+    }
+
+    private static string? GetOllamaGeneratedContent(JsonElement root)
+    {
+        var content = root.GetProperty("response").GetString();
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            return content;
+        }
+
+        return root.TryGetProperty("thinking", out var thinking)
+            ? thinking.GetString()
+            : content;
     }
 
     private async Task<ProviderCallResult> SendOpenAiCompatibleChatAsync(
@@ -302,6 +348,19 @@ public class OllamaAiProvider : IAiReportProvider
 
     private static string BuildUserPrompt(AiTextGenerationRequest request) =>
         AiProviderPromptBuilder.BuildUserPrompt(request);
+
+    private static string BuildOllamaPrompt(string model, string prompt)
+    {
+        if (!IsQwenThinkingModel(model) || prompt.Contains("/no_think", StringComparison.OrdinalIgnoreCase))
+        {
+            return prompt;
+        }
+
+        return $"{prompt}\n\n/no_think";
+    }
+
+    private static bool IsQwenThinkingModel(string model) =>
+        model.Contains("qwen3", StringComparison.OrdinalIgnoreCase);
 
     private static string NormalizeOpenAiBaseUrl(string baseUrl)
     {

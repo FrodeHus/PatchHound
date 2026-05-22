@@ -1,3 +1,4 @@
+using System.Reflection;
 using FluentAssertions;
 using PatchHound.Core.Enums;
 using PatchHound.Worker;
@@ -129,5 +130,45 @@ public class IngestionWorkerTests
         var act = () => VulnerabilityAssessmentWorker.BuildAssessmentRequest(externalId);
 
         act.Should().Throw<ArgumentException>().WithMessage("*not a valid CVE identifier*");
+    }
+
+    [Fact]
+    public void TryParseAssessment_AcceptsCaseInsensitiveProperties()
+    {
+        var raw = """
+            {"recommendation":"Patch as soon as possible","confidence":"High","summary":"Summary","urgency":{"tier":"High","target sla":"48 hours","reason":"Reason"},"similarVulnerabilities":[],"compensatingControlsUntilPatched":[],"references":[]}
+            """;
+
+        var (success, error) = InvokeTryParseAssessment(raw);
+
+        success.Should().BeTrue(error);
+        error.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TryParseAssessment_ReportsTopLevelKeys_WhenUrgencyIsMissing()
+    {
+        var raw = """
+            {"Recommendation":"Patch as soon as possible","Confidence":"High","Summary":"Summary","UrgencyTier":"High","UrgencyTargetSla":"48 hours","UrgencyReason":"Reason"}
+            """;
+
+        var (success, error) = InvokeTryParseAssessment(raw);
+
+        success.Should().BeFalse();
+        error.Should().Be("Missing Urgency object. Top-level keys: Recommendation, Confidence, Summary, UrgencyTier, UrgencyTargetSla, UrgencyReason");
+    }
+
+    private static (bool Success, string Error) InvokeTryParseAssessment(string raw)
+    {
+        var method = typeof(VulnerabilityAssessmentWorker).GetMethod(
+            "TryParseAssessment",
+            BindingFlags.NonPublic | BindingFlags.Static
+        );
+        method.Should().NotBeNull();
+
+        var args = new object?[] { raw, null, string.Empty };
+        var success = (bool)method!.Invoke(null, args)!;
+
+        return (success, (string)args[2]!);
     }
 }

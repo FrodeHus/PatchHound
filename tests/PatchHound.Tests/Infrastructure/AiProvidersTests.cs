@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using PatchHound.Core.Entities;
@@ -118,6 +119,134 @@ public class AiProvidersTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("model 'llama3.1:8b' not found");
         result.Error.Should().NotContain("{\"error\"");
+    }
+
+    [Fact]
+    public async Task OllamaGenerateTextAsync_AppendsNoThinkDirective_ForQwenModels()
+    {
+        var handler = new RecordingHttpMessageHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"response":"Generated assessment"}""", Encoding.UTF8, "application/json"),
+            }
+        );
+        var provider = new OllamaAiProvider(new HttpClient(handler));
+        var profile = TenantAiProfileFactory.Create(
+            Guid.NewGuid(),
+            providerType: TenantAiProviderType.Ollama,
+            name: "Local Qwen",
+            model: "hf.co/Qwen/Qwen3-32B-GGUF:Q5_K_M",
+            topP: 1.0m,
+            baseUrl: "http://ollama.local:11434"
+        );
+
+        var content = await provider.GenerateTextAsync(
+            new AiTextGenerationRequest("System", "Assess this vulnerability."),
+            new TenantAiProfileResolved(profile, string.Empty),
+            CancellationToken.None
+        );
+
+        content.Should().Be("Generated assessment");
+        handler.RequestBodies.Should().ContainSingle();
+        handler.RequestBodies[0].Should().Contain("Assess this vulnerability.\\n\\n/no_think");
+    }
+
+    [Fact]
+    public async Task OllamaGenerateTextAsync_DoesNotAppendNoThinkDirective_ForNonQwenModels()
+    {
+        var handler = new RecordingHttpMessageHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"response":"Generated assessment"}""", Encoding.UTF8, "application/json"),
+            }
+        );
+        var provider = new OllamaAiProvider(new HttpClient(handler));
+        var profile = TenantAiProfileFactory.Create(
+            Guid.NewGuid(),
+            providerType: TenantAiProviderType.Ollama,
+            name: "Local Llama",
+            model: "llama3.1:8b",
+            topP: 1.0m,
+            baseUrl: "http://ollama.local:11434"
+        );
+
+        var content = await provider.GenerateTextAsync(
+            new AiTextGenerationRequest("System", "Assess this vulnerability."),
+            new TenantAiProfileResolved(profile, string.Empty),
+            CancellationToken.None
+        );
+
+        content.Should().Be("Generated assessment");
+        handler.RequestBodies.Should().ContainSingle();
+        handler.RequestBodies[0].Should().NotContain("/no_think");
+    }
+
+    [Fact]
+    public async Task OllamaGenerateTextAsync_UsesThinkingContent_WhenResponseIsEmpty()
+    {
+        const string assessmentJson = """
+            {"Recommendation":"Patch as soon as possible","Confidence":"High","Summary":"Summary","Urgency":{"tier":"High","target SLA":"48 hours","reason":"Reason"},"SimilarVulnerabilities":[],"CompensatingControlsUntilPatched":[],"References":[]}
+            """;
+        var handler = new RecordingHttpMessageHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    $$"""{"response":"","thinking":{{JsonSerializer.Serialize(assessmentJson)}},"done":true}""",
+                    Encoding.UTF8,
+                    "application/json"
+                ),
+            }
+        );
+        var provider = new OllamaAiProvider(new HttpClient(handler));
+        var profile = TenantAiProfileFactory.Create(
+            Guid.NewGuid(),
+            providerType: TenantAiProviderType.Ollama,
+            name: "Local Qwen",
+            model: "hf.co/Qwen/Qwen3-32B-GGUF:Q5_K_M",
+            topP: 1.0m,
+            baseUrl: "http://ollama.local:11434"
+        );
+
+        var content = await provider.GenerateTextAsync(
+            new AiTextGenerationRequest("System", "Assess this vulnerability."),
+            new TenantAiProfileResolved(profile, string.Empty),
+            CancellationToken.None
+        );
+
+        content.Should().Be(assessmentJson.Trim());
+    }
+
+    [Fact]
+    public async Task OllamaGenerateTextAsync_TreatsThinkingErrorObjectAsProviderFailure()
+    {
+        var handler = new RecordingHttpMessageHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"response":"","thinking":"{\"error\":\"model context length exceeded\"}","done":true}""",
+                    Encoding.UTF8,
+                    "application/json"
+                ),
+            }
+        );
+        var provider = new OllamaAiProvider(new HttpClient(handler));
+        var profile = TenantAiProfileFactory.Create(
+            Guid.NewGuid(),
+            providerType: TenantAiProviderType.Ollama,
+            name: "Local Qwen",
+            model: "hf.co/Qwen/Qwen3-32B-GGUF:Q5_K_M",
+            topP: 1.0m,
+            baseUrl: "http://ollama.local:11434"
+        );
+
+        var act = () => provider.GenerateTextAsync(
+            new AiTextGenerationRequest("System", "Assess this vulnerability."),
+            new TenantAiProfileResolved(profile, string.Empty),
+            CancellationToken.None
+        );
+
+        await act.Should().ThrowAsync<HttpRequestException>()
+            .WithMessage("Ollama returned an error payload: model context length exceeded");
     }
 
     [Fact]
