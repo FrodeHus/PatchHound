@@ -11,6 +11,7 @@ using Npgsql;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Hubs;
 using PatchHound.Api.Middleware;
+using PatchHound.Api.RateLimiting;
 using PatchHound.Api.Workers;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -438,18 +439,11 @@ builder.Services.AddRateLimiter(options =>
 {
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
     {
-        var partitionKey = context.User.Identity?.Name
-            ?? context.User.FindFirst("runner_id")?.Value
-            ?? context.Connection.RemoteIpAddress?.ToString()
-            ?? "anonymous";
+        var partitionKey = ApiRateLimitingPolicy.GetPartitionKey(context);
 
         return RateLimitPartition.GetFixedWindowLimiter(
             partitionKey,
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 100,
-                Window = TimeSpan.FromMinutes(1),
-            }
+            _ => ApiRateLimitingPolicy.CreateFixedWindowOptions()
         );
     });
     options.RejectionStatusCode = 429;
