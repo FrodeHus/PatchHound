@@ -1068,7 +1068,8 @@ public class SoftwareController(
                         researchQuery,
                         ParseAllowedDomains(profile.AllowedDomains),
                         profile.MaxResearchSources,
-                        profile.IncludeCitations
+                        profile.IncludeCitations,
+                        ResearchSourceKey: profile.ResearchSourceKey
                     ),
                     ct
                 );

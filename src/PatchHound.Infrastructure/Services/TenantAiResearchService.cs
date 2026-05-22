@@ -1,13 +1,18 @@
 using PatchHound.Core.Common;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
+using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Tenants;
+using Microsoft.EntityFrameworkCore;
 
 namespace PatchHound.Infrastructure.Services;
 
 public class TenantAiResearchService(
     LocalVulnerabilityIntelResearchProvider localVulnerabilityIntelProvider,
-    ExternalWebSearchResearchProvider externalWebSearchProvider
+    IEnumerable<IAiResearchSourceProvider> researchSourceProviders,
+    PatchHoundDbContext dbContext
 ) : ITenantAiResearchService
 {
     private const int MaxCombinedContextChars = 12000;
@@ -33,7 +38,7 @@ public class TenantAiResearchService(
                 AiResearchProviderKind.LocalVulnerabilityIntel =>
                     await localVulnerabilityIntelProvider.ResearchAsync(request, ct),
                 AiResearchProviderKind.ExternalWebSearch =>
-                    await externalWebSearchProvider.ResearchAsync(request, ct),
+                    await ResearchExternalAsync(request, ct),
                 _ => Result<AiWebResearchBundle>.Success(new AiWebResearchBundle(string.Empty, [])),
             };
 
@@ -69,6 +74,57 @@ public class TenantAiResearchService(
                     .ToList()
             )
         );
+    }
+
+    private async Task<Result<AiWebResearchBundle>> ResearchExternalAsync(
+        AiWebResearchRequest request,
+        CancellationToken ct
+    )
+    {
+        var sourceKey = string.IsNullOrWhiteSpace(request.ResearchSourceKey)
+            ? EnrichmentSourceCatalog.ExternalWebSearchSourceKey
+            : request.ResearchSourceKey.Trim();
+
+        if (string.Equals(sourceKey, EnrichmentSourceCatalog.ExternalWebSearchSourceKey, StringComparison.OrdinalIgnoreCase))
+        {
+            var legacyProvider = researchSourceProviders.FirstOrDefault(
+                item => string.Equals(item.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase)
+            );
+            return legacyProvider is null
+                ? Result<AiWebResearchBundle>.Failure("Default web research provider is not registered.")
+                : await legacyProvider.ResearchAsync(
+                    EnrichmentSourceConfiguration.Create(sourceKey, "External web search", true),
+                    request,
+                    ct
+                );
+        }
+
+        var source = await dbContext.EnrichmentSourceConfigurations.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.SourceKey == sourceKey, ct);
+        source ??= EnrichmentSourceCatalog.CreateDefaults()
+            .FirstOrDefault(item => string.Equals(item.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase));
+
+        if (source is null)
+        {
+            return Result<AiWebResearchBundle>.Failure("Selected research source is not configured.");
+        }
+
+        if (!string.Equals(sourceKey, EnrichmentSourceCatalog.ExternalWebSearchSourceKey, StringComparison.OrdinalIgnoreCase)
+            && (!source.Enabled || !EnrichmentSourceCatalog.HasTarget(source, EnrichmentSourceCatalog.AiResearchTarget)))
+        {
+            return Result<AiWebResearchBundle>.Failure("Selected research source is not available for AI research.");
+        }
+
+        var provider = researchSourceProviders.FirstOrDefault(
+            item => string.Equals(item.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase)
+        );
+
+        if (provider is null)
+        {
+            return Result<AiWebResearchBundle>.Failure("Selected research source has no registered provider.");
+        }
+
+        return await provider.ResearchAsync(source, request, ct);
     }
 
     private static string Truncate(string value, int maxChars)

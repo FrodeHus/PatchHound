@@ -28,6 +28,7 @@ public class TenantAiProfile
     public bool IncludeCitations { get; private set; }
     public int MaxResearchSources { get; private set; }
     public string AllowedDomains { get; private set; } = string.Empty;
+    public string ResearchSourceKey { get; private set; } = string.Empty;
     public DateTimeOffset? LastValidatedAt { get; private set; }
     public TenantAiProfileValidationStatus LastValidationStatus { get; private set; }
     public string LastValidationError { get; private set; } = string.Empty;
@@ -59,7 +60,8 @@ public class TenantAiProfile
         int maxResearchSources = 5,
         string allowedDomains = "",
         int? numCtx = null,
-        TenantAiResponseFormat responseFormat = TenantAiResponseFormat.None
+        TenantAiResponseFormat responseFormat = TenantAiResponseFormat.None,
+        string researchSourceKey = ""
     )
     {
         var now = DateTimeOffset.UtcNow;
@@ -89,6 +91,7 @@ public class TenantAiProfile
             IncludeCitations = includeCitations,
             MaxResearchSources = maxResearchSources,
             AllowedDomains = allowedDomains.Trim(),
+            ResearchSourceKey = researchSourceKey.Trim(),
             LastValidationStatus = TenantAiProfileValidationStatus.Unknown,
             CreatedAt = now,
             UpdatedAt = now,
@@ -116,7 +119,8 @@ public class TenantAiProfile
         int maxResearchSources,
         string allowedDomains,
         int? numCtx,
-        TenantAiResponseFormat responseFormat
+        TenantAiResponseFormat responseFormat,
+        string researchSourceKey = ""
     )
     {
         Name = name.Trim();
@@ -140,6 +144,7 @@ public class TenantAiProfile
         IncludeCitations = includeCitations;
         MaxResearchSources = maxResearchSources;
         AllowedDomains = allowedDomains.Trim();
+        ResearchSourceKey = researchSourceKey.Trim();
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 

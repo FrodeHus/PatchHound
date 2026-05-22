@@ -125,7 +125,9 @@ export function GlobalEnrichmentSourceManagement({
           key: source.key,
           displayName: source.displayName,
           enabled: source.enabled,
+          targets: source.targets,
           refreshTtlHours: source.refreshTtlHours,
+          options: source.options,
           credentials: {
             storedCredentialId: source.credentials.storedCredentialId ?? null,
             secret: source.credentials.secret,
@@ -285,6 +287,18 @@ export function GlobalEnrichmentSourceManagement({
                           {source.key}
                         </span>
                       </div>
+                      {source.targets.length > 0 ? (
+                        <div className="mt-1 flex flex-wrap gap-1 pl-8">
+                          {source.targets.map((target) => (
+                            <span
+                              key={target}
+                              className="rounded-full border border-border/50 bg-background/60 px-2 py-0.5 text-[10px] text-muted-foreground"
+                            >
+                              {formatTargetLabel(target)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                       {source.runtime.lastError ? (
                         <p
                           className="mt-0.5 max-w-[200px] truncate pl-8 text-[11px] text-destructive"
@@ -537,7 +551,7 @@ function EnrichmentSourceEditorSheetContent({
               <div className="space-y-0.5">
                 <p className="text-sm font-medium">Enable provider</p>
                 <p className="text-xs text-muted-foreground">
-                  When enabled, the worker will invoke this enrichment source during vulnerability processing.
+                  When enabled, selected PatchHound processes can invoke this enrichment source.
                 </p>
               </div>
               <input
@@ -551,6 +565,36 @@ function EnrichmentSourceEditorSheetContent({
                 }
               />
             </label>
+
+            <div className="grid gap-2 rounded-lg border border-border/60 px-4 py-3">
+              <p className="text-sm font-medium">Process targets</p>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={source.targets.some((target) => target.toLowerCase() === 'scheduled')}
+                  onChange={(event) =>
+                    onUpdateSource(source.key, (current) => ({
+                      ...current,
+                      targets: updateTargetList(current.targets, 'Scheduled', event.target.checked),
+                    }))
+                  }
+                />
+                Scheduled enrichment worker
+              </label>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={source.targets.some((target) => target.toLowerCase() === 'airesearch')}
+                  onChange={(event) =>
+                    onUpdateSource(source.key, (current) => ({
+                      ...current,
+                      targets: updateTargetList(current.targets, 'AIResearch', event.target.checked),
+                    }))
+                  }
+                />
+                AI research and assessments
+              </label>
+            </div>
           </FormSection>
 
           <FormSection title="Configuration">
@@ -610,6 +654,131 @@ function EnrichmentSourceEditorSheetContent({
             </div>
           </FormSection>
 
+          {source.key === 'jina-reader' && source.options.jinaReader ? (
+            <FormSection title="Jina Reader options">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid content-start gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Timeout Seconds</span>
+                  <Input
+                    type="number"
+                    min={3}
+                    max={60}
+                    value={source.options.jinaReader.timeoutSeconds}
+                    onChange={(event) =>
+                      onUpdateJinaReaderOption(source, onUpdateSource, 'timeoutSeconds', Number(event.target.value || 3))
+                    }
+                    className="h-10"
+                  />
+                </div>
+                <div className="grid content-start gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Max Content Chars</span>
+                  <Input
+                    type="number"
+                    min={1000}
+                    max={20000}
+                    step={500}
+                    value={source.options.jinaReader.maxContentChars}
+                    onChange={(event) =>
+                      onUpdateJinaReaderOption(source, onUpdateSource, 'maxContentChars', Number(event.target.value || 1000))
+                    }
+                    className="h-10"
+                  />
+                </div>
+                <div className="grid content-start gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Response Format</span>
+                  <Select
+                    value={source.options.jinaReader.responseFormat}
+                    onValueChange={(value) => onUpdateJinaReaderOption(source, onUpdateSource, 'responseFormat', value ?? 'markdown')}
+                  >
+                    <SelectTrigger className="h-10 w-full rounded-lg border-border/70 bg-background px-3">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-border/70 bg-popover/95 backdrop-blur">
+                      <SelectItem value="markdown">Markdown</SelectItem>
+                      <SelectItem value="text">Text</SelectItem>
+                      <SelectItem value="html">HTML</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid content-start gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Reader Engine</span>
+                  <label className="flex h-10 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={source.options.jinaReader.useReaderLmV2}
+                      onChange={(event) =>
+                        onUpdateJinaReaderOption(source, onUpdateSource, 'useReaderLmV2', event.target.checked)
+                      }
+                    />
+                    Use ReaderLM v2
+                  </label>
+                </div>
+                <div className="grid content-start gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Target Selector</span>
+                  <Input
+                    value={source.options.jinaReader.targetSelector}
+                    onChange={(event) =>
+                      onUpdateJinaReaderOption(source, onUpdateSource, 'targetSelector', event.target.value)
+                    }
+                    className="h-10"
+                  />
+                </div>
+                <div className="grid content-start gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Exclude Selector</span>
+                  <Input
+                    value={source.options.jinaReader.excludeSelector}
+                    onChange={(event) =>
+                      onUpdateJinaReaderOption(source, onUpdateSource, 'excludeSelector', event.target.value)
+                    }
+                    className="h-10"
+                  />
+                </div>
+                <div className="grid content-start gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Wait For Selector</span>
+                  <Input
+                    value={source.options.jinaReader.waitForSelector}
+                    onChange={(event) =>
+                      onUpdateJinaReaderOption(source, onUpdateSource, 'waitForSelector', event.target.value)
+                    }
+                    className="h-10"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={source.options.jinaReader.removeImages}
+                      onChange={(event) =>
+                        onUpdateJinaReaderOption(source, onUpdateSource, 'removeImages', event.target.checked)
+                      }
+                    />
+                    Remove images
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={source.options.jinaReader.includeLinkSummary}
+                      onChange={(event) =>
+                        onUpdateJinaReaderOption(source, onUpdateSource, 'includeLinkSummary', event.target.checked)
+                      }
+                    />
+                    Include link summary
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={source.options.jinaReader.includeImageSummary}
+                      onChange={(event) =>
+                        onUpdateJinaReaderOption(source, onUpdateSource, 'includeImageSummary', event.target.checked)
+                      }
+                    />
+                    Include image summary
+                  </label>
+                </div>
+              </div>
+            </FormSection>
+          ) : null}
+
           <FormSection title="Credentials">
             {source.credentials.acceptedCredentialTypes.length > 0 ? (
               <StoredCredentialSelector
@@ -617,7 +786,7 @@ function EnrichmentSourceEditorSheetContent({
                 storedCredentials={storedCredentials}
                 onUpdateSource={onUpdateSource}
               />
-            ) : source.credentialMode === 'global-secret' || source.key === 'nvd' ? (
+            ) : source.credentialMode === 'global-secret' || source.credentialMode === 'optional-global-secret' || source.key === 'nvd' ? (
               <div className="grid content-start gap-2">
                 <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                   API Key{source.key === 'nvd' ? ' (optional)' : ''}
@@ -859,7 +1028,7 @@ function StoredCredentialSelector({
           Enter a provider-specific secret below, or select a reusable global credential.
         </p>
       )}
-      {source.credentialMode === 'global-secret' || source.key === 'nvd' ? (
+      {source.credentialMode === 'global-secret' || source.credentialMode === 'optional-global-secret' || source.key === 'nvd' ? (
         <Input
           type="password"
           placeholder={
@@ -891,6 +1060,44 @@ function mapSourceToDraft(source: EnrichmentSource): EnrichmentSourceDraft {
     ...source,
     credentials: { ...source.credentials, secret: '' },
   }
+}
+
+function updateTargetList(targets: string[], target: string, enabled: boolean) {
+  const normalized = targets.filter((item) => item.toLowerCase() !== target.toLowerCase())
+  return enabled ? [...normalized, target] : normalized
+}
+
+function formatTargetLabel(target: string) {
+  switch (target.toLowerCase()) {
+    case 'airesearch':
+      return 'AI research'
+    case 'scheduled':
+      return 'Scheduled'
+    default:
+      return target
+  }
+}
+
+function onUpdateJinaReaderOption<TKey extends keyof NonNullable<EnrichmentSource['options']['jinaReader']>>(
+  source: EnrichmentSourceDraft,
+  onUpdateSource: (key: string, mutate: (current: EnrichmentSourceDraft) => EnrichmentSourceDraft) => void,
+  key: TKey,
+  value: NonNullable<EnrichmentSource['options']['jinaReader']>[TKey],
+) {
+  onUpdateSource(source.key, (current) => {
+    if (!current.options.jinaReader) return current
+
+    return {
+      ...current,
+      options: {
+        ...current.options,
+        jinaReader: {
+          ...current.options.jinaReader,
+          [key]: value,
+        },
+      },
+    }
+  })
 }
 
 function formatTimestamp(value: string | null) {
@@ -934,6 +1141,11 @@ function getProviderStatusDescription(source: EnrichmentSource) {
   if (source.key === 'endoflife') {
     if (!source.enabled) return 'End-of-life enrichment is configured but currently inactive.'
     return 'Enriches software items with end-of-life date and support status from the endoflife.date database.'
+  }
+
+  if (source.key === 'jina-reader') {
+    if (!source.enabled) return 'Jina Reader is configured but currently inactive.'
+    return 'Jina Reader can fetch public web pages as research context for AI assessments. API keys are optional.'
   }
 
   return source.enabled

@@ -8,6 +8,8 @@ public class EnrichmentSourceConfiguration
     public bool Enabled { get; private set; }
     public string SecretRef { get; private set; } = string.Empty;
     public string ApiBaseUrl { get; private set; } = string.Empty;
+    public string Targets { get; private set; } = string.Empty;
+    public string OptionsJson { get; private set; } = string.Empty;
     public Guid? StoredCredentialId { get; private set; }
     public int? RefreshTtlHours { get; private set; }
     public Guid? ActiveEnrichmentRunId { get; private set; }
@@ -28,7 +30,9 @@ public class EnrichmentSourceConfiguration
         string secretRef = "",
         string apiBaseUrl = "",
         Guid? storedCredentialId = null,
-        int? refreshTtlHours = null
+        int? refreshTtlHours = null,
+        string targets = "",
+        string optionsJson = ""
     )
     {
         return new EnrichmentSourceConfiguration
@@ -39,6 +43,8 @@ public class EnrichmentSourceConfiguration
             Enabled = enabled,
             SecretRef = secretRef,
             ApiBaseUrl = apiBaseUrl,
+            Targets = targets.Trim(),
+            OptionsJson = optionsJson.Trim(),
             StoredCredentialId = storedCredentialId,
             RefreshTtlHours = refreshTtlHours,
         };
@@ -50,13 +56,17 @@ public class EnrichmentSourceConfiguration
         string secretRef,
         string apiBaseUrl,
         Guid? storedCredentialId,
-        int? refreshTtlHours
+        int? refreshTtlHours,
+        string targets = "",
+        string optionsJson = ""
     )
     {
         DisplayName = displayName;
         Enabled = enabled;
         SecretRef = secretRef;
         ApiBaseUrl = apiBaseUrl;
+        Targets = targets.Trim();
+        OptionsJson = optionsJson.Trim();
         StoredCredentialId = storedCredentialId;
         RefreshTtlHours = refreshTtlHours;
     }

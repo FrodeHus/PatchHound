@@ -4,13 +4,16 @@ using System.Text;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Options;
+using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Tenants;
 using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Infrastructure;
@@ -109,6 +112,142 @@ public class TenantAiResearchServiceTests
     }
 
     [Fact]
+    public async Task ResearchAsync_UsesSelectedJinaReaderSourceAndSendsOptionalApiKey()
+    {
+        var handler = new RecordingHttpMessageHandler(
+            request =>
+            {
+                if (request.RequestUri!.ToString().Contains("/search?"))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(
+                            """
+                            Title: Jina Search
+                            Markdown Content:
+                            [Vendor advisory](https://vendor.example/advisory)
+                            """,
+                            Encoding.UTF8,
+                            "text/plain"
+                        ),
+                    };
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                        Title: Vendor advisory
+                        URL Source: https://vendor.example/advisory
+                        Markdown Content:
+                        Exploitation details and patch guidance.
+                        """,
+                        Encoding.UTF8,
+                        "text/plain"
+                    ),
+                };
+            }
+        );
+        await using var db = TestDbContextFactory.CreateSystemContext();
+        db.EnrichmentSourceConfigurations.Add(
+            EnrichmentSourceConfiguration.Create(
+                EnrichmentSourceCatalog.JinaReaderSourceKey,
+                "Jina Reader",
+                true,
+                "system/enrichment-sources/jina-reader",
+                EnrichmentSourceCatalog.DefaultJinaReaderApiBaseUrl,
+                targets: "AIResearch"
+            )
+        );
+        await db.SaveChangesAsync();
+
+        var secretStore = Substitute.For<ISecretStore>();
+        secretStore
+            .GetSecretAsync("system/enrichment-sources/jina-reader", "apiKey", Arg.Any<CancellationToken>())
+            .Returns("jina-key");
+        var service = CreateService(db, handler, secretStore: secretStore);
+        var profile = TenantAiProfileFactory.Create(
+            Guid.NewGuid(),
+            providerType: TenantAiProviderType.Ollama,
+            allowExternalResearch: true,
+            webResearchMode: TenantAiWebResearchMode.PatchHoundManaged,
+            researchSourceKey: EnrichmentSourceCatalog.JinaReaderSourceKey
+        );
+
+        var result = await service.ResearchAsync(
+            new TenantAiProfileResolved(profile, string.Empty),
+            new AiWebResearchRequest(
+                "CVE-2026-0001",
+                [],
+                1,
+                true,
+                Providers: [AiResearchProviderKind.ExternalWebSearch],
+                ResearchSourceKey: EnrichmentSourceCatalog.JinaReaderSourceKey
+            ),
+            CancellationToken.None
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Context.Should().Contain("Exploitation details and patch guidance.");
+        handler.Requests.Should().HaveCount(2);
+        handler.Requests[0].RequestUri!.ToString().Should().StartWith("https://r.jina.ai/http://www.google.com/search?");
+        handler.Requests[0].Headers.Authorization!.Scheme.Should().Be("Bearer");
+        handler.Requests[0].Headers.Authorization!.Parameter.Should().Be("jina-key");
+    }
+
+    [Fact]
+    public async Task ResearchAsync_UsesSelectedJinaReaderSource_ReturnsUnavailableNote_WhenJinaIsRateLimited()
+    {
+        var handler = new RecordingHttpMessageHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+            {
+                Content = new StringContent(
+                    "The requested URL returned error: 429 Too Many Requests",
+                    Encoding.UTF8,
+                    "text/plain"
+                ),
+            }
+        );
+        await using var db = TestDbContextFactory.CreateSystemContext();
+        db.EnrichmentSourceConfigurations.Add(
+            EnrichmentSourceConfiguration.Create(
+                EnrichmentSourceCatalog.JinaReaderSourceKey,
+                "Jina Reader",
+                true,
+                apiBaseUrl: EnrichmentSourceCatalog.DefaultJinaReaderApiBaseUrl,
+                targets: "AIResearch"
+            )
+        );
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, handler);
+        var profile = TenantAiProfileFactory.Create(
+            Guid.NewGuid(),
+            providerType: TenantAiProviderType.Ollama,
+            allowExternalResearch: true,
+            webResearchMode: TenantAiWebResearchMode.PatchHoundManaged,
+            researchSourceKey: EnrichmentSourceCatalog.JinaReaderSourceKey
+        );
+
+        var result = await service.ResearchAsync(
+            new TenantAiProfileResolved(profile, string.Empty),
+            new AiWebResearchRequest(
+                "CVE-2026-0001",
+                [],
+                1,
+                true,
+                Providers: [AiResearchProviderKind.ExternalWebSearch],
+                ResearchSourceKey: EnrichmentSourceCatalog.JinaReaderSourceKey
+            ),
+            CancellationToken.None
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Context.Should().Be("External research was not available during the time of assessment");
+        result.Value.Sources.Should().BeEmpty();
+    }
+
+    [Fact]
     public void AddHttpClient_CanResolveTenantAiResearchService_WithConfiguredOptions()
     {
         var services = new ServiceCollection();
@@ -116,6 +255,10 @@ public class TenantAiResearchServiceTests
         services.AddSingleton(TestDbContextFactory.CreateSystemContext());
         services.AddScoped<LocalVulnerabilityIntelResearchProvider>();
         services.AddHttpClient<ExternalWebSearchResearchProvider>();
+        services.AddScoped<IAiResearchSourceProvider>(sp => sp.GetRequiredService<ExternalWebSearchResearchProvider>());
+        services.AddSingleton(Substitute.For<ISecretStore>());
+        services.AddHttpClient<JinaReaderAiResearchProvider>();
+        services.AddScoped<IAiResearchSourceProvider>(sp => sp.GetRequiredService<JinaReaderAiResearchProvider>());
         services.AddScoped<ITenantAiResearchService, TenantAiResearchService>();
 
         using var provider = services.BuildServiceProvider();
@@ -248,16 +391,25 @@ public class TenantAiResearchServiceTests
     private static TenantAiResearchService CreateService(
         PatchHoundDbContext db,
         RecordingHttpMessageHandler handler,
-        AiResearchOptions? options = null
+        AiResearchOptions? options = null,
+        ISecretStore? secretStore = null
     )
     {
+        var httpClient = new HttpClient(handler);
         var externalProvider = new ExternalWebSearchResearchProvider(
-            new HttpClient(handler),
+            httpClient,
+            Options.Create(options ?? new AiResearchOptions())
+        );
+        var jinaProvider = new JinaReaderAiResearchProvider(
+            httpClient,
+            db,
+            secretStore ?? Substitute.For<ISecretStore>(),
             Options.Create(options ?? new AiResearchOptions())
         );
         return new TenantAiResearchService(
             new LocalVulnerabilityIntelResearchProvider(db),
-            externalProvider
+            [externalProvider, jinaProvider],
+            db
         );
     }
 

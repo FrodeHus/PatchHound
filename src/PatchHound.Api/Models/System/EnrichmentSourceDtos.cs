@@ -4,9 +4,11 @@ public record EnrichmentSourceDto(
     string Key,
     string DisplayName,
     bool Enabled,
+    IReadOnlyList<string> Targets,
     EnrichmentSourceCredentialsDto Credentials,
     string CredentialMode,
     int? RefreshTtlHours,
+    EnrichmentSourceOptionsDto Options,
     EnrichmentSourceRuntimeDto Runtime,
     EnrichmentSourceQueueDto Queue,
     IReadOnlyList<EnrichmentRunDto> RecentRuns
@@ -53,13 +55,32 @@ public record UpdateEnrichmentSourceRequest(
     string DisplayName,
     bool Enabled,
     int? RefreshTtlHours,
-    UpdateEnrichmentSourceCredentialsRequest Credentials
+    UpdateEnrichmentSourceCredentialsRequest Credentials,
+    IReadOnlyList<string>? Targets = null,
+    EnrichmentSourceOptionsDto? Options = null
 );
 
 public record UpdateEnrichmentSourceCredentialsRequest(
     Guid? StoredCredentialId,
     string Secret,
     string ApiBaseUrl
+);
+
+public record EnrichmentSourceOptionsDto(
+    JinaReaderOptionsDto? JinaReader = null
+);
+
+public record JinaReaderOptionsDto(
+    int TimeoutSeconds,
+    int MaxContentChars,
+    string ResponseFormat,
+    bool UseReaderLmV2,
+    bool RemoveImages,
+    bool IncludeLinkSummary,
+    bool IncludeImageSummary,
+    string TargetSelector,
+    string ExcludeSelector,
+    string WaitForSelector
 );
 
 public record TriggerNvdFullSyncRequest(int FromYear, int ToYear);

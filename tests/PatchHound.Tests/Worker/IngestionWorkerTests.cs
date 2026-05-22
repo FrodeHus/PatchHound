@@ -158,6 +158,26 @@ public class IngestionWorkerTests
         error.Should().Be("Missing Urgency object. Top-level keys: Recommendation, Confidence, Summary, UrgencyTier, UrgencyTargetSla, UrgencyReason");
     }
 
+    [Fact]
+    public void ApplyExternalResearchUnavailableNote_AppendsNoteToSummaryOnce()
+    {
+        var summary = InvokeApplyExternalResearchUnavailableNote(
+            "Patch quickly based on local vulnerability intelligence.",
+            "External research was not available during the time of assessment"
+        );
+
+        summary.Should().Be(
+            "Patch quickly based on local vulnerability intelligence.\nExternal research was not available during the time of assessment"
+        );
+
+        InvokeApplyExternalResearchUnavailableNote(
+                summary,
+                "External research was not available during the time of assessment"
+            )
+            .Should()
+            .Be(summary);
+    }
+
     private static (bool Success, string Error) InvokeTryParseAssessment(string raw)
     {
         var method = typeof(VulnerabilityAssessmentWorker).GetMethod(
@@ -170,5 +190,16 @@ public class IngestionWorkerTests
         var success = (bool)method!.Invoke(null, args)!;
 
         return (success, (string)args[2]!);
+    }
+
+    private static string InvokeApplyExternalResearchUnavailableNote(string summary, string? externalContext)
+    {
+        var method = typeof(VulnerabilityAssessmentWorker).GetMethod(
+            "ApplyExternalResearchUnavailableNote",
+            BindingFlags.NonPublic | BindingFlags.Static
+        );
+        method.Should().NotBeNull();
+
+        return (string)method!.Invoke(null, [summary, externalContext])!;
     }
 }

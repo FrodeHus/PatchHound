@@ -12,6 +12,7 @@ using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Tenants;
 using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
@@ -203,6 +204,93 @@ public class TenantAiProfilesControllerTests : IDisposable
 
         action.Result.Should().BeOfType<BadRequestObjectResult>();
         (await _dbContext.TenantAiProfiles.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Create_ManagedExternalResearchWithoutAiSource_ReturnsBadRequest()
+    {
+        var action = await _controller.Create(
+            new SaveTenantAiProfileRequest(
+                "Default",
+                "OpenAi",
+                true,
+                true,
+                "gpt-4.1-mini",
+                "Prompt",
+                0.2m,
+                1.0m,
+                1200,
+                60,
+                "https://api.openai.com/v1",
+                "",
+                "",
+                "",
+                true,
+                "PatchHoundManaged",
+                true,
+                5,
+                "",
+                "secret-value",
+                null,
+                null,
+                ""
+            ),
+            CancellationToken.None
+        );
+
+        action.Result.Should().BeOfType<BadRequestObjectResult>();
+        (await _dbContext.TenantAiProfiles.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Create_ManagedExternalResearchWithEnabledAiSource_PersistsResearchSource()
+    {
+        await _dbContext.EnrichmentSourceConfigurations.AddAsync(
+            EnrichmentSourceConfiguration.Create(
+                EnrichmentSourceCatalog.JinaReaderSourceKey,
+                "Jina Reader",
+                true,
+                apiBaseUrl: EnrichmentSourceCatalog.DefaultJinaReaderApiBaseUrl,
+                targets: "AIResearch"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Create(
+            new SaveTenantAiProfileRequest(
+                "Default",
+                "OpenAi",
+                true,
+                true,
+                "gpt-4.1-mini",
+                "Prompt",
+                0.2m,
+                1.0m,
+                1200,
+                60,
+                "https://api.openai.com/v1",
+                "",
+                "",
+                "",
+                true,
+                "PatchHoundManaged",
+                true,
+                5,
+                "",
+                "secret-value",
+                null,
+                null,
+                EnrichmentSourceCatalog.JinaReaderSourceKey
+            ),
+            CancellationToken.None
+        );
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var dto = ok.Value.Should().BeOfType<TenantAiProfileDto>().Subject;
+        dto.ResearchSourceKey.Should().Be(EnrichmentSourceCatalog.JinaReaderSourceKey);
+
+        var profile = await _dbContext.TenantAiProfiles.SingleAsync();
+        profile.ResearchSourceKey.Should().Be(EnrichmentSourceCatalog.JinaReaderSourceKey);
     }
 
     [Theory]

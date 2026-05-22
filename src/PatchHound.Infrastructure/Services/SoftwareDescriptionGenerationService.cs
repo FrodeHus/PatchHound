@@ -153,7 +153,8 @@ public class SoftwareDescriptionGenerationService
                         BuildResearchQuery(identityCandidates),
                         ParseAllowedDomains(profile.AllowedDomains),
                         profile.MaxResearchSources,
-                        profile.IncludeCitations
+                        profile.IncludeCitations,
+                        ResearchSourceKey: profile.ResearchSourceKey
                     ),
                     ct
                 );

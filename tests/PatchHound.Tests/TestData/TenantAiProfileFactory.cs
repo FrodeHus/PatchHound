@@ -26,7 +26,8 @@ internal static class TenantAiProfileFactory
         TenantAiWebResearchMode webResearchMode = TenantAiWebResearchMode.Disabled,
         bool includeCitations = true,
         int maxResearchSources = 5,
-        string allowedDomains = ""
+        string allowedDomains = "",
+        string researchSourceKey = ""
     ) =>
         TenantAiProfile.Create(
             tenantId,
@@ -49,6 +50,7 @@ internal static class TenantAiProfileFactory
             webResearchMode,
             includeCitations,
             maxResearchSources,
-            allowedDomains
+            allowedDomains,
+            researchSourceKey: researchSourceKey
         );
 }

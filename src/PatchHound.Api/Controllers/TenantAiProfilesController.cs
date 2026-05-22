@@ -78,6 +78,12 @@ public class TenantAiProfilesController : ControllerBase
             return BadRequest(validationProblem);
         }
 
+        var researchSourceProblem = await ValidateResearchSourceAsync(request, ct);
+        if (researchSourceProblem is not null)
+        {
+            return BadRequest(researchSourceProblem);
+        }
+
         var profile = TenantAiProfile.Create(
             tenantId,
             request.Name,
@@ -100,7 +106,8 @@ public class TenantAiProfilesController : ControllerBase
             maxResearchSources: request.MaxResearchSources,
             allowedDomains: request.AllowedDomains,
             numCtx: request.NumCtx,
-            responseFormat: ResolveResponseFormat(request.ResponseFormat)
+            responseFormat: ResolveResponseFormat(request.ResponseFormat),
+            researchSourceKey: ResolveResearchSourceKey(request)
         );
 
         var secretRef = BuildSecretRef(tenantId, profile.Id);
@@ -132,7 +139,8 @@ public class TenantAiProfilesController : ControllerBase
                 request.MaxResearchSources,
                 request.AllowedDomains,
                 request.NumCtx,
-                ResolveResponseFormat(request.ResponseFormat)
+                ResolveResponseFormat(request.ResponseFormat),
+                ResolveResearchSourceKey(request)
             );
         }
 
@@ -164,7 +172,8 @@ public class TenantAiProfilesController : ControllerBase
                 request.MaxResearchSources,
                 request.AllowedDomains,
                 request.NumCtx,
-                ResolveResponseFormat(request.ResponseFormat)
+                ResolveResponseFormat(request.ResponseFormat),
+                ResolveResearchSourceKey(request)
             );
         }
 
@@ -212,6 +221,12 @@ public class TenantAiProfilesController : ControllerBase
             return BadRequest(validationProblem);
         }
 
+        var researchSourceProblem = await ValidateResearchSourceAsync(request, ct);
+        if (researchSourceProblem is not null)
+        {
+            return BadRequest(researchSourceProblem);
+        }
+
         var secretRef = profile.SecretRef;
         if (!string.IsNullOrWhiteSpace(request.ApiKey))
         {
@@ -249,7 +264,8 @@ public class TenantAiProfilesController : ControllerBase
             request.MaxResearchSources,
             request.AllowedDomains,
             request.NumCtx,
-            ResolveResponseFormat(request.ResponseFormat)
+            ResolveResponseFormat(request.ResponseFormat),
+            ResolveResearchSourceKey(request)
         );
         profile.ResetValidation();
 
@@ -302,7 +318,8 @@ public class TenantAiProfilesController : ControllerBase
             profile.MaxResearchSources,
             profile.AllowedDomains,
             profile.NumCtx,
-            profile.ResponseFormat
+            profile.ResponseFormat,
+            profile.ResearchSourceKey
         );
 
         await _dbContext.SaveChangesAsync(ct);
@@ -414,9 +431,46 @@ public class TenantAiProfilesController : ControllerBase
                 profile.MaxResearchSources,
                 profile.AllowedDomains,
                 profile.NumCtx,
-                profile.ResponseFormat
+                profile.ResponseFormat,
+                profile.ResearchSourceKey
             );
         }
+    }
+
+    private async Task<ProblemDetails?> ValidateResearchSourceAsync(
+        SaveTenantAiProfileRequest request,
+        CancellationToken ct
+    )
+    {
+        var mode = ResolveWebResearchMode(request);
+        if (!request.AllowExternalResearch || mode != TenantAiWebResearchMode.PatchHoundManaged)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ResearchSourceKey))
+        {
+            return new ProblemDetails { Title = "PatchHound-managed web research requires a research source." };
+        }
+
+        var source = await _dbContext.EnrichmentSourceConfigurations.AsNoTracking()
+            .FirstOrDefaultAsync(
+                item => item.SourceKey == request.ResearchSourceKey.Trim(),
+                ct
+            );
+
+        if (source is null)
+        {
+            source = EnrichmentSourceCatalog.CreateDefaults()
+                .FirstOrDefault(item => string.Equals(item.SourceKey, request.ResearchSourceKey.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (source is null || !source.Enabled || !EnrichmentSourceCatalog.HasTarget(source, EnrichmentSourceCatalog.AiResearchTarget))
+        {
+            return new ProblemDetails { Title = "Selected research source is not available for AI research." };
+        }
+
+        return null;
     }
 
     private static string BuildSecretRef(Guid tenantId, Guid profileId) =>
@@ -563,6 +617,7 @@ public class TenantAiProfilesController : ControllerBase
             profile.IncludeCitations,
             profile.MaxResearchSources,
             profile.AllowedDomains,
+            profile.ResearchSourceKey,
             !string.IsNullOrWhiteSpace(profile.SecretRef),
             profile.LastValidatedAt,
             profile.LastValidationStatus.ToString(),
@@ -614,6 +669,14 @@ public class TenantAiProfilesController : ControllerBase
         return Enum.TryParse<TenantAiWebResearchMode>(request.WebResearchMode, true, out var mode)
             ? mode
             : TenantAiWebResearchMode.PatchHoundManaged;
+    }
+
+    private static string ResolveResearchSourceKey(SaveTenantAiProfileRequest request)
+    {
+        var mode = ResolveWebResearchMode(request);
+        return request.AllowExternalResearch && mode == TenantAiWebResearchMode.PatchHoundManaged
+            ? request.ResearchSourceKey.Trim()
+            : string.Empty;
     }
 
     private static TenantAiProfileValidationResultDto MapValidationDto(TenantAiProfile profile) =>

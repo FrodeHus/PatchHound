@@ -93,7 +93,8 @@ public class RiskChangeBriefAiSummaryService : IRiskChangeBriefAiSummaryService
                     BuildResearchQuery(brief),
                     ParseAllowedDomains(profile.AllowedDomains),
                     profile.MaxResearchSources,
-                    profile.IncludeCitations
+                    profile.IncludeCitations,
+                    ResearchSourceKey: profile.ResearchSourceKey
                 ),
                 ct
             );
