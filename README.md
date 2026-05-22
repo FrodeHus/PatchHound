@@ -102,6 +102,7 @@ npm run dev
 - [Getting started](docs/tutorials/getting-started.md)
 - [Local development](docs/tutorials/local-development.md)
 - [Create the Entra ID application](docs/tutorials/entra-id-application.md)
+- [Setting up an AI profile](SETTING_UP_AI_PROFILE.md)
 - [Create an ingestion source](docs/CREATE_INGESTION_SOURCE.md)
 - [Adding an ingestion source](docs/tutorials/add-ingestion-source.md)
 - [Risk score calculation](docs/risk-score-calculation.md)

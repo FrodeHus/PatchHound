@@ -5,6 +5,7 @@
 - [Getting started](tutorials/getting-started.md)
 - [Local development](tutorials/local-development.md)
 - [Create the Entra ID application](tutorials/entra-id-application.md)
+- [Setting up an AI profile](../SETTING_UP_AI_PROFILE.md)
 - [Create an ingestion source](CREATE_INGESTION_SOURCE.md)
 - [Adding an ingestion source](tutorials/add-ingestion-source.md)
 
