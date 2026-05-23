@@ -36,7 +36,8 @@ public sealed class JinaReaderAiResearchProvider(
         {
             var apiKey = await ResolveApiKeyAsync(source, ct);
             var jinaOptions = JinaReaderOptions.FromJson(source.OptionsJson).Normalize();
-            var searchUrl = ExternalWebSearchResearchProvider.BuildSearchUrl(
+            var searchUrl = BuildReaderSearchUrl(
+                source.ApiBaseUrl,
                 BuildQuery(request),
                 _options.JinaSearchProvider
             );
@@ -48,7 +49,13 @@ public sealed class JinaReaderAiResearchProvider(
             }
 
             var sources = ExternalWebSearchResearchProvider.ExtractSources(searchBody, request.MaxSources);
-            var sourceContexts = await FetchSourceContextsAsync(sources, apiKey, jinaOptions, ct);
+            var sourceContexts = await FetchSourceContextsAsync(
+                sources,
+                source.ApiBaseUrl,
+                apiKey,
+                jinaOptions,
+                ct
+            );
             var context = ExternalWebSearchResearchProvider.BuildContext(
                 searchBody,
                 sources,
@@ -75,6 +82,7 @@ public sealed class JinaReaderAiResearchProvider(
 
     private async Task<IReadOnlyDictionary<string, string>> FetchSourceContextsAsync(
         IReadOnlyList<AiWebResearchSource> sources,
+        string apiBaseUrl,
         string? apiKey,
         JinaReaderOptions options,
         CancellationToken ct
@@ -92,7 +100,7 @@ public sealed class JinaReaderAiResearchProvider(
 
             try
             {
-                var proxiedUrl = $"https://r.jina.ai/http://{uri.Authority}{uri.PathAndQuery}";
+                var proxiedUrl = BuildReaderUrl(apiBaseUrl, uri);
                 var body = await SendReaderRequestAsync(proxiedUrl, apiKey, options, ct);
                 var snippet = ExternalWebSearchResearchProvider.ExtractSourceSnippet(body);
                 if (!string.IsNullOrWhiteSpace(snippet))
@@ -122,11 +130,10 @@ public sealed class JinaReaderAiResearchProvider(
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         }
 
-        request.Headers.TryAddWithoutValidation("X-Return-Format", options.ResponseFormat);
-        if (options.UseReaderLmV2)
-        {
-            request.Headers.TryAddWithoutValidation("X-Engine", "browser");
-        }
+        request.Headers.TryAddWithoutValidation(
+            "X-Respond-With",
+            options.UseReaderLmV2 ? "readerlm-v2" : options.ResponseFormat
+        );
 
         if (options.RemoveImages)
         {
@@ -146,6 +153,16 @@ public sealed class JinaReaderAiResearchProvider(
         if (!string.IsNullOrWhiteSpace(options.WaitForSelector))
         {
             request.Headers.TryAddWithoutValidation("X-Wait-For-Selector", options.WaitForSelector);
+        }
+
+        if (options.IncludeLinkSummary)
+        {
+            request.Headers.TryAddWithoutValidation("X-With-Links-Summary", "true");
+        }
+
+        if (options.IncludeImageSummary)
+        {
+            request.Headers.TryAddWithoutValidation("X-With-Images-Summary", "true");
         }
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -224,5 +241,30 @@ public sealed class JinaReaderAiResearchProvider(
         }
 
         return builder.ToString();
+    }
+
+    private static string BuildReaderSearchUrl(
+        string apiBaseUrl,
+        string query,
+        string? provider
+    )
+    {
+        var host = provider?.Trim().ToLowerInvariant() switch
+        {
+            "bing" => "www.bing.com",
+            _ => "www.google.com",
+        };
+        var target = new Uri($"http://{host}/search?q={Uri.EscapeDataString(query)}");
+
+        return BuildReaderUrl(apiBaseUrl, target);
+    }
+
+    private static string BuildReaderUrl(string apiBaseUrl, Uri target)
+    {
+        var normalizedBaseUrl = string.IsNullOrWhiteSpace(apiBaseUrl)
+            ? EnrichmentSourceCatalog.DefaultJinaReaderApiBaseUrl
+            : apiBaseUrl.Trim();
+
+        return $"{normalizedBaseUrl.TrimEnd('/')}/{target.AbsoluteUri}";
     }
 }

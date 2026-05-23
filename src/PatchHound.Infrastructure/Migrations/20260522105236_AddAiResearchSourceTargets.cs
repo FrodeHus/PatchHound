@@ -31,7 +31,15 @@ namespace PatchHound.Infrastructure.Migrations
                 type: "character varying(256)",
                 maxLength: 256,
                 nullable: false,
-                defaultValue: "");
+                defaultValue: "Scheduled");
+
+            migrationBuilder.Sql(
+                """
+                UPDATE "EnrichmentSourceConfigurations"
+                SET "Targets" = 'Scheduled'
+                WHERE "Targets" IS NULL OR btrim("Targets") = ''
+                """
+            );
         }
 
         /// <inheritdoc />

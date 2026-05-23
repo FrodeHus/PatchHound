@@ -114,6 +114,7 @@ public class TenantAiResearchServiceTests
     [Fact]
     public async Task ResearchAsync_UsesSelectedJinaReaderSourceAndSendsOptionalApiKey()
     {
+        const string customJinaBaseUrl = "https://reader.internal";
         var handler = new RecordingHttpMessageHandler(
             request =>
             {
@@ -155,8 +156,20 @@ public class TenantAiResearchServiceTests
                 "Jina Reader",
                 true,
                 "system/enrichment-sources/jina-reader",
-                EnrichmentSourceCatalog.DefaultJinaReaderApiBaseUrl,
-                targets: "AIResearch"
+                customJinaBaseUrl,
+                targets: "AIResearch",
+                optionsJson: new JinaReaderOptions(
+                    20,
+                    8000,
+                    "markdown",
+                    false,
+                    true,
+                    true,
+                    true,
+                    ".article",
+                    ".ads",
+                    "#content"
+                ).ToJson()
             )
         );
         await db.SaveChangesAsync();
@@ -190,9 +203,16 @@ public class TenantAiResearchServiceTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Context.Should().Contain("Exploitation details and patch guidance.");
         handler.Requests.Should().HaveCount(2);
-        handler.Requests[0].RequestUri!.ToString().Should().StartWith("https://r.jina.ai/http://www.google.com/search?");
+        handler.Requests[0].RequestUri!.ToString().Should().StartWith($"{customJinaBaseUrl}/http://www.google.com/search?");
+        handler.Requests[1].RequestUri!.ToString().Should().Be($"{customJinaBaseUrl}/https://vendor.example/advisory");
         handler.Requests[0].Headers.Authorization!.Scheme.Should().Be("Bearer");
         handler.Requests[0].Headers.Authorization!.Parameter.Should().Be("jina-key");
+        handler.Requests[0].Headers.GetValues("X-Respond-With").Should().ContainSingle().Which.Should().Be("markdown");
+        handler.Requests[0].Headers.GetValues("X-With-Links-Summary").Should().ContainSingle().Which.Should().Be("true");
+        handler.Requests[0].Headers.GetValues("X-With-Images-Summary").Should().ContainSingle().Which.Should().Be("true");
+        handler.Requests[0].Headers.GetValues("X-Target-Selector").Should().ContainSingle().Which.Should().Be(".article");
+        handler.Requests[0].Headers.GetValues("X-Remove-Selector").Should().Contain(".ads");
+        handler.Requests[0].Headers.GetValues("X-Wait-For-Selector").Should().ContainSingle().Which.Should().Be("#content");
     }
 
     [Fact]
@@ -245,6 +265,17 @@ public class TenantAiResearchServiceTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Context.Should().Be("External research was not available during the time of assessment");
         result.Value.Sources.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void JinaReaderOptions_FromJson_NormalizesMissingStringFields()
+    {
+        var options = JinaReaderOptions.FromJson("{}").Normalize();
+
+        options.ResponseFormat.Should().Be("markdown");
+        options.TargetSelector.Should().BeEmpty();
+        options.ExcludeSelector.Should().BeEmpty();
+        options.WaitForSelector.Should().BeEmpty();
     }
 
     [Fact]

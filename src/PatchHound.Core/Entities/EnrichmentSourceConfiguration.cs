@@ -31,7 +31,7 @@ public class EnrichmentSourceConfiguration
         string apiBaseUrl = "",
         Guid? storedCredentialId = null,
         int? refreshTtlHours = null,
-        string targets = "",
+        string targets = "Scheduled",
         string optionsJson = ""
     )
     {
@@ -43,8 +43,8 @@ public class EnrichmentSourceConfiguration
             Enabled = enabled,
             SecretRef = secretRef,
             ApiBaseUrl = apiBaseUrl,
-            Targets = targets.Trim(),
-            OptionsJson = optionsJson.Trim(),
+            Targets = string.IsNullOrWhiteSpace(targets) ? "Scheduled" : targets.Trim(),
+            OptionsJson = optionsJson?.Trim() ?? string.Empty,
             StoredCredentialId = storedCredentialId,
             RefreshTtlHours = refreshTtlHours,
         };
@@ -57,7 +57,7 @@ public class EnrichmentSourceConfiguration
         string apiBaseUrl,
         Guid? storedCredentialId,
         int? refreshTtlHours,
-        string targets = "",
+        string targets = "Scheduled",
         string optionsJson = ""
     )
     {
@@ -65,8 +65,8 @@ public class EnrichmentSourceConfiguration
         Enabled = enabled;
         SecretRef = secretRef;
         ApiBaseUrl = apiBaseUrl;
-        Targets = targets.Trim();
-        OptionsJson = optionsJson.Trim();
+        Targets = string.IsNullOrWhiteSpace(targets) ? "Scheduled" : targets.Trim();
+        OptionsJson = optionsJson?.Trim() ?? string.Empty;
         StoredCredentialId = storedCredentialId;
         RefreshTtlHours = refreshTtlHours;
     }

@@ -55,8 +55,8 @@ public sealed record JinaReaderOptions(
             TimeoutSeconds = Math.Clamp(TimeoutSeconds, 3, 60),
             MaxContentChars = Math.Clamp(MaxContentChars, 1000, 20000),
             ResponseFormat = string.IsNullOrWhiteSpace(ResponseFormat) ? "markdown" : ResponseFormat.Trim(),
-            TargetSelector = TargetSelector.Trim(),
-            ExcludeSelector = ExcludeSelector.Trim(),
-            WaitForSelector = WaitForSelector.Trim(),
+            TargetSelector = (TargetSelector ?? string.Empty).Trim(),
+            ExcludeSelector = (ExcludeSelector ?? string.Empty).Trim(),
+            WaitForSelector = (WaitForSelector ?? string.Empty).Trim(),
         };
 }
