@@ -86,6 +86,10 @@ See `docs/testing-conventions.md` for the full rules. Key points:
 
 Canonical entities must enforce EF max-length caps and FK `Guid` validity at the factory boundary — not in service code. See memory file `feedback_canonical_entity_factory_validation.md` for details.
 
+## Exposure Counting Convention
+
+Dashboard open-exposure summaries should count only exposures on active, healthy devices: `Devices.ActiveInTenant = true` and `Devices.HealthStatus = 'Active'`. Keep materialized views and base-table fallbacks aligned with this filter.
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

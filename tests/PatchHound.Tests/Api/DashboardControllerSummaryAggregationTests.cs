@@ -49,6 +49,8 @@ public sealed class DashboardControllerSummaryAggregationTests : IDisposable
     public async Task GetSummary_VulnerabilityAgeBuckets_CountUniqueVulnerabilities()
     {
         var seed = await CanonicalSeed.PlantAsync(_dbContext, _tenantId);
+        MarkActiveAndHealthy(seed.DeviceA);
+        MarkActiveAndHealthy(seed.DeviceB);
         _dbContext.DeviceVulnerabilityExposures.Add(DeviceVulnerabilityExposure.Observe(
             _tenantId,
             seed.DeviceB.Id,
@@ -77,6 +79,8 @@ public sealed class DashboardControllerSummaryAggregationTests : IDisposable
     public async Task GetSummary_TopCriticalVulnerabilities_ExcludesAlternateMitigationVulnerabilities()
     {
         var seed = await CanonicalSeed.PlantAsync(_dbContext, _tenantId);
+        MarkActiveAndHealthy(seed.DeviceA);
+        MarkActiveAndHealthy(seed.DeviceB);
         var remediationCase = RemediationCase.Create(_tenantId, seed.ProductA.Id);
         var decision = RemediationDecision.Create(
             _tenantId,
@@ -106,6 +110,33 @@ public sealed class DashboardControllerSummaryAggregationTests : IDisposable
         dto.TopCriticalVulnerabilities.Should().NotContain(item => item.Id == seed.ExposureA.VulnerabilityId);
     }
 
+    [Fact]
+    public async Task GetSummary_OpenExposureCounts_ExcludeInactiveAndUnhealthyDevices()
+    {
+        var seed = await CanonicalSeed.PlantAsync(_dbContext, _tenantId);
+        MarkActiveAndHealthy(seed.DeviceA);
+        seed.DeviceB.UpdateInventoryDetails(
+            computerDnsName: null,
+            healthStatus: "Inactive",
+            osPlatform: null,
+            osVersion: null,
+            externalRiskLabel: null,
+            lastSeenAt: DateTimeOffset.UtcNow,
+            lastIpAddress: null,
+            aadDeviceId: null);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var dto = ok.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
+        dto.VulnerabilitiesBySeverity[nameof(Severity.Critical)].Should().Be(1);
+        dto.VulnerabilitiesBySeverity[nameof(Severity.High)].Should().Be(0);
+        dto.VulnerabilitiesByStatus[nameof(VulnerabilityStatus.Open)].Should().Be(1);
+        dto.TopCriticalVulnerabilities.Should().ContainSingle(item => item.Id == seed.ExposureA.VulnerabilityId);
+        dto.TopCriticalVulnerabilities.Should().NotContain(item => item.Id == seed.ExposureB.VulnerabilityId);
+    }
+
     [Theory]
     [InlineData(RemediationOutcome.RiskAcceptance)]
     [InlineData(RemediationOutcome.AlternateMitigation)]
@@ -113,6 +144,8 @@ public sealed class DashboardControllerSummaryAggregationTests : IDisposable
         RemediationOutcome outcome)
     {
         var seed = await CanonicalSeed.PlantAsync(_dbContext, _tenantId);
+        MarkActiveAndHealthy(seed.DeviceA);
+        MarkActiveAndHealthy(seed.DeviceB);
         await AddApprovedRemediationAsync(seed.ProductA.Id, seed.ExposureA.VulnerabilityId, outcome);
 
         var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
@@ -152,6 +185,20 @@ public sealed class DashboardControllerSummaryAggregationTests : IDisposable
             decision.Outcome,
             decision.ApprovedAt!.Value));
         await _dbContext.SaveChangesAsync();
+    }
+
+    private static void MarkActiveAndHealthy(Device device)
+    {
+        device.SetActiveInTenant(true);
+        device.UpdateInventoryDetails(
+            computerDnsName: null,
+            healthStatus: "Active",
+            osPlatform: null,
+            osVersion: null,
+            externalRiskLabel: null,
+            lastSeenAt: DateTimeOffset.UtcNow,
+            lastIpAddress: null,
+            aadDeviceId: null);
     }
 
     public void Dispose()

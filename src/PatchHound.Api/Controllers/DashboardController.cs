@@ -19,6 +19,8 @@ namespace PatchHound.Api.Controllers;
 [Authorize]
 public class DashboardController : ControllerBase
 {
+    private const string ActiveDeviceHealthStatus = "Active";
+
     private readonly PatchHoundDbContext _dbContext;
     private readonly DashboardQueryService _dashboardQueryService;
     private readonly ITenantContext _tenantContext;
@@ -70,7 +72,7 @@ public class DashboardController : ControllerBase
 
         // Vulnerability counts from canonical DeviceVulnerabilityExposures
         var now = DateTimeOffset.UtcNow;
-        var exposureBaseQuery = _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+        var exposureBaseQuery = DeviceIsActiveAndHealthy(_dbContext.DeviceVulnerabilityExposures.AsNoTracking())
             .Where(e => e.TenantId == tenantId);
         if (filteredAssetIds != null)
             exposureBaseQuery = exposureBaseQuery.Where(e => filteredAssetIds.Contains(e.DeviceId));
@@ -1746,6 +1748,10 @@ public class DashboardController : ControllerBase
             acceptedRiskByTeamId.Values.Sum(),
             topOwners);
     }
+
+    private static IQueryable<DeviceVulnerabilityExposure> DeviceIsActiveAndHealthy(
+        IQueryable<DeviceVulnerabilityExposure> exposures) =>
+        exposures.Where(e => e.Device.ActiveInTenant && e.Device.HealthStatus == ActiveDeviceHealthStatus);
 
     private async Task<ExecutiveExposureSummaryDto> BuildExecutiveExposureSummaryAsync(
         Guid tenantId,
