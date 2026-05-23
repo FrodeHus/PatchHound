@@ -459,10 +459,17 @@ public class SystemController : ControllerBase
         foreach (var source in request)
         {
             existingSources.TryGetValue(source.Key, out var existingSource);
+            var defaultSource = EnrichmentSourceCatalog.CreateDefaults()
+                .FirstOrDefault(item => string.Equals(item.SourceKey, source.Key, StringComparison.OrdinalIgnoreCase));
             var secretRef = existingSource?.SecretRef ?? string.Empty;
             var secretValue = source.Credentials.Secret.Trim();
             var oldSecretRef = existingSource?.SecretRef;
             var storedCredentialId = source.Credentials.StoredCredentialId;
+            var targets = EnrichmentSourceCatalog.NormalizeTargets(
+                source.Targets
+                ?? EnrichmentSourceCatalog.ParseTargets(existingSource?.Targets ?? defaultSource?.Targets)
+            );
+            var optionsJson = SerializeOptions(source.Key, source.Options, existingSource?.OptionsJson ?? defaultSource?.OptionsJson);
 
             if (storedCredentialId.HasValue)
             {
@@ -507,7 +514,9 @@ public class SystemController : ControllerBase
                     secretRef,
                     source.Credentials.ApiBaseUrl,
                     storedCredentialId,
-                    source.RefreshTtlHours
+                    source.RefreshTtlHours,
+                    targets,
+                    optionsJson
                 );
                 await _dbContext.EnrichmentSourceConfigurations.AddAsync(existingSource, ct);
                 existingSources[source.Key] = existingSource;
@@ -524,7 +533,9 @@ public class SystemController : ControllerBase
                 secretRef,
                 source.Credentials.ApiBaseUrl,
                 storedCredentialId,
-                source.RefreshTtlHours
+                source.RefreshTtlHours,
+                targets,
+                optionsJson
             );
 
             if (
@@ -579,6 +590,7 @@ public class SystemController : ControllerBase
             source.SourceKey,
             source.DisplayName,
             source.Enabled,
+            EnrichmentSourceCatalog.ParseTargets(source.Targets),
             new EnrichmentSourceCredentialsDto(
                 source.StoredCredentialId,
                 EnrichmentSourceCatalog.GetAcceptedCredentialTypes(source.SourceKey),
@@ -591,10 +603,13 @@ public class SystemController : ControllerBase
                 StringComparison.OrdinalIgnoreCase
             )
                 ? "tenant-source"
-                : !EnrichmentSourceCatalog.RequiresCredentials(source.SourceKey)
+                : EnrichmentSourceCatalog.SupportsOptionalCredentials(source.SourceKey)
+                    ? "optional-global-secret"
+                    : !EnrichmentSourceCatalog.RequiresCredentials(source.SourceKey)
                     ? "no-credential"
                     : "global-secret",
             source.RefreshTtlHours,
+            MapOptions(source),
             new EnrichmentSourceRuntimeDto(
                 source.LastStartedAt,
                 source.LastCompletedAt,
@@ -605,6 +620,59 @@ public class SystemController : ControllerBase
             queue,
             recentRuns
         );
+    }
+
+    private static EnrichmentSourceOptionsDto MapOptions(EnrichmentSourceConfiguration source)
+    {
+        if (!string.Equals(source.SourceKey, EnrichmentSourceCatalog.JinaReaderSourceKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return new EnrichmentSourceOptionsDto();
+        }
+
+        var options = JinaReaderOptions.FromJson(source.OptionsJson).Normalize();
+        return new EnrichmentSourceOptionsDto(
+            new JinaReaderOptionsDto(
+                options.TimeoutSeconds,
+                options.MaxContentChars,
+                options.ResponseFormat,
+                options.UseReaderLmV2,
+                options.RemoveImages,
+                options.IncludeLinkSummary,
+                options.IncludeImageSummary,
+                options.TargetSelector,
+                options.ExcludeSelector,
+                options.WaitForSelector
+            )
+        );
+    }
+
+    private static string SerializeOptions(
+        string sourceKey,
+        EnrichmentSourceOptionsDto? options,
+        string? existingOptionsJson
+    )
+    {
+        if (!string.Equals(sourceKey, EnrichmentSourceCatalog.JinaReaderSourceKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return existingOptionsJson ?? string.Empty;
+        }
+
+        var jina = options?.JinaReader is null
+            ? JinaReaderOptions.FromJson(existingOptionsJson)
+            : new JinaReaderOptions(
+                options.JinaReader.TimeoutSeconds,
+                options.JinaReader.MaxContentChars,
+                options.JinaReader.ResponseFormat,
+                options.JinaReader.UseReaderLmV2,
+                options.JinaReader.RemoveImages,
+                options.JinaReader.IncludeLinkSummary,
+                options.JinaReader.IncludeImageSummary,
+                options.JinaReader.TargetSelector,
+                options.JinaReader.ExcludeSelector,
+                options.JinaReader.WaitForSelector
+            );
+
+        return jina.Normalize().ToJson();
     }
 
     private static EnrichmentRunDto MapRunDto(EnrichmentRun run)

@@ -8,5 +8,6 @@ public record AiWebResearchRequest(
     int MaxSources,
     bool IncludeCitations,
     IReadOnlyList<Guid>? VulnerabilityIds = null,
-    IReadOnlyList<AiResearchProviderKind>? Providers = null
+    IReadOnlyList<AiResearchProviderKind>? Providers = null,
+    string ResearchSourceKey = ""
 );

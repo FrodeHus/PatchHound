@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -22,6 +22,7 @@ import {
   validateTenantAiProfile,
 } from '@/api/ai-settings.functions'
 import type { SaveTenantAiProfile, TenantAiProfile } from '@/api/ai-settings.schemas'
+import { fetchEnrichmentSources, type EnrichmentSource } from '@/server/system.functions'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -126,6 +127,7 @@ function createEmptyProfile(): SaveTenantAiProfile {
     keepAlive: '',
     allowExternalResearch: false,
     webResearchMode: 'Disabled',
+    researchSourceKey: '',
     includeCitations: true,
     maxResearchSources: 5,
     allowedDomains: '',
@@ -154,6 +156,7 @@ function toDraft(profile: TenantAiProfile): SaveTenantAiProfile {
     keepAlive: profile.keepAlive,
     allowExternalResearch: profile.allowExternalResearch,
     webResearchMode: profile.webResearchMode as SaveTenantAiProfile['webResearchMode'],
+    researchSourceKey: profile.researchSourceKey,
     includeCitations: profile.includeCitations,
     maxResearchSources: profile.maxResearchSources,
     allowedDomains: profile.allowedDomains,
@@ -233,6 +236,11 @@ export function TenantAiSettingsPage({
     queryKey: ['tenant-ai-profiles', selectedTenantId],
     queryFn: () => fetchTenantAiProfiles(),
     enabled: !!selectedTenantId,
+  })
+
+  const enrichmentSourcesQuery = useQuery({
+    queryKey: ['enrichment-sources'],
+    queryFn: () => fetchEnrichmentSources(),
   })
 
   const profiles = profilesQuery.data ?? EMPTY_PROFILES
@@ -348,6 +356,7 @@ export function TenantAiSettingsPage({
             modelError={modelsMutation.isError ? getApiErrorMessage(modelsMutation.error, 'Failed to list available models.') : null}
             isListingModels={modelsMutation.isPending}
             onListModels={(id) => modelsMutation.mutate(id)}
+            enrichmentSources={enrichmentSourcesQuery.data ?? []}
             onDraftChange={setDraft}
             onSave={() => saveMutation.mutate(draft)}
             onBack={closeEditor}
@@ -531,6 +540,7 @@ function AiProfileEditorPage({
   modelError,
   isListingModels,
   onListModels,
+  enrichmentSources,
   onDraftChange,
   onSave,
   onBack,
@@ -547,11 +557,47 @@ function AiProfileEditorPage({
   modelError: string | null
   isListingModels: boolean
   onListModels: (id: string) => void
+  enrichmentSources: EnrichmentSource[]
   onDraftChange: React.Dispatch<React.SetStateAction<SaveTenantAiProfile>>
   onSave: () => void
   onBack: () => void
 }) {
   const saveLabel = profile ? 'Save changes' : 'Create profile'
+  const aiResearchSources = useMemo(
+    () =>
+      enrichmentSources.filter(
+        (source) =>
+          source.enabled &&
+          source.targets.some((target) => target.toLowerCase() === 'airesearch'),
+      ),
+    [enrichmentSources],
+  )
+  const selectedResearchSource = aiResearchSources.find((source) => source.key === draft.researchSourceKey) ?? null
+  const defaultResearchSourceKey = aiResearchSources[0]?.key ?? ''
+  const canUseProviderNativeResearch = draft.providerType === 'OpenAi'
+  const canUseManagedResearch = aiResearchSources.length > 0
+  const noResearchToolsAvailable = !canUseManagedResearch && !canUseProviderNativeResearch
+
+  useEffect(() => {
+    if (
+      draft.allowExternalResearch &&
+      draft.webResearchMode === 'PatchHoundManaged' &&
+      !draft.researchSourceKey &&
+      defaultResearchSourceKey
+    ) {
+      onDraftChange((current) =>
+        current.researchSourceKey
+          ? current
+          : { ...current, researchSourceKey: defaultResearchSourceKey },
+      )
+    }
+  }, [
+    defaultResearchSourceKey,
+    draft.allowExternalResearch,
+    draft.researchSourceKey,
+    draft.webResearchMode,
+    onDraftChange,
+  ])
 
   return (
     <div className="space-y-5">
@@ -613,8 +659,16 @@ function AiProfileEditorPage({
                               ? current.webResearchMode === 'Disabled'
                                 ? 'ProviderNative'
                                 : current.webResearchMode
-                              : 'PatchHoundManaged'
+                              : canUseManagedResearch
+                                ? 'PatchHoundManaged'
+                                : 'Disabled'
                             : 'Disabled',
+                          allowExternalResearch:
+                            current.allowExternalResearch && (provider.type === 'OpenAi' || canUseManagedResearch),
+                          researchSourceKey:
+                            provider.type === 'OpenAi' && current.webResearchMode === 'ProviderNative'
+                              ? ''
+                              : current.researchSourceKey || defaultResearchSourceKey,
                         }))
                       }}
                     >
@@ -872,31 +926,56 @@ function AiProfileEditorPage({
           <FormSection title="Web research" icon={CircleAlert}>
             <div className="space-y-4">
               <InsetPanel className="space-y-4 p-4">
-                <label className="flex items-start gap-3">
-                  <Checkbox
-                    checked={draft.allowExternalResearch}
-                    onCheckedChange={(checked) => {
-                      const allowExternalResearch = checked === true
-                      onDraftChange((current) => ({
-                        ...current,
-                        allowExternalResearch,
-                        webResearchMode: allowExternalResearch
-                          ? current.providerType === 'OpenAi'
-                            ? current.webResearchMode === 'Disabled'
-                              ? 'ProviderNative'
-                              : current.webResearchMode
-                            : 'PatchHoundManaged'
-                          : 'Disabled',
-                      }))
-                    }}
-                  />
-                  <div className="space-y-1">
-                    <span className="text-sm font-medium text-foreground">Allow external web research</span>
+                {noResearchToolsAvailable ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">No research tools available</p>
                     <p className="text-sm text-muted-foreground">
-                      Use recent external context when supported by the provider or by PatchHound-managed research. Vulnerability assessments always use local PatchHound intel first.
+                      Configure an enabled enrichment source that targets AI research before this profile can use external web research.
                     </p>
+                    <Link
+                      to="/admin/platform/enrichment"
+                      className="inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Configure research tools
+                    </Link>
                   </div>
-                </label>
+                ) : (
+                  <label className="flex items-start gap-3">
+                    <Checkbox
+                      checked={draft.allowExternalResearch}
+                      onCheckedChange={(checked) => {
+                        const allowExternalResearch = checked === true
+                        onDraftChange((current) => {
+                          const nextMode = allowExternalResearch
+                            ? current.providerType === 'OpenAi'
+                              ? current.webResearchMode === 'Disabled'
+                                ? 'ProviderNative'
+                                : current.webResearchMode
+                              : 'PatchHoundManaged'
+                            : 'Disabled'
+
+                          return {
+                            ...current,
+                            allowExternalResearch,
+                            webResearchMode: nextMode,
+                            researchSourceKey:
+                              allowExternalResearch && nextMode === 'PatchHoundManaged'
+                                ? current.researchSourceKey || defaultResearchSourceKey
+                                : nextMode === 'PatchHoundManaged'
+                                  ? current.researchSourceKey
+                                  : '',
+                          }
+                        })
+                      }}
+                    />
+                    <div className="space-y-1">
+                      <span className="text-sm font-medium text-foreground">Allow external web research</span>
+                      <p className="text-sm text-muted-foreground">
+                        Use recent external context when supported by the provider or by PatchHound-managed research. Vulnerability assessments always use local PatchHound intel first.
+                      </p>
+                    </div>
+                  </label>
+                )}
 
                 {draft.allowExternalResearch ? (
                   <div className="grid gap-4 md:grid-cols-2">
@@ -907,6 +986,10 @@ function AiProfileEditorPage({
                           onDraftChange((current) => ({
                             ...current,
                             webResearchMode: value as SaveTenantAiProfile['webResearchMode'],
+                            researchSourceKey:
+                              value === 'PatchHoundManaged'
+                                ? current.researchSourceKey || defaultResearchSourceKey
+                                : '',
                           }))
                         }
                       >
@@ -918,7 +1001,9 @@ function AiProfileEditorPage({
                             <SelectItem value="ProviderNative">Provider native</SelectItem>
                           ) : null}
                           <SelectItem value="LocalVulnerabilityIntel">Local vulnerability intel</SelectItem>
-                          <SelectItem value="PatchHoundManaged">PatchHound managed</SelectItem>
+                          {canUseManagedResearch ? (
+                            <SelectItem value="PatchHoundManaged">PatchHound managed</SelectItem>
+                          ) : null}
                         </SelectContent>
                       </Select>
                       {draft.webResearchMode === 'PatchHoundManaged' ? (
@@ -931,6 +1016,40 @@ function AiProfileEditorPage({
                         </p>
                       ) : null}
                     </Field>
+
+                    {draft.webResearchMode === 'PatchHoundManaged' ? (
+                      canUseManagedResearch ? (
+                        <Field label="Research tool" tooltip="Enabled enrichment sources that target AI research.">
+                          <Select
+                            value={selectedResearchSource?.key ?? defaultResearchSourceKey}
+                            onValueChange={(value) =>
+                              onDraftChange((current) => ({ ...current, researchSourceKey: value ?? '' }))
+                            }
+                          >
+                            <SelectTrigger className="h-10 w-full rounded-xl border-border/80 bg-card px-3">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                              {aiResearchSources.map((source) => (
+                                <SelectItem key={source.key} value={source.key}>
+                                  {source.displayName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                      ) : (
+                        <InsetPanel className="space-y-2 px-4 py-3 md:col-span-2">
+                          <p className="text-sm font-medium text-foreground">No research tools available</p>
+                          <Link
+                            to="/admin/platform/enrichment"
+                            className="inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            Configure research tools
+                          </Link>
+                        </InsetPanel>
+                      )
+                    ) : null}
 
                     <Field label="Max research sources" tooltip="Upper bound for external sources added to the research context.">
                       <Input

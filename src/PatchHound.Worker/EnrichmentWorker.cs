@@ -104,6 +104,7 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
             .ToListAsync(ct);
 
         return enabledSources
+            .Where(source => EnrichmentSourceCatalog.HasTarget(source, EnrichmentSourceCatalog.ScheduledTarget))
             .OrderBy(source => source.DisplayName)
             .Select(source => new EnrichmentSourceSnapshot(
                 source.Id,

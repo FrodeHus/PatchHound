@@ -27,6 +27,7 @@ public class TenantAiProfileConfiguration : IEntityTypeConfiguration<TenantAiPro
             .HasConversion<string>()
             .HasMaxLength(32);
         builder.Property(item => item.AllowedDomains).HasColumnType("text").IsRequired();
+        builder.Property(item => item.ResearchSourceKey).HasMaxLength(128).IsRequired();
         builder
             .Property(item => item.LastValidationStatus)
             .HasConversion<string>()

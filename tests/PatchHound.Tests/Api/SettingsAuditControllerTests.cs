@@ -308,6 +308,72 @@ public class SettingsAuditControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetEnrichmentSources_IncludesJinaReaderAsAiResearchTool()
+    {
+        var controller = CreateSystemController();
+
+        var action = await controller.GetEnrichmentSources(CancellationToken.None);
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var sources = ok
+            .Value.Should()
+            .BeAssignableTo<IReadOnlyList<EnrichmentSourceDto>>()
+            .Subject;
+        var dto = sources.Should().Contain(s => s.Key == EnrichmentSourceCatalog.JinaReaderSourceKey).Subject;
+        dto.Enabled.Should().BeFalse();
+        dto.CredentialMode.Should().Be("optional-global-secret");
+        dto.Targets.Should().ContainSingle().Which.Should().Be("AIResearch");
+        dto.Credentials.ApiBaseUrl.Should().Be(EnrichmentSourceCatalog.DefaultJinaReaderApiBaseUrl);
+        dto.Options.JinaReader.Should().NotBeNull();
+        dto.Options.JinaReader!.TimeoutSeconds.Should().Be(20);
+        dto.Options.JinaReader.MaxContentChars.Should().Be(8000);
+    }
+
+    [Fact]
+    public async Task UpdateEnrichmentSources_RoundTripsTargetsAndJinaOptions()
+    {
+        var controller = CreateSystemController();
+
+        var action = await controller.UpdateEnrichmentSources(
+            [
+                new UpdateEnrichmentSourceRequest(
+                    EnrichmentSourceCatalog.JinaReaderSourceKey,
+                    "Jina Reader",
+                    true,
+                    null,
+                    new UpdateEnrichmentSourceCredentialsRequest(
+                        null,
+                        string.Empty,
+                        EnrichmentSourceCatalog.DefaultJinaReaderApiBaseUrl
+                    ),
+                    ["AIResearch"],
+                    new EnrichmentSourceOptionsDto(
+                        new JinaReaderOptionsDto(
+                            30,
+                            6000,
+                            "markdown",
+                            true,
+                            true,
+                            true,
+                            false,
+                            "main",
+                            "nav, footer",
+                            ".content"
+                        )
+                    )
+                ),
+            ],
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<NoContentResult>();
+        var source = await _dbContext.EnrichmentSourceConfigurations.SingleAsync();
+        source.Targets.Should().Be("AIResearch");
+        source.OptionsJson.Should().Contain("\"timeoutSeconds\":30");
+        source.OptionsJson.Should().Contain("\"targetSelector\":\"main\"");
+    }
+
+    [Fact]
     public async Task TriggerNvdModifiedSync_QueuesModifiedFeedSync()
     {
         var nvdFeedSyncDispatcher = Substitute.For<INvdFeedSyncDispatcher>();

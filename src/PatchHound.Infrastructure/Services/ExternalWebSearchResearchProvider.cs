@@ -4,12 +4,14 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using PatchHound.Core.Common;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Options;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Infrastructure.Services;
 
-public partial class ExternalWebSearchResearchProvider
+public partial class ExternalWebSearchResearchProvider : IAiResearchSourceProvider
 {
     private const int MaxSnippetChars = 1800;
     private const int MaxContextChars = 6000;
@@ -25,6 +27,14 @@ public partial class ExternalWebSearchResearchProvider
         _httpClient = httpClient;
         _options = options?.Value ?? new AiResearchOptions();
     }
+
+    public string SourceKey => EnrichmentSourceCatalog.ExternalWebSearchSourceKey;
+
+    public Task<Result<AiWebResearchBundle>> ResearchAsync(
+        EnrichmentSourceConfiguration source,
+        AiWebResearchRequest request,
+        CancellationToken ct
+    ) => ResearchAsync(request, ct);
 
     public async Task<Result<AiWebResearchBundle>> ResearchAsync(
         AiWebResearchRequest request,
@@ -104,7 +114,7 @@ public partial class ExternalWebSearchResearchProvider
         return $"https://r.jina.ai/http://{host}/search?q={Uri.EscapeDataString(query)}";
     }
 
-    private static IReadOnlyList<AiWebResearchSource> ExtractSources(string body, int maxSources)
+    internal static IReadOnlyList<AiWebResearchSource> ExtractSources(string body, int maxSources)
     {
         var results = new List<AiWebResearchSource>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -208,7 +218,7 @@ public partial class ExternalWebSearchResearchProvider
         return contexts;
     }
 
-    private static bool IsAllowedUrl(Uri uri)
+    internal static bool IsAllowedUrl(Uri uri)
     {
         if (uri.Scheme is not ("http" or "https"))
         {
@@ -286,7 +296,7 @@ public partial class ExternalWebSearchResearchProvider
             || bytes[0] >= 224;
     }
 
-    private static string ExtractSourceSnippet(string body)
+    internal static string ExtractSourceSnippet(string body)
     {
         var text = body.Replace("\r", "\n");
         var lines = text
@@ -299,7 +309,7 @@ public partial class ExternalWebSearchResearchProvider
         return Truncate(string.Join('\n', lines), MaxSnippetChars);
     }
 
-    private static string BuildContext(
+    internal static string BuildContext(
         string searchBody,
         IReadOnlyList<AiWebResearchSource> sources,
         IReadOnlyDictionary<string, string> sourceContexts,
@@ -340,7 +350,7 @@ public partial class ExternalWebSearchResearchProvider
         return Truncate(builder.ToString().Trim(), MaxContextChars);
     }
 
-    private static string Truncate(string value, int maxChars)
+    internal static string Truncate(string value, int maxChars)
     {
         if (value.Length <= maxChars)
         {

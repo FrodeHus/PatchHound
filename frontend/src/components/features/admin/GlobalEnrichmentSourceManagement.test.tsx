@@ -43,7 +43,9 @@ const nvdSource: EnrichmentSource = {
   displayName: 'NVD API',
   enabled: true,
   credentialMode: 'no-credential',
+  targets: ['Scheduled'],
   refreshTtlHours: null,
+  options: { jinaReader: null },
   credentials: {
     storedCredentialId: null,
     acceptedCredentialTypes: ['api-key'],

@@ -134,6 +134,11 @@ public static class DependencyInjection
         services
             .AddHttpClient<ExternalWebSearchResearchProvider>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
+        services.AddScoped<IAiResearchSourceProvider>(sp => sp.GetRequiredService<ExternalWebSearchResearchProvider>());
+        services
+            .AddHttpClient<JinaReaderAiResearchProvider>()
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
+        services.AddScoped<IAiResearchSourceProvider>(sp => sp.GetRequiredService<JinaReaderAiResearchProvider>());
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();
         services.AddScoped<ExposureDerivationService>();

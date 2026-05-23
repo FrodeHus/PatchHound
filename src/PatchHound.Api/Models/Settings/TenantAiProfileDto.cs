@@ -21,6 +21,7 @@ public record TenantAiProfileDto(
     bool IncludeCitations,
     int MaxResearchSources,
     string AllowedDomains,
+    string ResearchSourceKey,
     bool HasSecret,
     DateTimeOffset? LastValidatedAt,
     string LastValidationStatus,
@@ -51,7 +52,8 @@ public record SaveTenantAiProfileRequest(
     string AllowedDomains,
     string ApiKey,
     int? NumCtx,
-    string? ResponseFormat
+    string? ResponseFormat,
+    string ResearchSourceKey = ""
 );
 
 public record TenantAiProfileValidationResultDto(
