@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Models.Decisions;
 using PatchHound.Core.Common;
+using PatchHound.Core.Constants;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
@@ -15,6 +16,8 @@ public class AiRecommendationDraftService(
     TenantAiTextGenerationService aiTextGenerationService
 )
 {
+    private const int MaxPatchAssessmentsForPrompt = 25;
+
     private const string SystemPrompt =
         "You are helping a security analyst draft a remediation recommendation. " +
         "Use only the supplied patch priority assessments and SLA context. " +
@@ -67,7 +70,7 @@ public class AiRecommendationDraftService(
         if (openVulnerabilityIds.Count == 0)
             return Result<AiRecommendationDraftDto>.Failure("No open vulnerabilities found for this remediation case.");
 
-        var assessments = await dbContext.VulnerabilityPatchAssessments.AsNoTracking()
+        var rankedAssessments = dbContext.VulnerabilityPatchAssessments.AsNoTracking()
             .Where(assessment => openVulnerabilityIds.Contains(assessment.VulnerabilityId))
             .Join(
                 dbContext.Vulnerabilities.AsNoTracking(),
@@ -87,8 +90,15 @@ public class AiRecommendationDraftService(
                     assessment.UrgencyReason,
                     assessment.AssessedAt,
                 })
-            .OrderByDescending(item => item.UrgencyTier == "emergency")
+            .OrderByDescending(item => item.UrgencyTier == PatchUrgencyTier.Emergency)
+            .ThenByDescending(item => item.UrgencyTier == PatchUrgencyTier.AsSoonAsPossible)
+            .ThenByDescending(item => item.UrgencyTier == PatchUrgencyTier.NormalPatchWindow)
             .ThenByDescending(item => item.CvssScore)
+            .ThenByDescending(item => item.AssessedAt);
+
+        var totalAssessments = await rankedAssessments.CountAsync(ct);
+        var assessments = await rankedAssessments
+            .Take(MaxPatchAssessmentsForPrompt)
             .ToListAsync(ct);
 
         if (assessments.Count == 0)
@@ -98,6 +108,9 @@ public class AiRecommendationDraftService(
         prompt.AppendLine($"Software product: {softwareName}");
         prompt.AppendLine();
         prompt.AppendLine("Patch assessments:");
+        if (totalAssessments > assessments.Count)
+            prompt.AppendLine($"Only the top {assessments.Count} of {totalAssessments} assessments are included, ranked by urgency and CVSS.");
+
         foreach (var assessment in assessments)
         {
             prompt.AppendLine($"- {assessment.ExternalId} ({assessment.VendorSeverity}, CVSS {assessment.CvssScore?.ToString("F1") ?? "N/A"}): {assessment.Title}");

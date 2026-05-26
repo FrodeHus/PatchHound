@@ -7,6 +7,7 @@ using PatchHound.Api.Models.ApprovalTasks;
 using PatchHound.Api.Models.Decisions;
 using PatchHound.Api.Services;
 using PatchHound.Core.Common;
+using PatchHound.Core.Constants;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -281,7 +282,45 @@ public class RemediationDecisionsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GenerateAiRecommendationDraft_UsesPatchAssessmentsForOpenVulnerabilities()
+    public async Task GenerateAiRecommendationDraft_ReturnsBadRequest_WhenNoTenantSelected()
+    {
+        var noTenantContext = Substitute.For<ITenantContext>();
+        noTenantContext.CurrentTenantId.Returns((Guid?)null);
+
+        var controller = new RemediationDecisionsController(
+            queryService: null!,
+            decisionService: null!,
+            approvalTaskService: null!,
+            recommendationService: null!,
+            workflowAuthorizationService: null!,
+            workflowService: null!,
+            threatIntelService: null!,
+            aiRecommendationDraftService: null!,
+            dbContext: _dbContext,
+            tenantContext: noTenantContext
+        );
+
+        var result = await controller.GenerateAiRecommendationDraft(Guid.NewGuid(), CancellationToken.None);
+
+        var badRequest = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        badRequest.Value.Should().BeOfType<ProblemDetails>().Which.Title.Should().Be("No active tenant is selected.");
+    }
+
+    [Fact]
+    public async Task GenerateAiRecommendationDraft_ReturnsNotFound_WhenCaseDoesNotExist()
+    {
+        var service = CreateAiRecommendationDraftService();
+        var controller = CreateController(aiRecommendationDraftService: service);
+
+        var result = await controller.GenerateAiRecommendationDraft(Guid.NewGuid(), CancellationToken.None);
+
+        var notFound = result.Result.Should().BeOfType<NotFoundObjectResult>().Subject;
+        notFound.Value.Should().BeOfType<ProblemDetails>().Which.Title.Should()
+            .Be("Remediation case not found.");
+    }
+
+    [Fact]
+    public async Task GenerateAiRecommendationDraft_ReturnsDraftFromPatchAssessments()
     {
         var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
         var remediationCase = RemediationCase.Create(_tenantId, product.Id);
@@ -312,7 +351,7 @@ public class RemediationDecisionsControllerTests : IDisposable
             "Patch immediately.",
             "High",
             "Known exploitation is credible.",
-            "emergency",
+            PatchUrgencyTier.Emergency,
             "Within 24 hours",
             "Public exploitation and high blast radius.",
             "[]",
@@ -347,21 +386,21 @@ public class RemediationDecisionsControllerTests : IDisposable
         await _dbContext.AddRangeAsync(product, remediationCase, device, installedSoftware, vulnerability, exposure, assessment);
         await _dbContext.SaveChangesAsync();
 
-        var service = new AiRecommendationDraftService(
-            _dbContext,
-            new TenantAiTextGenerationService([provider], aiResolver)
-        );
+        var service = CreateAiRecommendationDraftService(provider, aiResolver);
+        var controller = CreateController(aiRecommendationDraftService: service);
 
-        var result = await service.GenerateAsync(_tenantId, remediationCase.Id, CancellationToken.None);
+        var result = await controller.GenerateAiRecommendationDraft(remediationCase.Id, CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue(result.Error);
-        result.Value.RecommendedOutcome.Should().Be("ApprovedForPatching");
-        result.Value.PriorityOverride.Should().Be("Critical");
-        result.Value.Rationale.Should().Contain("target SLA is within 24 hours");
+        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var draft = ok.Value.Should().BeOfType<AiRecommendationDraftDto>().Subject;
+        draft.RecommendedOutcome.Should().Be("ApprovedForPatching");
+        draft.PriorityOverride.Should().Be("Critical");
+        draft.Rationale.Should().Contain("target SLA is within 24 hours");
     }
 
     private RemediationDecisionsController CreateController(
-        RemediationWorkflowAuthorizationService? workflowAuthorizationService = null
+        RemediationWorkflowAuthorizationService? workflowAuthorizationService = null,
+        AiRecommendationDraftService? aiRecommendationDraftService = null
     ) =>
         new(
             queryService: null!,
@@ -371,10 +410,30 @@ public class RemediationDecisionsControllerTests : IDisposable
             workflowAuthorizationService: workflowAuthorizationService!,
             workflowService: null!,
             threatIntelService: null!,
-            aiRecommendationDraftService: null!,
+            aiRecommendationDraftService: aiRecommendationDraftService!,
             dbContext: _dbContext,
             tenantContext: _tenantContext
         );
+
+    private AiRecommendationDraftService CreateAiRecommendationDraftService(
+        IAiReportProvider? provider = null,
+        ITenantAiConfigurationResolver? aiResolver = null)
+    {
+        aiResolver ??= Substitute.For<ITenantAiConfigurationResolver>();
+        if (provider is null)
+        {
+            var profile = TenantAiProfileFactory.Create(_tenantId, name: "Recommendation profile");
+            aiResolver.ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+                .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, "secret")));
+            provider = Substitute.For<IAiReportProvider>();
+            provider.ProviderType.Returns(TenantAiProviderType.OpenAi);
+        }
+
+        return new AiRecommendationDraftService(
+            _dbContext,
+            new TenantAiTextGenerationService([provider], aiResolver)
+        );
+    }
 
     private async Task<Guid> SeedActiveDecisionWorkflowAsync()
     {
