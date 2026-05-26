@@ -420,6 +420,7 @@ builder.Services.AddScoped<PatchHound.Api.Services.VulnerabilityDetailQueryServi
 builder.Services.AddScoped<PatchHound.Api.Services.DeviceDetailQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.RemediationDecisionQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.ThreatIntelGenerationService>();
+builder.Services.AddScoped<PatchHound.Api.Services.AiRecommendationDraftService>();
 builder.Services.AddScoped<PatchHound.Api.Services.RemediationWorkflowAuthorizationService>();
 builder.Services.AddScoped<PatchHound.Api.Services.BlockedTenantAccessLogger>();
 builder.Services.AddScoped<PatchHound.Api.Services.ApprovalTaskQueryService>();

@@ -1,9 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ExternalLink, LoaderCircle, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Trash2 } from 'lucide-react'
+import { ExternalLink, LoaderCircle, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Sparkles, Trash2 } from 'lucide-react'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
-import { addRecommendation } from '@/api/remediation.functions'
+import { addRecommendation, generateAiRecommendationDraft } from '@/api/remediation.functions'
 import { requestVulnerabilityAssessment } from '@/api/vulnerabilities.functions'
 import { createWorkNote, deleteWorkNote, fetchWorkNotes, updateWorkNote } from '@/api/work-notes.functions'
 import type { WorkNote } from '@/api/work-notes.schemas'
@@ -20,6 +20,13 @@ import {
 } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
@@ -55,6 +62,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
   const [rationale, setRationale] = useState(currentRecommendation?.rationale ?? '')
   const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? '')
   const [isSaving, setIsSaving] = useState(false)
+  const [isApplyingAiRecommendation, setIsApplyingAiRecommendation] = useState(false)
   const [requestingAssessment, setRequestingAssessment] = useState(false)
   const [requestingAssessmentIds, setRequestingAssessmentIds] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -91,6 +99,17 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
     highestRiskDriverDetail,
     threatDriverCount,
   })
+  const assessedTaskVulnerabilityIds = useMemo(() => {
+    const taskVulnerabilityIds = new Set(vulnerabilities.map((vulnerability) => vulnerability.vulnerabilityId))
+    return data.patchAssessments
+      .filter((assessment) =>
+        assessment.vulnerabilityId
+        && taskVulnerabilityIds.has(assessment.vulnerabilityId)
+        && (assessment.assessedAt || assessment.recommendation || assessment.urgencyReason)
+      )
+      .map((assessment) => assessment.vulnerabilityId)
+  }, [data.patchAssessments, vulnerabilities])
+  const canApplyAiRecommendation = assessedTaskVulnerabilityIds.length > 0
 
   async function handleSaveRecommendation() {
     if (!canSave) return
@@ -138,6 +157,22 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
     } finally {
       setRequestingAssessment(false)
       setRequestingAssessmentIds([])
+    }
+  }
+
+  async function handleApplyAiRecommendation() {
+    if (!canApplyAiRecommendation || isApplyingAiRecommendation) return
+    setIsApplyingAiRecommendation(true)
+    setError(null)
+    try {
+      const draft = await generateAiRecommendationDraft({ data: { caseId } })
+      setRecommendedOutcome(draft.recommendedOutcome)
+      setPriorityOverride(draft.priorityOverride)
+      setRationale(draft.rationale)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Unable to apply the AI recommendation draft.'))
+    } finally {
+      setIsApplyingAiRecommendation(false)
     }
   }
 
@@ -240,7 +275,9 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
                   onValueChange={(value) => setRecommendedOutcome(value ?? "")}
                 >
                   <SelectTrigger id="recommended-outcome">
-                    <SelectValue placeholder="Select action..." />
+                    <SelectValue placeholder="Select action...">
+                      {recommendedOutcome ? outcomeLabel(recommendedOutcome) : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {OUTCOMES.map((outcome) => (
@@ -265,7 +302,9 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
                   }
                 >
                   <SelectTrigger id="priority-override">
-                    <SelectValue placeholder="No priority" />
+                    <SelectValue placeholder="No priority">
+                      {priorityOverride || undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No priority</SelectItem>
@@ -295,6 +334,21 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
             </div>
 
             <div className="flex flex-wrap gap-2">
+              {canApplyAiRecommendation ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleApplyAiRecommendation}
+                  disabled={isApplyingAiRecommendation}
+                >
+                  {isApplyingAiRecommendation ? (
+                    <LoaderCircle className="size-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-4" />
+                  )}
+                  Apply AI Recommendation
+                </Button>
+              ) : null}
               <Button
                 onClick={handleSaveRecommendation}
                 disabled={!canSave || isSaving}
@@ -431,6 +485,23 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
       />
 
       <WorkNotesSection caseId={caseId} />
+
+      <Dialog open={isApplyingAiRecommendation}>
+        <DialogContent showCloseButton={false} size="sm">
+          <DialogHeader>
+            <DialogTitle>Work in progress</DialogTitle>
+            <DialogDescription>
+              Summarizing patch assessment urgency and target SLA into an editable recommendation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-3">
+            <LoaderCircle className="size-5 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">
+              Waiting for the default AI profile to respond.
+            </span>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

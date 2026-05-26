@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnchorHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { DecisionContext } from '@/api/remediation.schemas'
+import { addRecommendation, generateAiRecommendationDraft } from '@/api/remediation.functions'
 import { requestVulnerabilityAssessment } from '@/api/vulnerabilities.functions'
 import { SecurityAnalystWorkbench } from './SecurityAnalystWorkbench'
 
@@ -12,6 +13,7 @@ vi.mock('@tanstack/react-router', () => ({
 
 vi.mock('@/api/remediation.functions', () => ({
   addRecommendation: vi.fn(),
+  generateAiRecommendationDraft: vi.fn(),
 }))
 
 vi.mock('@/api/vulnerabilities.functions', () => ({
@@ -417,5 +419,63 @@ describe('SecurityAnalystWorkbench', () => {
     expect(screen.getByText('Assessment failed')).toBeInTheDocument()
     expect(screen.getByText(/The AI response was not valid JSON/i)).toBeInTheDocument()
     expect(screen.getByText(error)).toBeInTheDocument()
+  })
+
+  it('only shows the AI recommendation button when task vulnerabilities have assessments', () => {
+    const { rerender } = renderWorkbench({
+      ...dataFixture,
+      patchAssessment: {
+        ...dataFixture.patchAssessment,
+        recommendation: null,
+      },
+      patchAssessments: dataFixture.patchAssessments.map((assessment) => ({
+        ...assessment,
+        recommendation: null,
+        assessedAt: null,
+        urgencyReason: null,
+        urgencyTier: null,
+      })),
+    })
+
+    expect(screen.queryByRole('button', { name: /Apply AI Recommendation/i })).not.toBeInTheDocument()
+
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <SecurityAnalystWorkbench
+          data={dataFixture}
+          caseId={dataFixture.remediationCaseId}
+          queryKey={['security-analyst-workbench', dataFixture.remediationCaseId]}
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByRole('button', { name: /Apply AI Recommendation/i })).toBeInTheDocument()
+  })
+
+  it('fills recommendation fields from the AI draft without submitting', async () => {
+    vi.mocked(generateAiRecommendationDraft).mockResolvedValue({
+      recommendedOutcome: 'ApprovedForPatching',
+      priorityOverride: 'High',
+      rationale: 'Prioritize patching because the assessed SLA is 14 days and exposure remains open.',
+    })
+    renderWorkbench()
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply AI Recommendation/i }))
+
+    expect(screen.getByText('Work in progress')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.queryByText('Work in progress')).not.toBeInTheDocument()
+    })
+
+    expect(generateAiRecommendationDraft).toHaveBeenCalledWith({
+      data: { caseId: dataFixture.remediationCaseId },
+    })
+    expect(screen.getByLabelText(/Recommendation rationale/i)).toHaveValue(
+      'Prioritize patching because the assessed SLA is 14 days and exposure remains open.',
+    )
+    expect(screen.getByRole('combobox', { name: /Recommended remediation/i })).toHaveTextContent('Patch this software')
+    expect(screen.getByRole('combobox', { name: /Priority/i })).toHaveTextContent('High')
+    expect(addRecommendation).not.toHaveBeenCalled()
   })
 })

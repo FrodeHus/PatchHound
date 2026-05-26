@@ -144,6 +144,12 @@ export const threatIntelSchema = z.object({
   unavailableMessage: z.string().nullable(),
 })
 
+export const aiRecommendationDraftSchema = z.object({
+  recommendedOutcome: z.string(),
+  priorityOverride: z.string(),
+  rationale: z.string(),
+})
+
 export const patchAssessmentSchema = z.object({
   vulnerabilityId: z.string().uuid().nullable(),
   recommendation: z.string().nullable(),
@@ -246,6 +252,7 @@ export type PatchAssessment = z.infer<typeof patchAssessmentSchema>
 export type DecisionApprovalResolution = z.infer<typeof decisionApprovalResolutionSchema>
 export type VulnerabilityOverride = z.infer<typeof vulnerabilityOverrideSchema>
 export type ThreatIntel = z.infer<typeof threatIntelSchema>
+export type AiRecommendationDraft = z.infer<typeof aiRecommendationDraftSchema>
 export type DecisionListItem = z.infer<typeof decisionListItemSchema>
 export type DecisionListSummary = z.infer<typeof decisionListSummarySchema>
 export type PagedDecisionList = z.infer<typeof pagedDecisionListSchema>

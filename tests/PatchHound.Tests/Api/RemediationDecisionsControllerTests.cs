@@ -128,6 +128,7 @@ public class RemediationDecisionsControllerTests : IDisposable
             workflowAuthorizationService: null!,
             workflowService: null!,
             threatIntelService: null!,
+            aiRecommendationDraftService: null!,
             dbContext: _dbContext,
             tenantContext: noTenantContext
         );
@@ -159,6 +160,7 @@ public class RemediationDecisionsControllerTests : IDisposable
             workflowAuthorizationService: null!,
             workflowService: null!,
             threatIntelService: threatIntelService,
+            aiRecommendationDraftService: null!,
             dbContext: _dbContext,
             tenantContext: _tenantContext
         );
@@ -191,6 +193,7 @@ public class RemediationDecisionsControllerTests : IDisposable
             workflowAuthorizationService: null!,
             workflowService: null!,
             threatIntelService: threatIntelService,
+            aiRecommendationDraftService: null!,
             dbContext: _dbContext,
             tenantContext: _tenantContext
         );
@@ -277,6 +280,86 @@ public class RemediationDecisionsControllerTests : IDisposable
         reloaded.ThreatIntel.ProfileName.Should().Be("Threat profile");
     }
 
+    [Fact]
+    public async Task GenerateAiRecommendationDraft_UsesPatchAssessmentsForOpenVulnerabilities()
+    {
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var device = CanonicalTestData.MakeDevice(_tenantId);
+        var installedSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, device.Id, product.Id);
+        var vulnerability = Vulnerability.Create(
+            "nvd",
+            "CVE-2026-4242",
+            "Remote code execution",
+            "A remotely exploitable vulnerability.",
+            Severity.Critical,
+            9.8m,
+            null,
+            DateTimeOffset.UtcNow.AddDays(-30)
+        );
+        var exposure = DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            device.Id,
+            vulnerability.Id,
+            product.Id,
+            installedSoftware.Id,
+            "1.2.3",
+            ExposureMatchSource.Product,
+            DateTimeOffset.UtcNow.AddDays(-2),
+            runId: Guid.NewGuid());
+        var assessment = VulnerabilityPatchAssessment.Create(
+            vulnerability.Id,
+            "Patch immediately.",
+            "High",
+            "Known exploitation is credible.",
+            "emergency",
+            "Within 24 hours",
+            "Public exploitation and high blast radius.",
+            "[]",
+            "[]",
+            "[]",
+            "Default AI",
+            null,
+            DateTimeOffset.UtcNow
+        );
+        var profile = TenantAiProfileFactory.Create(_tenantId, name: "Recommendation profile");
+        var provider = Substitute.For<IAiReportProvider>();
+        provider.ProviderType.Returns(TenantAiProviderType.OpenAi);
+        provider
+            .GenerateTextAsync(
+                Arg.Is<AiTextGenerationRequest>(request =>
+                    request.UserPrompt.Contains("CVE-2026-4242")
+                    && request.UserPrompt.Contains("Public exploitation and high blast radius.")
+                    && request.UserPrompt.Contains("Target SLA: Within 24 hours")),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>())
+            .Returns("""
+            {
+              "recommendedOutcome": "ApprovedForPatching",
+              "priorityOverride": "Critical",
+              "rationale": "Patch immediately because exploitation is likely and the target SLA is within 24 hours."
+            }
+            """);
+        var aiResolver = Substitute.For<ITenantAiConfigurationResolver>();
+        aiResolver.ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, "secret")));
+
+        await _dbContext.AddRangeAsync(product, remediationCase, device, installedSoftware, vulnerability, exposure, assessment);
+        await _dbContext.SaveChangesAsync();
+
+        var service = new AiRecommendationDraftService(
+            _dbContext,
+            new TenantAiTextGenerationService([provider], aiResolver)
+        );
+
+        var result = await service.GenerateAsync(_tenantId, remediationCase.Id, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.Error);
+        result.Value.RecommendedOutcome.Should().Be("ApprovedForPatching");
+        result.Value.PriorityOverride.Should().Be("Critical");
+        result.Value.Rationale.Should().Contain("target SLA is within 24 hours");
+    }
+
     private RemediationDecisionsController CreateController(
         RemediationWorkflowAuthorizationService? workflowAuthorizationService = null
     ) =>
@@ -288,6 +371,7 @@ public class RemediationDecisionsControllerTests : IDisposable
             workflowAuthorizationService: workflowAuthorizationService!,
             workflowService: null!,
             threatIntelService: null!,
+            aiRecommendationDraftService: null!,
             dbContext: _dbContext,
             tenantContext: _tenantContext
         );

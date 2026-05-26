@@ -25,6 +25,7 @@ public class RemediationDecisionsController(
     RemediationWorkflowAuthorizationService workflowAuthorizationService,
     RemediationWorkflowService workflowService,
     ThreatIntelGenerationService threatIntelService,
+    AiRecommendationDraftService aiRecommendationDraftService,
     PatchHoundDbContext dbContext,
     ITenantContext tenantContext
 ) : ControllerBase
@@ -407,6 +408,27 @@ public class RemediationDecisionsController(
             });
 
         var result = await threatIntelService.GenerateAsync(tenantId, caseId, ct);
+        if (!result.IsSuccess)
+        {
+            if (result.Error == "Remediation case not found.")
+                return NotFound(new ProblemDetails { Title = result.Error });
+            return BadRequest(new ProblemDetails { Title = result.Error });
+        }
+
+        return Ok(result.Value);
+    }
+
+    [HttpPost("analysis/ai-recommendation")]
+    [Authorize(Policy = Policies.GenerateAiReports)]
+    public async Task<ActionResult<AiRecommendationDraftDto>> GenerateAiRecommendationDraft(
+        Guid caseId,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var result = await aiRecommendationDraftService.GenerateAsync(tenantId, caseId, ct);
         if (!result.IsSuccess)
         {
             if (result.Error == "Remediation case not found.")
