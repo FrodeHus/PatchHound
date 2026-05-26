@@ -4,6 +4,7 @@ import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost } from '@/server/api'
 import {
   analystRecommendationSchema,
+  aiRecommendationDraftSchema,
   decisionContextSchema,
   pagedDecisionListSchema,
   remediationDecisionSchema,
@@ -124,6 +125,14 @@ export const generateThreatIntel = createServerFn({ method: 'POST' })
   .handler(async ({ context, data: { caseId } }) => {
     const data = await apiPost(`/remediation/cases/${caseId}/threat-intel`, context, {})
     return threatIntelSchema.parse(data)
+  })
+
+export const generateAiRecommendationDraft = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ caseId: z.string().uuid() }))
+  .handler(async ({ context, data: { caseId } }) => {
+    const data = await apiPost(`/remediation/cases/${caseId}/analysis/ai-recommendation`, context, {})
+    return aiRecommendationDraftSchema.parse(data)
   })
 
 export const fetchDecisionList = createServerFn({ method: 'GET' })

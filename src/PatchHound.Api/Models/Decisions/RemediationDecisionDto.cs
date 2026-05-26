@@ -53,6 +53,12 @@ public record ThreatIntelDto(
     string? UnavailableMessage
 );
 
+public record AiRecommendationDraftDto(
+    string RecommendedOutcome,
+    string PriorityOverride,
+    string Rationale
+);
+
 public record DecisionSummaryDto(
     int TotalVulnerabilities,
     int CriticalCount,

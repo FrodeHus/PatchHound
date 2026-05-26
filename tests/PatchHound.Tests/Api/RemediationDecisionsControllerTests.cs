@@ -7,6 +7,7 @@ using PatchHound.Api.Models.ApprovalTasks;
 using PatchHound.Api.Models.Decisions;
 using PatchHound.Api.Services;
 using PatchHound.Core.Common;
+using PatchHound.Core.Constants;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -128,6 +129,7 @@ public class RemediationDecisionsControllerTests : IDisposable
             workflowAuthorizationService: null!,
             workflowService: null!,
             threatIntelService: null!,
+            aiRecommendationDraftService: null!,
             dbContext: _dbContext,
             tenantContext: noTenantContext
         );
@@ -159,6 +161,7 @@ public class RemediationDecisionsControllerTests : IDisposable
             workflowAuthorizationService: null!,
             workflowService: null!,
             threatIntelService: threatIntelService,
+            aiRecommendationDraftService: null!,
             dbContext: _dbContext,
             tenantContext: _tenantContext
         );
@@ -191,6 +194,7 @@ public class RemediationDecisionsControllerTests : IDisposable
             workflowAuthorizationService: null!,
             workflowService: null!,
             threatIntelService: threatIntelService,
+            aiRecommendationDraftService: null!,
             dbContext: _dbContext,
             tenantContext: _tenantContext
         );
@@ -277,8 +281,126 @@ public class RemediationDecisionsControllerTests : IDisposable
         reloaded.ThreatIntel.ProfileName.Should().Be("Threat profile");
     }
 
+    [Fact]
+    public async Task GenerateAiRecommendationDraft_ReturnsBadRequest_WhenNoTenantSelected()
+    {
+        var noTenantContext = Substitute.For<ITenantContext>();
+        noTenantContext.CurrentTenantId.Returns((Guid?)null);
+
+        var controller = new RemediationDecisionsController(
+            queryService: null!,
+            decisionService: null!,
+            approvalTaskService: null!,
+            recommendationService: null!,
+            workflowAuthorizationService: null!,
+            workflowService: null!,
+            threatIntelService: null!,
+            aiRecommendationDraftService: null!,
+            dbContext: _dbContext,
+            tenantContext: noTenantContext
+        );
+
+        var result = await controller.GenerateAiRecommendationDraft(Guid.NewGuid(), CancellationToken.None);
+
+        var badRequest = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        badRequest.Value.Should().BeOfType<ProblemDetails>().Which.Title.Should().Be("No active tenant is selected.");
+    }
+
+    [Fact]
+    public async Task GenerateAiRecommendationDraft_ReturnsNotFound_WhenCaseDoesNotExist()
+    {
+        var service = CreateAiRecommendationDraftService();
+        var controller = CreateController(aiRecommendationDraftService: service);
+
+        var result = await controller.GenerateAiRecommendationDraft(Guid.NewGuid(), CancellationToken.None);
+
+        var notFound = result.Result.Should().BeOfType<NotFoundObjectResult>().Subject;
+        notFound.Value.Should().BeOfType<ProblemDetails>().Which.Title.Should()
+            .Be("Remediation case not found.");
+    }
+
+    [Fact]
+    public async Task GenerateAiRecommendationDraft_ReturnsDraftFromPatchAssessments()
+    {
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var device = CanonicalTestData.MakeDevice(_tenantId);
+        var installedSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, device.Id, product.Id);
+        var vulnerability = Vulnerability.Create(
+            "nvd",
+            "CVE-2026-4242",
+            "Remote code execution",
+            "A remotely exploitable vulnerability.",
+            Severity.Critical,
+            9.8m,
+            null,
+            DateTimeOffset.UtcNow.AddDays(-30)
+        );
+        var exposure = DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            device.Id,
+            vulnerability.Id,
+            product.Id,
+            installedSoftware.Id,
+            "1.2.3",
+            ExposureMatchSource.Product,
+            DateTimeOffset.UtcNow.AddDays(-2),
+            runId: Guid.NewGuid());
+        var assessment = VulnerabilityPatchAssessment.Create(
+            vulnerability.Id,
+            "Patch immediately.",
+            "High",
+            "Known exploitation is credible.",
+            PatchUrgencyTier.Emergency,
+            "Within 24 hours",
+            "Public exploitation and high blast radius.",
+            "[]",
+            "[]",
+            "[]",
+            "Default AI",
+            null,
+            DateTimeOffset.UtcNow
+        );
+        var profile = TenantAiProfileFactory.Create(_tenantId, name: "Recommendation profile");
+        var provider = Substitute.For<IAiReportProvider>();
+        provider.ProviderType.Returns(TenantAiProviderType.OpenAi);
+        provider
+            .GenerateTextAsync(
+                Arg.Is<AiTextGenerationRequest>(request =>
+                    request.UserPrompt.Contains("CVE-2026-4242")
+                    && request.UserPrompt.Contains("Public exploitation and high blast radius.")
+                    && request.UserPrompt.Contains("Target SLA: Within 24 hours")),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>())
+            .Returns("""
+            {
+              "recommendedOutcome": "ApprovedForPatching",
+              "priorityOverride": "Critical",
+              "rationale": "Patch immediately because exploitation is likely and the target SLA is within 24 hours."
+            }
+            """);
+        var aiResolver = Substitute.For<ITenantAiConfigurationResolver>();
+        aiResolver.ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, "secret")));
+
+        await _dbContext.AddRangeAsync(product, remediationCase, device, installedSoftware, vulnerability, exposure, assessment);
+        await _dbContext.SaveChangesAsync();
+
+        var service = CreateAiRecommendationDraftService(provider, aiResolver);
+        var controller = CreateController(aiRecommendationDraftService: service);
+
+        var result = await controller.GenerateAiRecommendationDraft(remediationCase.Id, CancellationToken.None);
+
+        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var draft = ok.Value.Should().BeOfType<AiRecommendationDraftDto>().Subject;
+        draft.RecommendedOutcome.Should().Be("ApprovedForPatching");
+        draft.PriorityOverride.Should().Be("Critical");
+        draft.Rationale.Should().Contain("target SLA is within 24 hours");
+    }
+
     private RemediationDecisionsController CreateController(
-        RemediationWorkflowAuthorizationService? workflowAuthorizationService = null
+        RemediationWorkflowAuthorizationService? workflowAuthorizationService = null,
+        AiRecommendationDraftService? aiRecommendationDraftService = null
     ) =>
         new(
             queryService: null!,
@@ -288,9 +410,30 @@ public class RemediationDecisionsControllerTests : IDisposable
             workflowAuthorizationService: workflowAuthorizationService!,
             workflowService: null!,
             threatIntelService: null!,
+            aiRecommendationDraftService: aiRecommendationDraftService!,
             dbContext: _dbContext,
             tenantContext: _tenantContext
         );
+
+    private AiRecommendationDraftService CreateAiRecommendationDraftService(
+        IAiReportProvider? provider = null,
+        ITenantAiConfigurationResolver? aiResolver = null)
+    {
+        aiResolver ??= Substitute.For<ITenantAiConfigurationResolver>();
+        if (provider is null)
+        {
+            var profile = TenantAiProfileFactory.Create(_tenantId, name: "Recommendation profile");
+            aiResolver.ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+                .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, "secret")));
+            provider = Substitute.For<IAiReportProvider>();
+            provider.ProviderType.Returns(TenantAiProviderType.OpenAi);
+        }
+
+        return new AiRecommendationDraftService(
+            _dbContext,
+            new TenantAiTextGenerationService([provider], aiResolver)
+        );
+    }
 
     private async Task<Guid> SeedActiveDecisionWorkflowAsync()
     {
