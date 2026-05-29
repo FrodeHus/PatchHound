@@ -171,7 +171,14 @@ public class ExposureDerivationService(
                     "ResolvedAt"     = NULL,
                     "LastSeenRunId"  = EXCLUDED."LastSeenRunId",
                     "LastMissedRunId" = NULL,
-                    "MissingSyncCount" = 0
+                    "MissingSyncCount" = 0,
+                    -- Re-point linkage at the current evidence (the deduped row prefers
+                    -- Product over Cpe), so the exposure keeps describing the install that
+                    -- is actually driving it instead of freezing at the original INSERT.
+                    "InstalledSoftwareId" = EXCLUDED."InstalledSoftwareId",
+                    "SoftwareProductId"   = EXCLUDED."SoftwareProductId",
+                    "MatchedVersion"      = EXCLUDED."MatchedVersion",
+                    "MatchSource"         = EXCLUDED."MatchSource"
                 RETURNING (xmax = 0) AS inserted
             )
             SELECT

@@ -298,4 +298,75 @@ public class ExposureDerivationServiceCteTests
         exposures.Select(e => e.DeviceId).Should().BeEquivalentTo(new[] { otherSourceDevice.Id, currentSourceDevice.Id });
         exposures.Should().OnlyContain(e => e.LastSeenRunId == currentRun);
     }
+
+    /// <summary>
+    /// Issue #83: on conflict the upsert must refresh the linkage columns, not freeze them
+    /// at the original INSERT. When an exposure is re-derived from a *different* install
+    /// (e.g. the originally-linked install was pruned and a sibling product now drives the
+    /// same (device, vuln)), the row must re-point at the new install, product, version and
+    /// match source — while keeping FirstObservedAt and bumping LastSeenRunId.
+    /// </summary>
+    [Fact]
+    public async Task DeriveForTenantAsync_repoints_linkage_when_exposure_rederived_from_different_install()
+    {
+        await _fx.ResetAsync();
+        await using var db = _fx.CreateDbContext();
+
+        var productA = SoftwareProduct.Create("Acme", "Widget", "cpe:2.3:a:acme:widget:*:*:*:*:*:*:*:*");
+        var productB = SoftwareProduct.Create("Acme", "Gadget", "cpe:2.3:a:acme:gadget:*:*:*:*:*:*:*:*");
+        var vuln = Vulnerability.Create("nvd", "CVE-2026-CTE6", "t", "d", Severity.Critical, 9.5m, "v", DateTimeOffset.UtcNow);
+        db.SoftwareProducts.AddRange(productA, productB);
+        db.Vulnerabilities.Add(vuln);
+        // Both products are applicable to the same vulnerability, so an install of either
+        // produces an exposure on the same (device, vuln) conflict key.
+        db.VulnerabilityApplicabilities.Add(VulnerabilityApplicability.Create(
+            vuln.Id, productA.Id, null, true, null, null, null, null));
+        db.VulnerabilityApplicabilities.Add(VulnerabilityApplicability.Create(
+            vuln.Id, productB.Id, null, true, null, null, null, null));
+
+        var source = SourceSystem.Create("test", "Test");
+        db.SourceSystems.Add(source);
+        var device = Device.Create(TenantId, source.Id, "dev-1", "Device", Criticality.Medium);
+        db.Devices.Add(device);
+
+        var firstRun = Guid.NewGuid();
+        var installA = InstalledSoftware.Observe(TenantId, device.Id, productA.Id, source.Id, "1.0", DateTimeOffset.UtcNow, firstRun);
+        db.InstalledSoftware.Add(installA);
+        await db.SaveChangesAsync();
+
+        var svc = new ExposureDerivationService(
+            db, NullLogger<ExposureDerivationService>.Instance, new PostgresBulkExposureWriter(db));
+
+        var firstObservedAt = DateTimeOffset.UtcNow;
+        await svc.DeriveForTenantAsync(TenantId, firstObservedAt, firstRun, CancellationToken.None);
+
+        var initial = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().SingleAsync();
+        initial.InstalledSoftwareId.Should().Be(installA.Id);
+        initial.SoftwareProductId.Should().Be(productA.Id);
+        initial.MatchedVersion.Should().Be("1.0");
+
+        // The originally-linked install is pruned; a different product's install now drives
+        // the same (device, vuln) exposure.
+        db.InstalledSoftware.Remove(installA);
+        var secondRun = Guid.NewGuid();
+        var installB = InstalledSoftware.Observe(TenantId, device.Id, productB.Id, source.Id, "2.0", DateTimeOffset.UtcNow, secondRun);
+        db.InstalledSoftware.Add(installB);
+        await db.SaveChangesAsync();
+
+        var secondObservedAt = firstObservedAt.AddHours(1);
+        var result = await svc.DeriveForTenantAsync(TenantId, secondObservedAt, secondRun, CancellationToken.None);
+
+        result.Inserted.Should().Be(0);
+        result.Reobserved.Should().Be(1);
+        result.Resolved.Should().Be(0);
+
+        var refreshed = await db.DeviceVulnerabilityExposures.AsNoTracking().IgnoreQueryFilters().SingleAsync();
+        refreshed.Id.Should().Be(initial.Id, "the same conflict row is updated, not replaced");
+        refreshed.InstalledSoftwareId.Should().Be(installB.Id);
+        refreshed.SoftwareProductId.Should().Be(productB.Id);
+        refreshed.MatchedVersion.Should().Be("2.0");
+        refreshed.MatchSource.Should().Be(ExposureMatchSource.Product);
+        refreshed.FirstObservedAt.Should().BeCloseTo(firstObservedAt, TimeSpan.FromSeconds(1));
+        refreshed.LastSeenRunId.Should().Be(secondRun);
+    }
 }

@@ -39,11 +39,12 @@ internal sealed class InMemoryBulkExposureWriter(PatchHoundDbContext db) : IBulk
                       && e.VulnerabilityId == row.VulnerabilityId,
                     ct);
 
+            var match = row.MatchSource == nameof(ExposureMatchSource.Cpe)
+                ? ExposureMatchSource.Cpe
+                : ExposureMatchSource.Product;
+
             if (existing is null)
             {
-                var match = row.MatchSource == nameof(ExposureMatchSource.Cpe)
-                    ? ExposureMatchSource.Cpe
-                    : ExposureMatchSource.Product;
                 var fresh = DeviceVulnerabilityExposure.Observe(
                     row.TenantId,
                     row.DeviceId,
@@ -59,7 +60,14 @@ internal sealed class InMemoryBulkExposureWriter(PatchHoundDbContext db) : IBulk
             }
             else
             {
-                existing.Reobserve(row.ObservedAt, row.RunId);
+                // Mirror the Postgres ON CONFLICT path: re-point linkage at the current evidence.
+                existing.Reobserve(
+                    row.ObservedAt,
+                    row.RunId,
+                    installedSoftwareId: row.InstalledSoftwareId,
+                    softwareProductId: row.SoftwareProductId,
+                    matchedVersion: row.MatchedVersion ?? string.Empty,
+                    matchSource: match);
                 reobserved++;
             }
         }
