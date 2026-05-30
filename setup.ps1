@@ -14,6 +14,42 @@ function Invoke-Bao {
     docker compose exec -e "BAO_ADDR=$BAO_ADDR" openbao bao @BaoArgs
 }
 
+# ── 0. Ensure a minimal .env exists before any docker compose command ────────
+if (-not (Test-Path '.env')) {
+    Write-Host "`n==> Creating minimal .env..." -ForegroundColor Cyan
+    @'
+POSTGRES_DB=patchhound
+POSTGRES_USER=patchhound
+POSTGRES_PASSWORD=change-me
+
+OPENBAO_ADDR=http://localhost:8200
+OPENBAO_INTERNAL_ADDR=http://openbao:8200
+OPENBAO_TOKEN=
+OPENBAO_KV_MOUNT=patchhound
+
+API_ENVIRONMENT=Development
+WORKER_ENVIRONMENT=Development
+FRONTEND_NODE_ENV=production
+
+AZURE_AD_CLIENT_ID=
+AZURE_AD_TENANT_ID=common
+AZURE_AD_AUDIENCE=
+AZURE_AD_ENABLE_PII_LOGGING=true
+
+FRONTEND_ORIGIN=http://localhost:3000
+
+SMTP_HOST=localhost
+SMTP_PORT=25
+SMTP_USERNAME=
+SMTP_PASSWORD=
+
+SESSION_SECRET=change-me-to-at-least-32-characters
+SESSION_DATABASE_URL=
+ENTRA_CLIENT_SECRET=
+ENTRA_SCOPES=openid profile email
+'@ | Set-Content -Path '.env'
+}
+
 # ── 1. Build containers ──────────────────────────────────────────────────────
 Write-Host "`n==> Building containers..." -ForegroundColor Cyan
 docker compose build
@@ -130,12 +166,7 @@ Write-Host "Root token:        $rootToken" -ForegroundColor Yellow
 Write-Host "PatchHound token:  $appToken" -ForegroundColor Yellow
 Write-Host ""
 
-# ── 11. Create / update .env ──────────────────────────────────────────────────
-if (-not (Test-Path '.env')) {
-    Write-Host "==> Copying .env.example -> .env..." -ForegroundColor Cyan
-    Copy-Item '.env.example' '.env'
-}
-
+# ── 11. Update .env with generated token ─────────────────────────────────────
 function Set-EnvValue {
     param([string]$File, [string]$Key, [string]$Value)
     $content = Get-Content $File

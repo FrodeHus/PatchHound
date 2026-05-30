@@ -30,6 +30,42 @@ json_field() {
     python3 -c "import sys,json; print(json.load(sys.stdin)$1)"
 }
 
+# ── 0. Ensure a minimal .env exists before any docker compose command ────────
+if [ ! -f .env ]; then
+    cyan "==> Creating minimal .env..."
+    cat > .env <<'EOF'
+POSTGRES_DB=patchhound
+POSTGRES_USER=patchhound
+POSTGRES_PASSWORD=change-me
+
+OPENBAO_ADDR=http://localhost:8200
+OPENBAO_INTERNAL_ADDR=http://openbao:8200
+OPENBAO_TOKEN=
+OPENBAO_KV_MOUNT=patchhound
+
+API_ENVIRONMENT=Development
+WORKER_ENVIRONMENT=Development
+FRONTEND_NODE_ENV=production
+
+AZURE_AD_CLIENT_ID=
+AZURE_AD_TENANT_ID=common
+AZURE_AD_AUDIENCE=
+AZURE_AD_ENABLE_PII_LOGGING=true
+
+FRONTEND_ORIGIN=http://localhost:3000
+
+SMTP_HOST=localhost
+SMTP_PORT=25
+SMTP_USERNAME=
+SMTP_PASSWORD=
+
+SESSION_SECRET=change-me-to-at-least-32-characters
+SESSION_DATABASE_URL=
+ENTRA_CLIENT_SECRET=
+ENTRA_SCOPES=openid profile email
+EOF
+fi
+
 # ── 1. Build containers ──────────────────────────────────────────────────────
 echo; cyan "==> Building containers..."
 docker compose build
@@ -150,12 +186,7 @@ yellow "Root token:        $root_token"
 yellow "PatchHound token:  $app_token"
 echo
 
-# ── 11. Create / update .env ──────────────────────────────────────────────────
-if [ ! -f .env ]; then
-    cyan "==> Copying .env.example -> .env..."
-    cp .env.example .env
-fi
-
+# ── 11. Update .env with generated token ─────────────────────────────────────
 set_env_value .env OPENBAO_TOKEN "$app_token"
 
 # ── 12. Prompt for Azure AD values ────────────────────────────────────────────
