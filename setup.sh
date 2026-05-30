@@ -160,20 +160,11 @@ set_env_value .env OPENBAO_TOKEN "$app_token"
 
 # ── 12. Prompt for Azure AD values ────────────────────────────────────────────
 cyan "==> Azure AD configuration"
-echo "    Press Enter to keep the current value (shown in brackets)."
 echo
 
-current_client_id=$(read_env_value .env AZURE_AD_CLIENT_ID)
-current_tenant_id=$(read_env_value .env AZURE_AD_TENANT_ID)
-current_audience=$(read_env_value  .env AZURE_AD_AUDIENCE)
-
-read -r -p "  AZURE_AD_CLIENT_ID  [${current_client_id}]: " client_id
-read -r -p "  AZURE_AD_TENANT_ID  [${current_tenant_id}]: " tenant_id
-read -r -p "  AZURE_AD_AUDIENCE    [${current_audience}]: " audience
-
-[ -z "$client_id" ] && client_id="$current_client_id"
-[ -z "$tenant_id" ] && tenant_id="$current_tenant_id"
-[ -z "$audience"  ] && audience="$current_audience"
+read -r -p "  AZURE_AD_CLIENT_ID: " client_id
+read -r -p "  AZURE_AD_TENANT_ID: " tenant_id
+read -r -p "  AZURE_AD_AUDIENCE:  " audience
 
 set_env_value .env AZURE_AD_CLIENT_ID "$client_id"
 set_env_value .env AZURE_AD_TENANT_ID "$tenant_id"

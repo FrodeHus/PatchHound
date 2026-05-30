@@ -152,28 +152,11 @@ Set-EnvValue -File '.env' -Key 'OPENBAO_TOKEN' -Value $appToken
 
 # ── 12. Prompt for Azure AD values ────────────────────────────────────────────
 Write-Host "==> Azure AD configuration" -ForegroundColor Cyan
-Write-Host "    Press Enter to keep the current value (shown in brackets)."
 Write-Host ""
 
-function Read-EnvValue {
-    param([string]$File, [string]$Key)
-    $line = Get-Content $File | Where-Object { $_ -match "^$Key=" } | Select-Object -First 1
-    if ($line) { return $line.Substring($Key.Length + 1) }
-    return ''
-}
-
-$currentClientId  = Read-EnvValue -File '.env' -Key 'AZURE_AD_CLIENT_ID'
-$currentTenantId  = Read-EnvValue -File '.env' -Key 'AZURE_AD_TENANT_ID'
-$currentAudience  = Read-EnvValue -File '.env' -Key 'AZURE_AD_AUDIENCE'
-
-$clientId = Read-Host "  AZURE_AD_CLIENT_ID  [$currentClientId]"
-if ([string]::IsNullOrWhiteSpace($clientId)) { $clientId = $currentClientId }
-
-$tenantId = Read-Host "  AZURE_AD_TENANT_ID  [$currentTenantId]"
-if ([string]::IsNullOrWhiteSpace($tenantId)) { $tenantId = $currentTenantId }
-
-$audience = Read-Host "  AZURE_AD_AUDIENCE    [$currentAudience]"
-if ([string]::IsNullOrWhiteSpace($audience)) { $audience = $currentAudience }
+$clientId = Read-Host "  AZURE_AD_CLIENT_ID"
+$tenantId = Read-Host "  AZURE_AD_TENANT_ID"
+$audience = Read-Host "  AZURE_AD_AUDIENCE"
 
 Set-EnvValue -File '.env' -Key 'AZURE_AD_CLIENT_ID' -Value $clientId
 Set-EnvValue -File '.env' -Key 'AZURE_AD_TENANT_ID' -Value $tenantId
