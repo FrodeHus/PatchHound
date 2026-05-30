@@ -83,7 +83,8 @@ Invoke-Bao 'login', '-no-print', $rootToken
 
 # ── 6. Enable KV v2 ──────────────────────────────────────────────────────────
 $secretsList = Invoke-Bao 'secrets', 'list', '-format=json' | ConvertFrom-Json -ErrorAction SilentlyContinue
-if ($secretsList -and $secretsList."$KV_MOUNT/") {
+$kvMountKey = "$KV_MOUNT/"
+if ($secretsList -and $secretsList.PSObject.Properties[$kvMountKey]) {
     Write-Host "    KV mount '$KV_MOUNT' already enabled." -ForegroundColor Yellow
 } else {
     Write-Host "`n==> Enabling KV v2 at $KV_MOUNT/..." -ForegroundColor Cyan
