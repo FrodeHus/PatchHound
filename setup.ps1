@@ -10,8 +10,8 @@ $INIT_DIR = '.openbao-init'
 $INIT_FILE = "$INIT_DIR/init.json"
 
 function Invoke-Bao {
-    param([string[]]$Args)
-    docker compose exec -e "BAO_ADDR=$BAO_ADDR" openbao bao @Args
+    param([string[]]$BaoArgs)
+    docker compose exec -e "BAO_ADDR=$BAO_ADDR" openbao bao @BaoArgs
 }
 
 # ── 1. Build containers ──────────────────────────────────────────────────────
