@@ -26,6 +26,10 @@ read_env_value() {
     grep -E "^${key}=" "$file" | head -1 | cut -d= -f2- || true
 }
 
+json_field() {
+    python3 -c "import sys,json; print(json.load(sys.stdin)$1)"
+}
+
 # ── 1. Build containers ──────────────────────────────────────────────────────
 echo; cyan "==> Building containers..."
 docker compose build
@@ -34,31 +38,33 @@ docker compose build
 echo; cyan "==> Starting OpenBao container..."
 docker compose up -d openbao
 
-echo "    Waiting for OpenBao to be ready..."
+# Wait until the HTTP listener is accepting connections.
+# Use the sys/health endpoint — it responds with a non-connection-error HTTP
+# status regardless of init/seal state, so curl exits 0 as soon as the server
+# is up. We do NOT use `bao status` here: it exits 1 when uninitialized, which
+# is indistinguishable from "server not yet started".
+echo "    Waiting for OpenBao HTTP listener..."
 max_wait=60
 elapsed=0
-# Ignore exit code — bao status exits 1 for both "not yet up" and "uninitialized".
-# Valid JSON in stdout is the only reliable signal that the server is accepting requests.
-while true; do
-    status_json=$(docker compose exec openbao bao status -address="$BAO_ADDR" -format=json 2>/dev/null || true)
-    if python3 -c "import sys,json; json.loads(sys.stdin.read())" <<< "$status_json" 2>/dev/null; then
-        break
-    fi
+until curl -sf --max-time 2 "$BAO_ADDR/v1/sys/health" -o /dev/null 2>/dev/null \
+      || curl -s  --max-time 2 "$BAO_ADDR/v1/sys/health" -o /dev/null 2>/dev/null; do
     sleep 2
     elapsed=$((elapsed + 2))
     if [ "$elapsed" -ge "$max_wait" ]; then
-        echo "ERROR: OpenBao did not become ready within ${max_wait}s." >&2
+        echo "ERROR: OpenBao did not start within ${max_wait}s." >&2
         exit 1
     fi
 done
+echo "    OpenBao is up."
 
 # ── 3. Initialize ────────────────────────────────────────────────────────────
 mkdir -p "$INIT_DIR"
 chmod 700 "$INIT_DIR"
 
-initialized=$(printf '%s' "$status_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('initialized') else 'no')" 2>/dev/null || echo no)
+# Check init state via the API (not bao status).
+init_state=$(curl -s "$BAO_ADDR/v1/sys/init" | python3 -c "import sys,json; print('yes' if json.load(sys.stdin).get('initialized') else 'no')" 2>/dev/null || echo no)
 
-if [ "$initialized" = "yes" ]; then
+if [ "$init_state" = "yes" ]; then
     yellow "    OpenBao already initialized."
     if [ ! -f "$INIT_FILE" ]; then
         echo "ERROR: OpenBao is initialized but $INIT_FILE is missing. Recreate the openbao_data volume to start fresh." >&2
@@ -71,18 +77,18 @@ else
     echo "    Init output saved to $INIT_FILE"
 fi
 
-root_token=$(python3 -c "import json; d=json.load(open('$INIT_FILE')); print(d['root_token'])")
-unseal_key0=$(python3 -c "import json; d=json.load(open('$INIT_FILE')); print(d['unseal_keys_b64'][0])")
-unseal_key1=$(python3 -c "import json; d=json.load(open('$INIT_FILE')); print(d['unseal_keys_b64'][1])")
-unseal_key2=$(python3 -c "import json; d=json.load(open('$INIT_FILE')); print(d['unseal_keys_b64'][2])")
+root_token=$(json_field "['root_token']"          < "$INIT_FILE")
+unseal_key0=$(json_field "['unseal_keys_b64'][0]" < "$INIT_FILE")
+unseal_key1=$(json_field "['unseal_keys_b64'][1]" < "$INIT_FILE")
+unseal_key2=$(json_field "['unseal_keys_b64'][2]" < "$INIT_FILE")
 
 # ── 4. Unseal ────────────────────────────────────────────────────────────────
-sealed=$(printf '%s' "$status_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('sealed') else 'no')" 2>/dev/null || echo yes)
+seal_state=$(curl -s "$BAO_ADDR/v1/sys/seal-status" | python3 -c "import sys,json; print('yes' if json.load(sys.stdin).get('sealed') else 'no')" 2>/dev/null || echo yes)
 
-if [ "$sealed" = "no" ]; then
+if [ "$seal_state" = "no" ]; then
     yellow "    OpenBao already unsealed."
 else
-    echo; cyan "==> Unsealing OpenBao..."
+    echo; cyan "==> Unsealing OpenBao (3 of 5 keys)..."
     bao operator unseal "$unseal_key0" >/dev/null
     bao operator unseal "$unseal_key1" >/dev/null
     bao operator unseal "$unseal_key2" >/dev/null
@@ -124,11 +130,21 @@ echo "    Application token saved to $INIT_DIR/app-token.txt"
 echo; cyan "==> Stopping OpenBao container..."
 docker compose stop openbao
 
-# ── 10. Print tokens ──────────────────────────────────────────────────────────
+# ── 10. Print summary ─────────────────────────────────────────────────────────
+all_keys=$(python3 -c "
+import json
+d = json.load(open('$INIT_FILE'))
+for i, k in enumerate(d['unseal_keys_b64'], 1):
+    print(f'  Key {i}: {k}')
+")
+
 echo
 green "============================================"
 green "  OpenBao setup complete"
 green "============================================"
+echo
+yellow "Unseal keys (keep these safe):"
+yellow "$all_keys"
 echo
 yellow "Root token:        $root_token"
 yellow "PatchHound token:  $app_token"

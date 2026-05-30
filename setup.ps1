@@ -22,27 +22,40 @@ docker compose build
 Write-Host "`n==> Starting OpenBao container..." -ForegroundColor Cyan
 docker compose up -d openbao
 
-Write-Host "    Waiting for OpenBao to be ready..."
+# Wait until the HTTP listener is accepting connections.
+# Use the sys/health endpoint — it responds with a non-connection-error HTTP
+# status regardless of init/seal state. We do NOT use `bao status` here:
+# it exits 1 when uninitialized, which is indistinguishable from "not yet started".
+Write-Host "    Waiting for OpenBao HTTP listener..."
 $maxWait = 60
 $elapsed = 0
-$status = $null
+$ready = $false
 do {
     Start-Sleep -Seconds 2
     $elapsed += 2
-    # Ignore exit code — bao status exits 1 for both "not yet up" and "uninitialized".
-    # Valid JSON in stdout is the only reliable signal the server is accepting requests.
-    $statusJson = docker compose exec openbao bao status -address=$BAO_ADDR -format=json 2>$null
-    $status = $statusJson | ConvertFrom-Json -ErrorAction SilentlyContinue
-} while (-not $status -and $elapsed -lt $maxWait)
+    try {
+        $null = Invoke-WebRequest -Uri "$BAO_ADDR/v1/sys/health" -TimeoutSec 2 -ErrorAction Stop
+        $ready = $true
+    } catch [System.Net.WebException] {
+        # A WebException with a response means the server is up (e.g. 429, 501, 503).
+        if ($_.Exception.Response) { $ready = $true }
+    } catch {
+        # Connection refused / timeout — not ready yet.
+    }
+} while (-not $ready -and $elapsed -lt $maxWait)
 
-if (-not $status) {
-    Write-Error "OpenBao did not become ready within ${maxWait}s."
+if (-not $ready) {
+    Write-Error "OpenBao did not start within ${maxWait}s."
 }
+Write-Host "    OpenBao is up."
 
 # ── 3. Initialize ────────────────────────────────────────────────────────────
 New-Item -ItemType Directory -Force -Path $INIT_DIR | Out-Null
 
-if ($status.initialized) {
+# Check init state via the API (not bao status).
+$initState = Invoke-RestMethod -Uri "$BAO_ADDR/v1/sys/init" -ErrorAction SilentlyContinue
+
+if ($initState.initialized) {
     Write-Host "    OpenBao already initialized." -ForegroundColor Yellow
     if (-not (Test-Path $INIT_FILE)) {
         Write-Error "OpenBao is initialized but $INIT_FILE is missing. Recreate the openbao_data volume to start fresh."
@@ -60,10 +73,12 @@ $rootToken = $init.root_token
 $unsealKeys = $init.unseal_keys_b64
 
 # ── 4. Unseal ────────────────────────────────────────────────────────────────
-if ($status -and -not $status.sealed) {
+$sealState = Invoke-RestMethod -Uri "$BAO_ADDR/v1/sys/seal-status" -ErrorAction SilentlyContinue
+
+if ($sealState -and -not $sealState.sealed) {
     Write-Host "    OpenBao already unsealed." -ForegroundColor Yellow
 } else {
-    Write-Host "`n==> Unsealing OpenBao..." -ForegroundColor Cyan
+    Write-Host "`n==> Unsealing OpenBao (3 of 5 keys)..." -ForegroundColor Cyan
     foreach ($key in $unsealKeys[0..2]) {
         Invoke-Bao 'operator', 'unseal', $key | Out-Null
     }
@@ -107,11 +122,16 @@ Write-Host "    Application token saved to $INIT_DIR/app-token.txt"
 Write-Host "`n==> Stopping OpenBao container..." -ForegroundColor Cyan
 docker compose stop openbao
 
-# ── 10. Print tokens ──────────────────────────────────────────────────────────
+# ── 10. Print summary ─────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Green
 Write-Host "  OpenBao setup complete" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "Unseal keys (keep these safe):" -ForegroundColor Yellow
+for ($i = 0; $i -lt $unsealKeys.Count; $i++) {
+    Write-Host "  Key $($i + 1): $($unsealKeys[$i])" -ForegroundColor Yellow
+}
 Write-Host ""
 Write-Host "Root token:        $rootToken" -ForegroundColor Yellow
 Write-Host "PatchHound token:  $appToken" -ForegroundColor Yellow
