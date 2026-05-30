@@ -25,10 +25,15 @@ docker compose up -d openbao
 Write-Host "    Waiting for OpenBao to be ready..."
 $maxWait = 60
 $elapsed = 0
+$status = $null
 do {
     Start-Sleep -Seconds 2
     $elapsed += 2
-    $status = docker compose exec openbao bao status -address=$BAO_ADDR -format=json 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
+    # bao status exits 0 (active) or 2 (sealed) when ready; capture JSON from stdout regardless.
+    $statusJson = docker compose exec openbao bao status -address=$BAO_ADDR -format=json 2>$null
+    if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 2) {
+        $status = $statusJson | ConvertFrom-Json -ErrorAction SilentlyContinue
+    }
 } while (-not $status -and $elapsed -lt $maxWait)
 
 if (-not $status) {
@@ -56,7 +61,6 @@ $rootToken = $init.root_token
 $unsealKeys = $init.unseal_keys_b64
 
 # ── 4. Unseal ────────────────────────────────────────────────────────────────
-$status = docker compose exec openbao bao status -address=$BAO_ADDR -format=json 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
 if ($status -and -not $status.sealed) {
     Write-Host "    OpenBao already unsealed." -ForegroundColor Yellow
 } else {

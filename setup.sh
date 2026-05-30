@@ -37,7 +37,13 @@ docker compose up -d openbao
 echo "    Waiting for OpenBao to be ready..."
 max_wait=60
 elapsed=0
-while ! docker compose exec openbao bao status -address="$BAO_ADDR" -format=json >/dev/null 2>&1; do
+# bao status exits 0 (active) or 2 (sealed) when the server is up; exit 1 means not yet ready.
+bao_status_json() {
+    docker compose exec openbao bao status -address="$BAO_ADDR" -format=json 2>/dev/null
+    local rc=$?
+    [ $rc -eq 0 ] || [ $rc -eq 2 ]
+}
+while ! bao_status_json; do
     sleep 2
     elapsed=$((elapsed + 2))
     if [ "$elapsed" -ge "$max_wait" ]; then
@@ -50,9 +56,11 @@ done
 mkdir -p "$INIT_DIR"
 chmod 700 "$INIT_DIR"
 
-initialized=$(docker compose exec openbao bao status -address="$BAO_ADDR" -format=json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('initialized','false'))" 2>/dev/null || echo false)
+# Reuse the JSON already fetched by the readiness loop.
+status_json=$(docker compose exec openbao bao status -address="$BAO_ADDR" -format=json 2>/dev/null || true)
+initialized=$(printf '%s' "$status_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('initialized') else 'no')" 2>/dev/null || echo no)
 
-if [ "$initialized" = "True" ] || [ "$initialized" = "true" ]; then
+if [ "$initialized" = "yes" ]; then
     yellow "    OpenBao already initialized."
     if [ ! -f "$INIT_FILE" ]; then
         echo "ERROR: OpenBao is initialized but $INIT_FILE is missing. Recreate the openbao_data volume to start fresh." >&2
@@ -71,9 +79,9 @@ unseal_key1=$(python3 -c "import json; d=json.load(open('$INIT_FILE')); print(d[
 unseal_key2=$(python3 -c "import json; d=json.load(open('$INIT_FILE')); print(d['unseal_keys_b64'][2])")
 
 # ── 4. Unseal ────────────────────────────────────────────────────────────────
-sealed=$(docker compose exec openbao bao status -address="$BAO_ADDR" -format=json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sealed','true'))" 2>/dev/null || echo true)
+sealed=$(printf '%s' "$status_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('sealed') else 'no')" 2>/dev/null || echo yes)
 
-if [ "$sealed" = "False" ] || [ "$sealed" = "false" ]; then
+if [ "$sealed" = "no" ]; then
     yellow "    OpenBao already unsealed."
 else
     echo; cyan "==> Unsealing OpenBao..."
