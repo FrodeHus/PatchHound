@@ -23,9 +23,8 @@ Write-Host "`n==> Starting OpenBao container..." -ForegroundColor Cyan
 docker compose up -d openbao
 
 # Wait until the HTTP listener is accepting connections.
-# Use the sys/health endpoint — it responds with a non-connection-error HTTP
-# status regardless of init/seal state. We do NOT use `bao status` here:
-# it exits 1 when uninitialized, which is indistinguishable from "not yet started".
+# curl.exe exits 0 for any HTTP response regardless of status code (without -f),
+# and non-zero only when it cannot connect at all. This works on all init/seal states.
 Write-Host "    Waiting for OpenBao HTTP listener..."
 $maxWait = 60
 $elapsed = 0
@@ -33,15 +32,8 @@ $ready = $false
 do {
     Start-Sleep -Seconds 2
     $elapsed += 2
-    try {
-        $null = Invoke-WebRequest -Uri "$BAO_ADDR/v1/sys/health" -TimeoutSec 2 -ErrorAction Stop
-        $ready = $true
-    } catch [System.Net.WebException] {
-        # A WebException with a response means the server is up (e.g. 429, 501, 503).
-        if ($_.Exception.Response) { $ready = $true }
-    } catch {
-        # Connection refused / timeout — not ready yet.
-    }
+    curl.exe -s --max-time 2 "$BAO_ADDR/v1/sys/health" -o NUL 2>$null
+    if ($LASTEXITCODE -eq 0) { $ready = $true }
 } while (-not $ready -and $elapsed -lt $maxWait)
 
 if (-not $ready) {
