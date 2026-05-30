@@ -37,13 +37,13 @@ docker compose up -d openbao
 echo "    Waiting for OpenBao to be ready..."
 max_wait=60
 elapsed=0
-# bao status exits 0 (active) or 2 (sealed) when the server is up; exit 1 means not yet ready.
-bao_status_json() {
-    docker compose exec openbao bao status -address="$BAO_ADDR" -format=json 2>/dev/null
-    local rc=$?
-    [ $rc -eq 0 ] || [ $rc -eq 2 ]
-}
-while ! bao_status_json; do
+# Ignore exit code — bao status exits 1 for both "not yet up" and "uninitialized".
+# Valid JSON in stdout is the only reliable signal that the server is accepting requests.
+while true; do
+    status_json=$(docker compose exec openbao bao status -address="$BAO_ADDR" -format=json 2>/dev/null || true)
+    if python3 -c "import sys,json; json.loads(sys.stdin.read())" <<< "$status_json" 2>/dev/null; then
+        break
+    fi
     sleep 2
     elapsed=$((elapsed + 2))
     if [ "$elapsed" -ge "$max_wait" ]; then
@@ -56,8 +56,6 @@ done
 mkdir -p "$INIT_DIR"
 chmod 700 "$INIT_DIR"
 
-# Reuse the JSON already fetched by the readiness loop.
-status_json=$(docker compose exec openbao bao status -address="$BAO_ADDR" -format=json 2>/dev/null || true)
 initialized=$(printf '%s' "$status_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('initialized') else 'no')" 2>/dev/null || echo no)
 
 if [ "$initialized" = "yes" ]; then

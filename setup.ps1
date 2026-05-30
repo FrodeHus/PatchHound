@@ -29,11 +29,10 @@ $status = $null
 do {
     Start-Sleep -Seconds 2
     $elapsed += 2
-    # bao status exits 0 (active) or 2 (sealed) when ready; capture JSON from stdout regardless.
+    # Ignore exit code — bao status exits 1 for both "not yet up" and "uninitialized".
+    # Valid JSON in stdout is the only reliable signal the server is accepting requests.
     $statusJson = docker compose exec openbao bao status -address=$BAO_ADDR -format=json 2>$null
-    if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 2) {
-        $status = $statusJson | ConvertFrom-Json -ErrorAction SilentlyContinue
-    }
+    $status = $statusJson | ConvertFrom-Json -ErrorAction SilentlyContinue
 } while (-not $status -and $elapsed -lt $maxWait)
 
 if (-not $status) {
