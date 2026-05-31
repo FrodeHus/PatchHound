@@ -38,7 +38,6 @@ POSTGRES_DB=patchhound
 POSTGRES_USER=patchhound
 POSTGRES_PASSWORD=change-me
 
-OPENBAO_ADDR=http://localhost:8200
 OPENBAO_INTERNAL_ADDR=http://openbao:8200
 OPENBAO_TOKEN=
 OPENBAO_KV_MOUNT=patchhound
@@ -60,7 +59,6 @@ SMTP_USERNAME=
 SMTP_PASSWORD=
 
 SESSION_SECRET=change-me-to-at-least-32-characters
-SESSION_DATABASE_URL=
 ENTRA_CLIENT_SECRET=
 ENTRA_SCOPES=openid profile email
 EOF
