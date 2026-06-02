@@ -140,7 +140,12 @@ public class TenantAiProfilesController : ControllerBase
                 request.AllowedDomains,
                 request.NumCtx,
                 ResolveResponseFormat(request.ResponseFormat),
-                ResolveResearchSourceKey(request)
+                ResolveResearchSourceKey(request),
+                false,
+                OperationalContextMode.StructuredOnly,
+                3000,
+                true,
+                false
             );
         }
 
@@ -173,7 +178,12 @@ public class TenantAiProfilesController : ControllerBase
                 request.AllowedDomains,
                 request.NumCtx,
                 ResolveResponseFormat(request.ResponseFormat),
-                ResolveResearchSourceKey(request)
+                ResolveResearchSourceKey(request),
+                false,
+                OperationalContextMode.StructuredOnly,
+                3000,
+                true,
+                false
             );
         }
 
@@ -265,7 +275,12 @@ public class TenantAiProfilesController : ControllerBase
             request.AllowedDomains,
             request.NumCtx,
             ResolveResponseFormat(request.ResponseFormat),
-            ResolveResearchSourceKey(request)
+            ResolveResearchSourceKey(request),
+            profile.AllowOperationalContext,
+            profile.OperationalContextMode,
+            profile.MaxOperationalContextTokens,
+            profile.IncludeDeviceNamesInContext,
+            profile.IncludeUserNamesInContext
         );
         profile.ResetValidation();
 
@@ -319,7 +334,12 @@ public class TenantAiProfilesController : ControllerBase
             profile.AllowedDomains,
             profile.NumCtx,
             profile.ResponseFormat,
-            profile.ResearchSourceKey
+            profile.ResearchSourceKey,
+            profile.AllowOperationalContext,
+            profile.OperationalContextMode,
+            profile.MaxOperationalContextTokens,
+            profile.IncludeDeviceNamesInContext,
+            profile.IncludeUserNamesInContext
         );
 
         await _dbContext.SaveChangesAsync(ct);
@@ -432,7 +452,12 @@ public class TenantAiProfilesController : ControllerBase
                 profile.AllowedDomains,
                 profile.NumCtx,
                 profile.ResponseFormat,
-                profile.ResearchSourceKey
+                profile.ResearchSourceKey,
+                profile.AllowOperationalContext,
+                profile.OperationalContextMode,
+                profile.MaxOperationalContextTokens,
+                profile.IncludeDeviceNamesInContext,
+                profile.IncludeUserNamesInContext
             );
         }
     }

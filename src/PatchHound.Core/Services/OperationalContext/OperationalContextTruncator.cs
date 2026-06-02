@@ -6,6 +6,14 @@ namespace PatchHound.Core.Services.OperationalContext;
 
 public sealed class OperationalContextTruncator(IPromptTokenEstimator estimator)
 {
+    /// <summary>
+    /// Trims <paramref name="pack"/> to fit within <paramref name="maxTokens"/> by progressively
+    /// dropping lower-priority detail (workflow, labels, teams, citations).
+    /// <para>
+    /// This method mutates <paramref name="pack"/> in place and returns the same reference.
+    /// Callers must not retain the pre-truncation pack expecting it to remain unchanged.
+    /// </para>
+    /// </summary>
     public (OperationalContextPack Pack, int TokenEstimate) Fit(
         OperationalContextPack pack, int maxTokens)
     {

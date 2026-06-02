@@ -135,12 +135,12 @@ public class TenantAiProfile
         string allowedDomains,
         int? numCtx,
         TenantAiResponseFormat responseFormat,
-        string researchSourceKey = "",
-        bool allowOperationalContext = false,
-        OperationalContextMode operationalContextMode = OperationalContextMode.StructuredOnly,
-        int maxOperationalContextTokens = 3000,
-        bool includeDeviceNamesInContext = true,
-        bool includeUserNamesInContext = false
+        string researchSourceKey,
+        bool allowOperationalContext,
+        OperationalContextMode operationalContextMode,
+        int maxOperationalContextTokens,
+        bool includeDeviceNamesInContext,
+        bool includeUserNamesInContext
     )
     {
         Name = name.Trim();

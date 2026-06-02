@@ -14,5 +14,13 @@ public sealed class AiOperationalContextOptions
 
     /// <summary>True when names should be pseudonymized (external provider unless opted in).</summary>
     public bool RedactDeviceNames => ProviderIsExternal && !IncludeDeviceNames;
+
+    /// <summary>
+    /// True when user/team identity should be pseudonymized.
+    /// Intentionally stricter than <see cref="RedactDeviceNames"/>: user names are redacted
+    /// unless explicitly opted in (<see cref="IncludeUserNames"/> = true), regardless of whether
+    /// the provider is external or local. Team names are preferred by default per the
+    /// data-minimization principle in the spec, so opting out of redaction is an explicit choice.
+    /// </summary>
     public bool RedactUserNames => !IncludeUserNames;
 }

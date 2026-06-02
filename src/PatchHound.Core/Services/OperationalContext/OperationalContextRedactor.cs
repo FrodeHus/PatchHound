@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using PatchHound.Core.Models.OperationalContext;
 
 namespace PatchHound.Core.Services.OperationalContext;
@@ -25,9 +26,9 @@ public sealed class OperationalContextRedactor
 
             deviceOrdinal++;
             var pseudonym = $"device-{deviceOrdinal}";
-            var fact = string.IsNullOrEmpty(c.Label)
+            var fact = string.IsNullOrWhiteSpace(c.Label)
                 ? c.Fact
-                : c.Fact.Replace(c.Label, pseudonym, StringComparison.Ordinal);
+                : Regex.Replace(c.Fact, $@"(?<!\w){Regex.Escape(c.Label)}(?!\w)", pseudonym);
             result.Add(new OperationalContextCitation
             {
                 Key = c.Key,
