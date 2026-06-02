@@ -12,7 +12,7 @@ using PatchHound.Infrastructure.Data;
 namespace PatchHound.Infrastructure.Migrations
 {
     [DbContext(typeof(PatchHoundDbContext))]
-    [Migration("20260602101657_AddTenantAiProfileOperationalContextFields")]
+    [Migration("20260602103251_AddTenantAiProfileOperationalContextFields")]
     partial class AddTenantAiProfileOperationalContextFields
     {
         /// <inheritdoc />
@@ -4051,7 +4051,9 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("AllowOperationalContext")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("AllowedDomains")
                         .IsRequired()
@@ -4079,10 +4081,14 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IncludeDeviceNamesInContext")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("IncludeUserNamesInContext")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<bool>("IsDefault")
                         .HasColumnType("boolean");
@@ -4109,7 +4115,9 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasColumnType("character varying(16)");
 
                     b.Property<int>("MaxOperationalContextTokens")
-                        .HasColumnType("integer");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3000);
 
                     b.Property<int>("MaxOutputTokens")
                         .HasColumnType("integer");
@@ -4130,8 +4138,12 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<int?>("NumCtx")
                         .HasColumnType("integer");
 
-                    b.Property<int>("OperationalContextMode")
-                        .HasColumnType("integer");
+                    b.Property<string>("OperationalContextMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("StructuredOnly");
 
                     b.Property<string>("ProviderType")
                         .IsRequired()

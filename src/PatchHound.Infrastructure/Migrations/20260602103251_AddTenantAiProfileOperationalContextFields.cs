@@ -22,7 +22,7 @@ namespace PatchHound.Infrastructure.Migrations
                 table: "TenantAiProfiles",
                 type: "boolean",
                 nullable: false,
-                defaultValue: false);
+                defaultValue: true);
 
             migrationBuilder.AddColumn<bool>(
                 name: "IncludeUserNamesInContext",
@@ -36,14 +36,15 @@ namespace PatchHound.Infrastructure.Migrations
                 table: "TenantAiProfiles",
                 type: "integer",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 3000);
 
-            migrationBuilder.AddColumn<int>(
+            migrationBuilder.AddColumn<string>(
                 name: "OperationalContextMode",
                 table: "TenantAiProfiles",
-                type: "integer",
+                type: "character varying(32)",
+                maxLength: 32,
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: "StructuredOnly");
         }
 
         /// <inheritdoc />

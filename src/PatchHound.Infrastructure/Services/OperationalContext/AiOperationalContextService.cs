@@ -55,6 +55,7 @@ public sealed class AiOperationalContextService : IAiOperationalContextService
                 && e.Device.ActiveInTenant
                 && e.Device.HealthStatus == "Active");
 
+        // Two queries on purpose: exposure count and distinct affected-device count are different values (a device can have multiple open exposures for the same product).
         var openExposureCount = await exposures.CountAsync(ct);
         var deviceIds = await exposures.Select(e => e.DeviceId).Distinct().ToListAsync(ct);
 
@@ -102,6 +103,7 @@ public sealed class AiOperationalContextService : IAiOperationalContextService
     public async Task<AiOperationalContextResult> BuildForVulnerabilityAsync(
         Guid tenantId, Guid vulnerabilityId, AiOperationalContextOptions options, CancellationToken ct)
     {
+        // Vulnerability is a global catalog entity (no TenantId column); tenant isolation is enforced on the exposure query below.
         var vuln = await db.Vulnerabilities.IgnoreQueryFilters()
             .Where(v => v.Id == vulnerabilityId)
             .Select(v => new { v.Id, v.ExternalId, v.VendorSeverity })
@@ -115,6 +117,7 @@ public sealed class AiOperationalContextService : IAiOperationalContextService
                 && e.Device.ActiveInTenant
                 && e.Device.HealthStatus == "Active");
 
+        // Two queries on purpose: exposure count and distinct affected-device count are different values (a device can have multiple open exposures for the same product).
         var openExposureCount = await exposures.CountAsync(ct);
         var deviceIds = await exposures.Select(e => e.DeviceId).Distinct().ToListAsync(ct);
 
