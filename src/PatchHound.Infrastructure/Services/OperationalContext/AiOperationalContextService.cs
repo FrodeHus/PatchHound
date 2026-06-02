@@ -99,9 +99,67 @@ public sealed class AiOperationalContextService : IAiOperationalContextService
         return Finalize(pack, options);
     }
 
-    public Task<AiOperationalContextResult> BuildForVulnerabilityAsync(
+    public async Task<AiOperationalContextResult> BuildForVulnerabilityAsync(
         Guid tenantId, Guid vulnerabilityId, AiOperationalContextOptions options, CancellationToken ct)
-        => throw new NotImplementedException(); // Task 10
+    {
+        var vuln = await db.Vulnerabilities.IgnoreQueryFilters()
+            .Where(v => v.Id == vulnerabilityId)
+            .Select(v => new { v.Id, v.ExternalId, v.VendorSeverity })
+            .FirstOrDefaultAsync(ct)
+            ?? throw new InvalidOperationException($"Vulnerability {vulnerabilityId} not found.");
+
+        var exposures = db.DeviceVulnerabilityExposures.IgnoreQueryFilters()
+            .Where(e => e.TenantId == tenantId
+                && e.VulnerabilityId == vulnerabilityId
+                && e.Status == ExposureStatus.Open
+                && e.Device.ActiveInTenant
+                && e.Device.HealthStatus == "Active");
+
+        var openExposureCount = await exposures.CountAsync(ct);
+        var deviceIds = await exposures.Select(e => e.DeviceId).Distinct().ToListAsync(ct);
+
+        var criticality = await db.Devices.IgnoreQueryFilters()
+            .Where(d => d.TenantId == tenantId && deviceIds.Contains(d.Id))
+            .GroupBy(d => d.Criticality)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        // Top-N devices by risk score, for citations.
+        var topDevices = await db.DeviceRiskScores.IgnoreQueryFilters()
+            .Where(s => s.TenantId == tenantId && deviceIds.Contains(s.DeviceId))
+            .OrderByDescending(s => s.OverallScore)
+            .Take(options.TopDeviceLimit)
+            .Join(db.Devices.IgnoreQueryFilters(), s => s.DeviceId, d => d.Id,
+                (s, d) => new { d.Id, d.Name, d.Criticality, s.OverallScore })
+            .ToListAsync(ct);
+
+        var citations = topDevices.Select((d, i) => new OperationalContextCitation
+        {
+            Key = $"device-risk-top-{i + 1}",
+            EntityType = "Device",
+            EntityId = d.Id,
+            Label = d.Name,
+            Fact = $"Device {d.Name} risk score {d.OverallScore:0}, {d.Criticality} asset",
+            RiskWeight = (double)d.OverallScore,
+        }).ToList();
+
+        var pack = new OperationalContextPack
+        {
+            ContextKind = "Vulnerability",
+            Subject = new() { VulnerabilityId = vuln.Id, VulnerabilityExternalId = vuln.ExternalId },
+            Scope = new()
+            {
+                OpenExposureCount = openExposureCount,
+                AffectedDeviceCount = deviceIds.Count,
+                CriticalityDistribution = criticality.ToDictionary(x => x.Key.ToString(), x => x.Count),
+            },
+            Risk = new() { HighestVendorSeverity = vuln.VendorSeverity.ToString() },
+            Citations = citations,
+            Limits = new() { TopDeviceLimit = options.TopDeviceLimit, ExposureLimit = options.ExposureLimit },
+        };
+
+        return Finalize(pack, options);
+    }
 
     private AiOperationalContextResult Finalize(OperationalContextPack pack, AiOperationalContextOptions options)
     {

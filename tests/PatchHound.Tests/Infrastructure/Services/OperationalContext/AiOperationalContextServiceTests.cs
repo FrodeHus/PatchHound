@@ -63,4 +63,22 @@ public class AiOperationalContextServiceTests(PostgresFixture fixture)
         result.Pack.Scope.AffectedDeviceCount.Should().Be(2);
     }
 
+    [Fact]
+    public async Task Vulnerability_pack_excludes_other_tenant_for_same_cve()
+    {
+        await fixture.ResetAsync();
+        await using var db = fixture.CreateDbContext();
+        var seed = await OperationalContextSeed.SeedRemediationCaseAsync(db);
+        await OperationalContextSeed.SeedOtherTenantExposureForSameSoftwareAsync(db, seed);
+
+        var service = CreateService(db);
+
+        var result = await service.BuildForVulnerabilityAsync(
+            seed.TenantId, seed.VulnerabilityId, Options(), CancellationToken.None);
+
+        result.Pack.ContextKind.Should().Be("Vulnerability");
+        result.Pack.Subject.VulnerabilityId.Should().Be(seed.VulnerabilityId);
+        result.Pack.Scope.AffectedDeviceCount.Should().Be(2); // never the other tenant's device
+        result.Pack.Citations.Should().OnlyContain(c => c.EntityType == "Device");
+    }
 }
