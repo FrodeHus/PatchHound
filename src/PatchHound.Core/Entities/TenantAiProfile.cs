@@ -29,6 +29,11 @@ public class TenantAiProfile
     public int MaxResearchSources { get; private set; }
     public string AllowedDomains { get; private set; } = string.Empty;
     public string ResearchSourceKey { get; private set; } = string.Empty;
+    public bool AllowOperationalContext { get; private set; }
+    public OperationalContextMode OperationalContextMode { get; private set; }
+    public int MaxOperationalContextTokens { get; private set; }
+    public bool IncludeDeviceNamesInContext { get; private set; }
+    public bool IncludeUserNamesInContext { get; private set; }
     public DateTimeOffset? LastValidatedAt { get; private set; }
     public TenantAiProfileValidationStatus LastValidationStatus { get; private set; }
     public string LastValidationError { get; private set; } = string.Empty;
@@ -61,7 +66,12 @@ public class TenantAiProfile
         string allowedDomains = "",
         int? numCtx = null,
         TenantAiResponseFormat responseFormat = TenantAiResponseFormat.None,
-        string researchSourceKey = ""
+        string researchSourceKey = "",
+        bool allowOperationalContext = false,
+        OperationalContextMode operationalContextMode = OperationalContextMode.StructuredOnly,
+        int maxOperationalContextTokens = 3000,
+        bool includeDeviceNamesInContext = true,
+        bool includeUserNamesInContext = false
     )
     {
         var now = DateTimeOffset.UtcNow;
@@ -92,6 +102,11 @@ public class TenantAiProfile
             MaxResearchSources = maxResearchSources,
             AllowedDomains = allowedDomains.Trim(),
             ResearchSourceKey = researchSourceKey.Trim(),
+            AllowOperationalContext = allowOperationalContext,
+            OperationalContextMode = operationalContextMode,
+            MaxOperationalContextTokens = maxOperationalContextTokens,
+            IncludeDeviceNamesInContext = includeDeviceNamesInContext,
+            IncludeUserNamesInContext = includeUserNamesInContext,
             LastValidationStatus = TenantAiProfileValidationStatus.Unknown,
             CreatedAt = now,
             UpdatedAt = now,
@@ -120,7 +135,12 @@ public class TenantAiProfile
         string allowedDomains,
         int? numCtx,
         TenantAiResponseFormat responseFormat,
-        string researchSourceKey = ""
+        string researchSourceKey,
+        bool allowOperationalContext,
+        OperationalContextMode operationalContextMode,
+        int maxOperationalContextTokens,
+        bool includeDeviceNamesInContext,
+        bool includeUserNamesInContext
     )
     {
         Name = name.Trim();
@@ -145,6 +165,11 @@ public class TenantAiProfile
         MaxResearchSources = maxResearchSources;
         AllowedDomains = allowedDomains.Trim();
         ResearchSourceKey = researchSourceKey.Trim();
+        AllowOperationalContext = allowOperationalContext;
+        OperationalContextMode = operationalContextMode;
+        MaxOperationalContextTokens = maxOperationalContextTokens;
+        IncludeDeviceNamesInContext = includeDeviceNamesInContext;
+        IncludeUserNamesInContext = includeUserNamesInContext;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 

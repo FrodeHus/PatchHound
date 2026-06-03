@@ -5,7 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
+using PatchHound.Core.Services.OperationalContext;
 using PatchHound.Infrastructure.AiProviders;
+using PatchHound.Infrastructure.Services.OperationalContext;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.ExternalHttp;
 using PatchHound.Infrastructure.Options;
@@ -131,6 +133,10 @@ public static class DependencyInjection
         services.Configure<AiResearchOptions>(configuration.GetSection(AiResearchOptions.SectionName));
         services.AddScoped<LocalVulnerabilityIntelResearchProvider>();
         services.AddScoped<ITenantAiResearchService, TenantAiResearchService>();
+        services.AddScoped<IPromptTokenEstimator, HeuristicPromptTokenEstimator>();
+        services.AddScoped<OperationalContextRedactor>();
+        services.AddScoped<OperationalContextTruncator>();
+        services.AddScoped<IAiOperationalContextService, AiOperationalContextService>();
         services
             .AddHttpClient<ExternalWebSearchResearchProvider>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);

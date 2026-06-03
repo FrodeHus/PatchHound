@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PatchHound.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PatchHound.Infrastructure.Data;
 namespace PatchHound.Infrastructure.Migrations
 {
     [DbContext(typeof(PatchHoundDbContext))]
-    partial class PatchHoundDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260603045237_AddTenantAiProfileOperationalContextFields")]
+    partial class AddTenantAiProfileOperationalContextFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4753,13 +4756,6 @@ namespace PatchHound.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
-
-                    b.Property<string>("ContextHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("ContextJson")
-                        .HasColumnType("text");
 
                     b.Property<string>("RawOutput")
                         .HasColumnType("text");
