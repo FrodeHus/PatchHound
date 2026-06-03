@@ -12,8 +12,8 @@ using PatchHound.Infrastructure.Data;
 namespace PatchHound.Infrastructure.Migrations
 {
     [DbContext(typeof(PatchHoundDbContext))]
-    [Migration("20260602103251_AddTenantAiProfileOperationalContextFields")]
-    partial class AddTenantAiProfileOperationalContextFields
+    [Migration("20260603045251_AddOperationalContextToAssessment")]
+    partial class AddOperationalContextToAssessment
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -4051,7 +4051,6 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("AllowOperationalContext")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
@@ -4081,12 +4080,10 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IncludeDeviceNamesInContext")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<bool>("IncludeUserNamesInContext")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
@@ -4115,7 +4112,6 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasColumnType("character varying(16)");
 
                     b.Property<int>("MaxOperationalContextTokens")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(3000);
 
@@ -4140,7 +4136,6 @@ namespace PatchHound.Infrastructure.Migrations
 
                     b.Property<string>("OperationalContextMode")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasDefaultValue("StructuredOnly");
@@ -4761,6 +4756,13 @@ namespace PatchHound.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ContextHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ContextJson")
+                        .HasColumnType("text");
 
                     b.Property<string>("RawOutput")
                         .HasColumnType("text");

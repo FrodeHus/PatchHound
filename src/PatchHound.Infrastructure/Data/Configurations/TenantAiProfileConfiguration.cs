@@ -40,14 +40,27 @@ public class TenantAiProfileConfiguration : IEntityTypeConfiguration<TenantAiPro
             .Property(item => item.ResponseFormat)
             .HasConversion<string>()
             .HasMaxLength(16);
-        builder.Property(item => item.AllowOperationalContext).HasDefaultValue(false);
+        builder
+            .Property(item => item.AllowOperationalContext)
+            .HasDefaultValue(false)
+            .ValueGeneratedNever();
         builder
             .Property(item => item.OperationalContextMode)
             .HasConversion<string>()
             .HasMaxLength(32)
-            .HasDefaultValue(OperationalContextMode.StructuredOnly);
-        builder.Property(item => item.MaxOperationalContextTokens).HasDefaultValue(3000);
-        builder.Property(item => item.IncludeDeviceNamesInContext).HasDefaultValue(true);
-        builder.Property(item => item.IncludeUserNamesInContext).HasDefaultValue(false);
+            .HasDefaultValue(OperationalContextMode.StructuredOnly)
+            .ValueGeneratedNever();
+        builder
+            .Property(item => item.MaxOperationalContextTokens)
+            .HasDefaultValue(3000)
+            .ValueGeneratedNever();
+        builder
+            .Property(item => item.IncludeDeviceNamesInContext)
+            .HasDefaultValue(true)
+            .ValueGeneratedNever();
+        builder
+            .Property(item => item.IncludeUserNamesInContext)
+            .HasDefaultValue(false)
+            .ValueGeneratedNever();
     }
 }
