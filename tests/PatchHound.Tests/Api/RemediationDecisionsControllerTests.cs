@@ -431,7 +431,9 @@ public class RemediationDecisionsControllerTests : IDisposable
 
         return new AiRecommendationDraftService(
             _dbContext,
-            new TenantAiTextGenerationService([provider], aiResolver)
+            new TenantAiTextGenerationService([provider], aiResolver),
+            aiResolver,
+            Substitute.For<IAiOperationalContextService>()
         );
     }
 
