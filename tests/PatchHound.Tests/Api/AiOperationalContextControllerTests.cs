@@ -140,6 +140,40 @@ public class AiOperationalContextControllerTests : IDisposable
             default, default, default!, default);
     }
 
+    [Fact]
+    public async Task Preview_remediation_case_returns_not_found_when_subject_missing()
+    {
+        var caseId = Guid.NewGuid();
+        _contextService
+            .BuildForRemediationCaseAsync(
+                _tenantId,
+                caseId,
+                Arg.Any<AiOperationalContextOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns<AiOperationalContextResult>(_ => throw new InvalidOperationException("Remediation case not found."));
+
+        var action = await _controller.PreviewRemediationCase(caseId, CancellationToken.None);
+
+        action.Result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task Preview_vulnerability_returns_not_found_when_subject_missing()
+    {
+        var vulnId = Guid.NewGuid();
+        _contextService
+            .BuildForVulnerabilityAsync(
+                _tenantId,
+                vulnId,
+                Arg.Any<AiOperationalContextOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns<AiOperationalContextResult>(_ => throw new InvalidOperationException("Vulnerability not found."));
+
+        var action = await _controller.PreviewVulnerability(vulnId, CancellationToken.None);
+
+        action.Result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

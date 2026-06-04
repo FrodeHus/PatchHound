@@ -281,11 +281,11 @@ public class TenantAiProfilesController : ControllerBase
             request.NumCtx,
             ResolveResponseFormat(request.ResponseFormat),
             ResolveResearchSourceKey(request),
-            profile.AllowOperationalContext,
-            profile.OperationalContextMode,
-            profile.MaxOperationalContextTokens,
-            profile.IncludeDeviceNamesInContext,
-            profile.IncludeUserNamesInContext
+            request.AllowOperationalContext,
+            ResolveOperationalContextMode(request.OperationalContextMode),
+            request.MaxOperationalContextTokens,
+            request.IncludeDeviceNamesInContext,
+            request.IncludeUserNamesInContext
         );
         profile.ResetValidation();
 

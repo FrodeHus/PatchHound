@@ -132,8 +132,8 @@ function createEmptyProfile(): SaveTenantAiProfile {
     maxResearchSources: 5,
     allowedDomains: '',
     allowOperationalContext: false,
-    operationalContextMode: 'Disabled',
-    maxOperationalContextTokens: 4000,
+    operationalContextMode: 'StructuredOnly',
+    maxOperationalContextTokens: 3000,
     includeDeviceNamesInContext: false,
     includeUserNamesInContext: false,
     apiKey: '',
@@ -1102,7 +1102,7 @@ function AiProfileEditorPage({
             </div>
           </FormSection>
 
-          <FormSection title="Operational context" icon={CircleAlert}>
+          <FormSection title="Operational context" icon={Server}>
             <div className="space-y-4">
               <InsetPanel className="space-y-4 p-4">
                 <label className="flex items-start gap-3">

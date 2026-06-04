@@ -421,6 +421,67 @@ public class TenantAiProfilesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Update_OperationalContextSettings_PersistsChangedValues()
+    {
+        var profile = TenantAiProfileFactory.Create(
+            _tenantId,
+            topP: 1.0m,
+            baseUrl: "https://api.openai.com/v1",
+            secretRef: "tenants/test/ai/default"
+        );
+
+        await _dbContext.TenantAiProfiles.AddAsync(profile);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Update(
+            profile.Id,
+            new SaveTenantAiProfileRequest(
+                "Default",
+                "OpenAi",
+                true,
+                true,
+                "gpt-4.1",
+                "Updated prompt",
+                0.3m,
+                0.9m,
+                1500,
+                45,
+                "https://api.openai.com/v1",
+                "",
+                "",
+                "",
+                false,
+                "Disabled",
+                true,
+                5,
+                "",
+                "",
+                null,
+                null,
+                "",
+                AllowOperationalContext: true,
+                OperationalContextMode: "StructuredAndSemantic",
+                MaxOperationalContextTokens: 1234,
+                IncludeDeviceNamesInContext: false,
+                IncludeUserNamesInContext: true
+            ),
+            CancellationToken.None
+        );
+
+        action.Result.Should().BeOfType<OkObjectResult>();
+
+        var listAction = await _controller.List(CancellationToken.None);
+        var listOk = listAction.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var list = listOk.Value.Should().BeAssignableTo<IReadOnlyList<TenantAiProfileDto>>().Subject;
+        var listed = list.Single();
+        listed.AllowOperationalContext.Should().BeTrue();
+        listed.OperationalContextMode.Should().Be("StructuredAndSemantic");
+        listed.MaxOperationalContextTokens.Should().Be(1234);
+        listed.IncludeDeviceNamesInContext.Should().BeFalse();
+        listed.IncludeUserNamesInContext.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Create_OperationalContextSettings_RoundTripThroughDto()
     {
         var action = await _controller.Create(

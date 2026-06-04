@@ -28,8 +28,15 @@ public class AiOperationalContextController(
         }
 
         var options = await ResolveOptionsAsync(tenantId, ct);
-        var result = await contextService.BuildForRemediationCaseAsync(tenantId, caseId, options, ct);
-        return Ok(ToDto(result, caseId));
+        try
+        {
+            var result = await contextService.BuildForRemediationCaseAsync(tenantId, caseId, options, ct);
+            return Ok(ToDto(result, caseId));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new ProblemDetails { Title = ex.Message });
+        }
     }
 
     [HttpGet("vulnerabilities/{vulnerabilityId:guid}")]
@@ -42,12 +49,22 @@ public class AiOperationalContextController(
         }
 
         var options = await ResolveOptionsAsync(tenantId, ct);
-        var result = await contextService.BuildForVulnerabilityAsync(tenantId, vulnerabilityId, options, ct);
-        return Ok(ToDto(result, vulnerabilityId));
+        try
+        {
+            var result = await contextService.BuildForVulnerabilityAsync(tenantId, vulnerabilityId, options, ct);
+            return Ok(ToDto(result, vulnerabilityId));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new ProblemDetails { Title = ex.Message });
+        }
     }
 
     private async Task<AiOperationalContextOptions> ResolveOptionsAsync(Guid tenantId, CancellationToken ct)
     {
+        // Note: the preview endpoints intentionally do NOT gate on AllowOperationalContext.
+        // We build (and return) the context even when operational context is disabled so admins
+        // can inspect exactly what WOULD be supplied to the model before enabling the feature.
         var profile = await dbContext.TenantAiProfiles.AsNoTracking()
             .Where(p => p.TenantId == tenantId && p.IsDefault)
             .Select(p => new
