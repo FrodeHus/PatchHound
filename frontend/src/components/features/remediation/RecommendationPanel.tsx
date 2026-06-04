@@ -16,23 +16,12 @@ import { toneBadge } from '@/lib/tone-classes'
 import { formatDateTime } from '@/lib/formatting'
 import { outcomeLabel, outcomeTone } from './remediation-utils'
 
-type AiCitation = {
-  key: string
-  entityType: string
-  entityId: string
-  label: string
-  fact: string
-}
-
 type RecommendationPanelProps = {
   caseId: string
   recommendations: AnalystRecommendation[]
   aiAnalystAssessment?: string | null
   aiRecommendedOutcome?: string | null
   aiRecommendedPriority?: string | null
-  aiOperationalContextUsed?: boolean
-  aiUncited?: boolean
-  aiCitations?: AiCitation[]
   queryKey: readonly unknown[]
   readOnly?: boolean
   recommendationSeed?: {
@@ -58,9 +47,6 @@ export function RecommendationPanel({
   aiAnalystAssessment,
   aiRecommendedOutcome,
   aiRecommendedPriority,
-  aiOperationalContextUsed = false,
-  aiUncited = false,
-  aiCitations,
   queryKey,
   readOnly = false,
   recommendationSeed = null,
@@ -134,28 +120,6 @@ export function RecommendationPanel({
           </div>
           {aiAnalystAssessment ? (
             <p className="text-sm text-muted-foreground">{aiAnalystAssessment}</p>
-          ) : null}
-          {aiOperationalContextUsed ? (
-            <div className="space-y-2">
-              <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${toneBadge('info')}`}>
-                Grounded with local context
-              </span>
-              {aiUncited ? (
-                <p className="text-xs text-muted-foreground">No local facts were cited.</p>
-              ) : aiCitations && aiCitations.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {aiCitations.map((citation) => (
-                    <span
-                      key={citation.key}
-                      title={citation.fact}
-                      className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-xs text-muted-foreground"
-                    >
-                      {citation.label}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
           ) : null}
           {readOnly ? null : (
             <div className="flex flex-wrap gap-2">
