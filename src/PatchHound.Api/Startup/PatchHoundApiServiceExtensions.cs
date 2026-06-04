@@ -19,6 +19,8 @@ public static class PatchHoundApiServiceExtensions
         services.AddPatchHoundInfrastructure(configuration);
 
         services.AddScoped<ITenantContext, Auth.TenantContext>();
+        services.AddSingleton<IApiClock, SystemApiClock>();
+        services.AddScoped<ApiRequestContext>();
         services.AddScoped<TenantSoftwareAliasResolver>();
         services.AddScoped<DashboardQueryService>();
         services.AddScoped<VulnerabilityDetailQueryService>();

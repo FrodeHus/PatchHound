@@ -86,7 +86,7 @@ public class DeviceRulesControllerTests : IDisposable
 
         _controller = new DeviceRulesController(
             _dbContext,
-            _tenantContext,
+            new ApiRequestContext(_tenantContext),
             evaluationService,
             definitionService,
             previewService,

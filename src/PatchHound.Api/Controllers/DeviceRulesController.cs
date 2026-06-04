@@ -26,7 +26,7 @@ namespace PatchHound.Api.Controllers;
 public class DeviceRulesController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
-    private readonly ITenantContext _tenantContext;
+    private readonly ApiRequestContext _requestContext;
     private readonly IDeviceRuleEvaluationService _evaluationService;
     private readonly DeviceRuleDefinitionService _definitionService;
     private readonly DeviceRulePreviewService _previewService;
@@ -35,7 +35,7 @@ public class DeviceRulesController : ControllerBase
 
     public DeviceRulesController(
         PatchHoundDbContext dbContext,
-        ITenantContext tenantContext,
+        ApiRequestContext requestContext,
         IDeviceRuleEvaluationService evaluationService,
         DeviceRuleDefinitionService definitionService,
         DeviceRulePreviewService previewService,
@@ -43,7 +43,7 @@ public class DeviceRulesController : ControllerBase
         RiskRefreshService riskRefreshService)
     {
         _dbContext = dbContext;
-        _tenantContext = tenantContext;
+        _requestContext = requestContext;
         _evaluationService = evaluationService;
         _definitionService = definitionService;
         _previewService = previewService;
@@ -56,8 +56,8 @@ public class DeviceRulesController : ControllerBase
         [FromQuery] PaginationQuery pagination,
         CancellationToken ct)
     {
-        if (_tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        if (_requestContext.RequireCurrentTenant(out var tenantId) is { } tenantError)
+            return tenantError;
 
         var query = _dbContext.DeviceRules
             .AsNoTracking()
@@ -77,8 +77,8 @@ public class DeviceRulesController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<DeviceRuleDto>> Get(Guid id, CancellationToken ct)
     {
-        if (_tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        if (_requestContext.RequireCurrentTenant(out var tenantId) is { } tenantError)
+            return tenantError;
 
         var rule = await _dbContext.DeviceRules
             .AsNoTracking()
@@ -95,8 +95,8 @@ public class DeviceRulesController : ControllerBase
         [FromBody] CreateDeviceRuleRequest request,
         CancellationToken ct)
     {
-        if (_tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        if (_requestContext.RequireCurrentTenant(out var tenantId) is { } tenantError)
+            return tenantError;
 
         var definition = await _definitionService.ParseAndValidateAsync(
             tenantId,
@@ -131,8 +131,8 @@ public class DeviceRulesController : ControllerBase
         [FromBody] UpdateDeviceRuleRequest request,
         CancellationToken ct)
     {
-        if (_tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        if (_requestContext.RequireCurrentTenant(out var tenantId) is { } tenantError)
+            return tenantError;
 
         var rule = await _dbContext.DeviceRules
             .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId, ct);
@@ -158,8 +158,8 @@ public class DeviceRulesController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        if (_tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        if (_requestContext.RequireCurrentTenant(out var tenantId) is { } tenantError)
+            return tenantError;
 
         var rule = await _dbContext.DeviceRules
             .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId, ct);
@@ -205,8 +205,8 @@ public class DeviceRulesController : ControllerBase
         [FromBody] PreviewDeviceRuleFilterRequest request,
         CancellationToken ct)
     {
-        if (_tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        if (_requestContext.RequireCurrentTenant(out var tenantId) is { } tenantError)
+            return tenantError;
 
         if (!DeviceRuleAssetTypes.IsSupported(request.AssetType))
             return BadRequest(new ProblemDetails { Title = "Unsupported asset type." });
@@ -231,8 +231,8 @@ public class DeviceRulesController : ControllerBase
     [HttpPost("run")]
     public async Task<IActionResult> Run(CancellationToken ct)
     {
-        if (_tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        if (_requestContext.RequireCurrentTenant(out var tenantId) is { } tenantError)
+            return tenantError;
 
         await _evaluationService.EvaluateRulesAsync(tenantId, ct);
         await _riskRefreshService.RefreshForTenantAsync(
@@ -248,8 +248,8 @@ public class DeviceRulesController : ControllerBase
         [FromBody] ReorderDeviceRulesRequest request,
         CancellationToken ct)
     {
-        if (_tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        if (_requestContext.RequireCurrentTenant(out var tenantId) is { } tenantError)
+            return tenantError;
 
         var rules = await _dbContext.DeviceRules
             .Where(r => r.TenantId == tenantId)
