@@ -27,7 +27,12 @@ internal static class TenantAiProfileFactory
         bool includeCitations = true,
         int maxResearchSources = 5,
         string allowedDomains = "",
-        string researchSourceKey = ""
+        string researchSourceKey = "",
+        bool allowOperationalContext = false,
+        OperationalContextMode operationalContextMode = OperationalContextMode.StructuredOnly,
+        int maxOperationalContextTokens = 3000,
+        bool includeDeviceNamesInContext = true,
+        bool includeUserNamesInContext = false
     ) =>
         TenantAiProfile.Create(
             tenantId,
@@ -51,6 +56,11 @@ internal static class TenantAiProfileFactory
             includeCitations,
             maxResearchSources,
             allowedDomains,
-            researchSourceKey: researchSourceKey
+            researchSourceKey: researchSourceKey,
+            allowOperationalContext: allowOperationalContext,
+            operationalContextMode: operationalContextMode,
+            maxOperationalContextTokens: maxOperationalContextTokens,
+            includeDeviceNamesInContext: includeDeviceNamesInContext,
+            includeUserNamesInContext: includeUserNamesInContext
         );
 }
