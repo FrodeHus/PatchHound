@@ -28,6 +28,12 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
     private DashboardQueryService CreateSut() =>
         new(_db, Substitute.For<IRiskChangeBriefAiSummaryService>());
 
+    private DashboardQueryService CreateSut(DateTimeOffset utcNow) =>
+        new(
+            _db,
+            Substitute.For<IRiskChangeBriefAiSummaryService>(),
+            clock: new FixedApiClock(utcNow));
+
     // ── Test 1 ──────────────────────────────────────────────────────────────
     [Fact]
     public async Task GetRecurrenceDataAsync_SingleEpisode_NotCountedAsRecurring()
@@ -252,6 +258,64 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
         result.Appeared.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task BuildRiskChangeBriefAsync_UsesInjectedClockForCutoff()
+    {
+        var seed = await CanonicalSeed.PlantAsync(_db, _tenantId);
+        var fixedNow = new DateTimeOffset(2030, 1, 10, 12, 0, 0, TimeSpan.Zero);
+        var insideWindow = Vulnerability.Create(
+            "nvd",
+            "CVE-2030-1100",
+            "Inside deterministic window",
+            "desc",
+            Severity.High,
+            8.0m,
+            null,
+            fixedNow);
+        var outsideWindow = Vulnerability.Create(
+            "nvd",
+            "CVE-2030-1101",
+            "Outside deterministic window",
+            "desc",
+            Severity.High,
+            8.0m,
+            null,
+            fixedNow);
+        _db.Vulnerabilities.AddRange(insideWindow, outsideWindow);
+        await _db.SaveChangesAsync();
+
+        _db.DeviceVulnerabilityExposures.AddRange(
+            DeviceVulnerabilityExposure.Observe(
+                _tenantId,
+                seed.DeviceA.Id,
+                insideWindow.Id,
+                seed.ProductA.Id,
+                seed.InstallA.Id,
+                seed.InstallA.Version,
+                ExposureMatchSource.Product,
+                fixedNow.AddHours(-23),
+                runId: Guid.NewGuid()),
+            DeviceVulnerabilityExposure.Observe(
+                _tenantId,
+                seed.DeviceA.Id,
+                outsideWindow.Id,
+                seed.ProductA.Id,
+                seed.InstallA.Id,
+                seed.InstallA.Version,
+                ExposureMatchSource.Product,
+                fixedNow.AddHours(-25),
+                runId: Guid.NewGuid()));
+        await _db.SaveChangesAsync();
+
+        var svc = CreateSut(fixedNow);
+        var result = await svc.BuildRiskChangeBriefAsync(
+            _tenantId, _tenantId, limit: null, highCriticalOnly: false,
+            CancellationToken.None, cutoffHours: 24);
+
+        result.Appeared.Should().ContainSingle(item => item.VulnerabilityId == insideWindow.Id);
+        result.Appeared.Should().NotContain(item => item.VulnerabilityId == outsideWindow.Id);
+    }
+
     // ── Test 6 ──────────────────────────────────────────────────────────────
     [Fact]
     public async Task BuildRiskChangeBriefAsync_AppearedItem_CarriesRemediationCaseId()
@@ -316,5 +380,10 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
             decision.Outcome,
             decision.ApprovedAt!.Value));
         await _db.SaveChangesAsync();
+    }
+
+    private sealed class FixedApiClock(DateTimeOffset utcNow) : IApiClock
+    {
+        public DateTimeOffset UtcNow { get; } = utcNow;
     }
 }

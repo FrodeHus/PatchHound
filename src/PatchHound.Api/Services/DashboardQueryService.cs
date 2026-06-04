@@ -11,7 +11,8 @@ namespace PatchHound.Api.Services;
 public class DashboardQueryService(
     PatchHoundDbContext dbContext,
     IRiskChangeBriefAiSummaryService riskChangeBriefAiSummaryService,
-    ExecutiveDashboardBriefingService? executiveDashboardBriefingService = null
+    ExecutiveDashboardBriefingService? executiveDashboardBriefingService = null,
+    IApiClock? clock = null
 )
 {
     public record RecurrenceData(
@@ -100,7 +101,7 @@ public class DashboardQueryService(
         int cutoffHours = 24
     )
     {
-        var cutoff = DateTimeOffset.UtcNow.AddHours(-Math.Abs(cutoffHours));
+        var cutoff = (clock ?? SystemApiClock.Instance).UtcNow.AddHours(-Math.Abs(cutoffHours));
 
         var appeared = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             .Where(e => e.TenantId == tenantId && e.FirstObservedAt >= cutoff)
