@@ -63,6 +63,11 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
   const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? '')
   const [isSaving, setIsSaving] = useState(false)
   const [isApplyingAiRecommendation, setIsApplyingAiRecommendation] = useState(false)
+  const [aiDraftMeta, setAiDraftMeta] = useState<{
+    operationalContextUsed: boolean
+    uncited: boolean
+    citations: { key: string; label: string; fact: string }[]
+  } | null>(null)
   const [requestingAssessment, setRequestingAssessment] = useState(false)
   const [requestingAssessmentIds, setRequestingAssessmentIds] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -164,13 +169,20 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
     if (!canApplyAiRecommendation || isApplyingAiRecommendation) return
     setIsApplyingAiRecommendation(true)
     setError(null)
+    setAiDraftMeta(null)
     try {
       const draft = await generateAiRecommendationDraft({ data: { caseId } })
       setRecommendedOutcome(draft.recommendedOutcome)
       setPriorityOverride(draft.priorityOverride)
       setRationale(draft.rationale)
+      setAiDraftMeta({
+        operationalContextUsed: draft.operationalContextUsed ?? false,
+        uncited: draft.uncited ?? false,
+        citations: draft.citations ?? [],
+      })
     } catch (err) {
       setError(getApiErrorMessage(err, 'Unable to apply the AI recommendation draft.'))
+      setAiDraftMeta(null)
     } finally {
       setIsApplyingAiRecommendation(false)
     }
@@ -332,6 +344,34 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
                 placeholder="Explain the risk drivers, business impact, and why this remediation path is recommended..."
               />
             </div>
+
+            {aiDraftMeta?.operationalContextUsed ? (
+              <div className="space-y-2">
+                <span
+                  className={cn(
+                    "inline-flex rounded-full border px-2 py-0.5 text-xs font-medium",
+                    toneBadge("info"),
+                  )}
+                >
+                  Grounded with local context
+                </span>
+                {aiDraftMeta.uncited ? (
+                  <p className="text-xs text-muted-foreground">No local facts were cited.</p>
+                ) : aiDraftMeta.citations.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {aiDraftMeta.citations.map((citation) => (
+                      <span
+                        key={citation.key}
+                        title={citation.fact}
+                        className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-xs text-muted-foreground"
+                      >
+                        {citation.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap gap-2">
               {canApplyAiRecommendation ? (

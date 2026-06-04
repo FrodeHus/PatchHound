@@ -420,6 +420,162 @@ public class TenantAiProfilesControllerTests : IDisposable
         updated.LastValidatedAt.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Update_OperationalContextSettings_PersistsChangedValues()
+    {
+        var profile = TenantAiProfileFactory.Create(
+            _tenantId,
+            topP: 1.0m,
+            baseUrl: "https://api.openai.com/v1",
+            secretRef: "tenants/test/ai/default"
+        );
+
+        await _dbContext.TenantAiProfiles.AddAsync(profile);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Update(
+            profile.Id,
+            new SaveTenantAiProfileRequest(
+                "Default",
+                "OpenAi",
+                true,
+                true,
+                "gpt-4.1",
+                "Updated prompt",
+                0.3m,
+                0.9m,
+                1500,
+                45,
+                "https://api.openai.com/v1",
+                "",
+                "",
+                "",
+                false,
+                "Disabled",
+                true,
+                5,
+                "",
+                "",
+                null,
+                null,
+                "",
+                AllowOperationalContext: true,
+                OperationalContextMode: "StructuredAndSemantic",
+                MaxOperationalContextTokens: 1234,
+                IncludeDeviceNamesInContext: false,
+                IncludeUserNamesInContext: true
+            ),
+            CancellationToken.None
+        );
+
+        action.Result.Should().BeOfType<OkObjectResult>();
+
+        var listAction = await _controller.List(CancellationToken.None);
+        var listOk = listAction.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var list = listOk.Value.Should().BeAssignableTo<IReadOnlyList<TenantAiProfileDto>>().Subject;
+        var listed = list.Single();
+        listed.AllowOperationalContext.Should().BeTrue();
+        listed.OperationalContextMode.Should().Be("StructuredAndSemantic");
+        listed.MaxOperationalContextTokens.Should().Be(1234);
+        listed.IncludeDeviceNamesInContext.Should().BeFalse();
+        listed.IncludeUserNamesInContext.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Create_OperationalContextSettings_RoundTripThroughDto()
+    {
+        var action = await _controller.Create(
+            new SaveTenantAiProfileRequest(
+                "Default",
+                "OpenAi",
+                true,
+                true,
+                "gpt-4.1-mini",
+                "Prompt",
+                0.2m,
+                1.0m,
+                1200,
+                60,
+                "https://api.openai.com/v1",
+                "",
+                "",
+                "",
+                false,
+                "Disabled",
+                true,
+                5,
+                "",
+                "secret-value",
+                null,
+                null,
+                "",
+                AllowOperationalContext: true,
+                OperationalContextMode: "StructuredAndSemantic",
+                MaxOperationalContextTokens: 1500,
+                IncludeDeviceNamesInContext: false,
+                IncludeUserNamesInContext: true
+            ),
+            CancellationToken.None
+        );
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var dto = ok.Value.Should().BeOfType<TenantAiProfileDto>().Subject;
+        dto.AllowOperationalContext.Should().BeTrue();
+        dto.OperationalContextMode.Should().Be("StructuredAndSemantic");
+        dto.MaxOperationalContextTokens.Should().Be(1500);
+        dto.IncludeDeviceNamesInContext.Should().BeFalse();
+        dto.IncludeUserNamesInContext.Should().BeTrue();
+
+        var listAction = await _controller.List(CancellationToken.None);
+        var listOk = listAction.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var list = listOk.Value.Should().BeAssignableTo<IReadOnlyList<TenantAiProfileDto>>().Subject;
+        var listed = list.Single();
+        listed.AllowOperationalContext.Should().BeTrue();
+        listed.OperationalContextMode.Should().Be("StructuredAndSemantic");
+        listed.MaxOperationalContextTokens.Should().Be(1500);
+        listed.IncludeDeviceNamesInContext.Should().BeFalse();
+        listed.IncludeUserNamesInContext.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(99)]
+    [InlineData(32001)]
+    public async Task Create_MaxOperationalContextTokensOutOfRange_ReturnsBadRequest(int tokens)
+    {
+        var action = await _controller.Create(
+            new SaveTenantAiProfileRequest(
+                "Default",
+                "OpenAi",
+                true,
+                true,
+                "gpt-4.1-mini",
+                "Prompt",
+                0.2m,
+                1.0m,
+                1200,
+                60,
+                "https://api.openai.com/v1",
+                "",
+                "",
+                "",
+                false,
+                "Disabled",
+                true,
+                5,
+                "",
+                "secret-value",
+                null,
+                null,
+                "",
+                MaxOperationalContextTokens: tokens
+            ),
+            CancellationToken.None
+        );
+
+        action.Result.Should().BeOfType<BadRequestObjectResult>();
+        (await _dbContext.TenantAiProfiles.CountAsync()).Should().Be(0);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

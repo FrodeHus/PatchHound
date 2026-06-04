@@ -53,10 +53,15 @@ public record ThreatIntelDto(
     string? UnavailableMessage
 );
 
+public record AiCitationDto(string Key, string EntityType, Guid EntityId, string Label, string Fact);
+
 public record AiRecommendationDraftDto(
     string RecommendedOutcome,
     string PriorityOverride,
-    string Rationale
+    string Rationale,
+    bool OperationalContextUsed = false,
+    bool Uncited = false,
+    IReadOnlyList<AiCitationDto>? Citations = null
 );
 
 public record DecisionSummaryDto(

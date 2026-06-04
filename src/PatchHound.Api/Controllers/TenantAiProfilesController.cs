@@ -107,7 +107,12 @@ public class TenantAiProfilesController : ControllerBase
             allowedDomains: request.AllowedDomains,
             numCtx: request.NumCtx,
             responseFormat: ResolveResponseFormat(request.ResponseFormat),
-            researchSourceKey: ResolveResearchSourceKey(request)
+            researchSourceKey: ResolveResearchSourceKey(request),
+            allowOperationalContext: request.AllowOperationalContext,
+            operationalContextMode: ResolveOperationalContextMode(request.OperationalContextMode),
+            maxOperationalContextTokens: request.MaxOperationalContextTokens,
+            includeDeviceNamesInContext: request.IncludeDeviceNamesInContext,
+            includeUserNamesInContext: request.IncludeUserNamesInContext
         );
 
         var secretRef = BuildSecretRef(tenantId, profile.Id);
@@ -141,11 +146,11 @@ public class TenantAiProfilesController : ControllerBase
                 request.NumCtx,
                 ResolveResponseFormat(request.ResponseFormat),
                 ResolveResearchSourceKey(request),
-                false,
-                OperationalContextMode.StructuredOnly,
-                3000,
-                true,
-                false
+                request.AllowOperationalContext,
+                ResolveOperationalContextMode(request.OperationalContextMode),
+                request.MaxOperationalContextTokens,
+                request.IncludeDeviceNamesInContext,
+                request.IncludeUserNamesInContext
             );
         }
 
@@ -179,11 +184,11 @@ public class TenantAiProfilesController : ControllerBase
                 request.NumCtx,
                 ResolveResponseFormat(request.ResponseFormat),
                 ResolveResearchSourceKey(request),
-                false,
-                OperationalContextMode.StructuredOnly,
-                3000,
-                true,
-                false
+                request.AllowOperationalContext,
+                ResolveOperationalContextMode(request.OperationalContextMode),
+                request.MaxOperationalContextTokens,
+                request.IncludeDeviceNamesInContext,
+                request.IncludeUserNamesInContext
             );
         }
 
@@ -276,11 +281,11 @@ public class TenantAiProfilesController : ControllerBase
             request.NumCtx,
             ResolveResponseFormat(request.ResponseFormat),
             ResolveResearchSourceKey(request),
-            profile.AllowOperationalContext,
-            profile.OperationalContextMode,
-            profile.MaxOperationalContextTokens,
-            profile.IncludeDeviceNamesInContext,
-            profile.IncludeUserNamesInContext
+            request.AllowOperationalContext,
+            ResolveOperationalContextMode(request.OperationalContextMode),
+            request.MaxOperationalContextTokens,
+            request.IncludeDeviceNamesInContext,
+            request.IncludeUserNamesInContext
         );
         profile.ResetValidation();
 
@@ -560,6 +565,11 @@ public class TenantAiProfilesController : ControllerBase
             return new ProblemDetails { Title = "Default AI profiles must be enabled." };
         }
 
+        if (request.MaxOperationalContextTokens is < 100 or > 32000)
+        {
+            return new ProblemDetails { Title = "MaxOperationalContextTokens must be between 100 and 32000." };
+        }
+
         if (request.AllowExternalResearch && request.MaxResearchSources <= 0)
         {
             return new ProblemDetails { Title = "Max research sources must be greater than 0 when external research is enabled." };
@@ -648,7 +658,12 @@ public class TenantAiProfilesController : ControllerBase
             profile.LastValidationStatus.ToString(),
             profile.LastValidationError,
             profile.NumCtx,
-            profile.ResponseFormat.ToString()
+            profile.ResponseFormat.ToString(),
+            profile.AllowOperationalContext,
+            profile.OperationalContextMode.ToString(),
+            profile.MaxOperationalContextTokens,
+            profile.IncludeDeviceNamesInContext,
+            profile.IncludeUserNamesInContext
         );
 
     private static TenantAiResponseFormat ResolveResponseFormat(string? value) =>
@@ -681,6 +696,11 @@ public class TenantAiProfilesController : ControllerBase
         result = parsed;
         return true;
     }
+
+    private static OperationalContextMode ResolveOperationalContextMode(string? value) =>
+        Enum.TryParse<OperationalContextMode>(value, ignoreCase: true, out var mode)
+            ? mode
+            : OperationalContextMode.StructuredOnly;
 
     private static TenantAiWebResearchMode ResolveWebResearchMode(
         SaveTenantAiProfileRequest request

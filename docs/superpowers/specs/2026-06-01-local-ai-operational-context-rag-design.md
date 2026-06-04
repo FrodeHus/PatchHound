@@ -18,13 +18,22 @@ document. They were settled after reviewing the spec against the existing codeba
    `AiProviderPromptBuilder` renders it in its own `<local_context note="Untrusted…">` block,
    reusing the existing close-tag sanitization approach. The two channels are never merged.
 
-2. **Snapshot storage — inline columns, no snapshot table.** Do **not** create
-   `AiOperationalContextSnapshot`. Instead persist `ContextJson` + `ContextHash` columns on each
-   AI-output row: `VulnerabilityPatchAssessment` (vuln assessment), `AIReport` (case summary /
-   approval rationale / closure draft), and `AnalystRecommendation` (assignment recommendation).
-   `ContextJson` stores the **exact post-redaction pack** that was sent. `ContextHash` enables
-   "skip regeneration if unchanged." The `(TenantId, DataHash)` index and 90-day retention from
-   the original Data Model section are dropped as table-specific.
+2. **Snapshot storage — inline columns on tenant-scoped rows only.** Do **not** create
+   `AiOperationalContextSnapshot`. Persist `ContextJson` + `ContextHash` columns only on
+   **tenant-scoped** AI-output rows: `AIReport` and `AnalystRecommendation` (both carry
+   `TenantId`/`RemediationCaseId`). `ContextJson` stores the **exact post-redaction pack** sent;
+   `ContextHash` enables "skip regeneration if unchanged." The `(TenantId, DataHash)` index and
+   90-day retention from the original Data Model section are dropped as table-specific.
+
+   **Correction (2026-06-03):** the vulnerability path must **not** persist operational context
+   on `VulnerabilityPatchAssessment`. That entity is **global** — one shared row per CVE (unique
+   index on `VulnerabilityId`, no `TenantId`), read by every tenant viewing the CVE — so storing
+   one tenant's context there leaks it cross-tenant, and injecting one tenant's context into the
+   prompt that produces the shared `Summary` also taints the shared text. For the vulnerability
+   path, operational-context grounding is therefore **on-demand and tenant-scoped**: built fresh
+   per request under the caller's tenant context (preview / analyst-explanation endpoints),
+   returned to that tenant, and never persisted on the shared assessment. The Phase-1
+   `ContextJson`/`ContextHash` columns on `VulnerabilityPatchAssessment` were removed.
 
 3. **Citation enforcement — validate citation array.** The model emits a `citations[]` of keys;
    the service validates each key against the pack, drops invalid keys, and marks the whole
@@ -467,7 +476,7 @@ Update the existing assessment request flow:
 1. Resolve tenant AI profile.
 2. If `AllowOperationalContext` is enabled, call `IAiOperationalContextService.BuildForVulnerabilityAsync`.
 3. Merge local operational context with the existing local vulnerability intel and optional external research context.
-4. Persist the exact post-redaction pack as `ContextJson` + `ContextHash` on `VulnerabilityPatchAssessment` (see Resolved Design Decision #2).
+4. Do **not** persist the pack on `VulnerabilityPatchAssessment` — it is a global per-CVE row (see Resolved Design Decision #2). Vulnerability-path grounding is on-demand and tenant-scoped; the pack is returned to the requesting tenant, not stored on the shared assessment.
 5. Require model output to separate public vulnerability reasoning from tenant-local impact reasoning.
 
 ### Remediation Workflows
