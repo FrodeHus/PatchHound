@@ -66,8 +66,9 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
   const [aiDraftMeta, setAiDraftMeta] = useState<{
     operationalContextUsed: boolean
     uncited: boolean
-    citations: { key: string; label: string; fact: string }[]
+    citations: { key: string; label: string; fact: string; entityType: string; entityId: string }[]
   } | null>(null)
+  const [citedFactsOpen, setCitedFactsOpen] = useState(false)
   const [requestingAssessment, setRequestingAssessment] = useState(false)
   const [requestingAssessmentIds, setRequestingAssessmentIds] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -358,17 +359,49 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
                 {aiDraftMeta.uncited ? (
                   <p className="text-xs text-muted-foreground">No local facts were cited.</p>
                 ) : aiDraftMeta.citations.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {aiDraftMeta.citations.map((citation) => (
-                      <span
-                        key={citation.key}
-                        title={citation.fact}
-                        className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-xs text-muted-foreground"
-                      >
-                        {citation.label}
-                      </span>
-                    ))}
-                  </div>
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCitedFactsOpen(true)}
+                    >
+                      View cited facts ({aiDraftMeta.citations.length})
+                    </Button>
+                    <Dialog open={citedFactsOpen} onOpenChange={setCitedFactsOpen}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Cited local facts</DialogTitle>
+                        </DialogHeader>
+                        <ul className="space-y-3">
+                          {aiDraftMeta.citations.map((citation) => (
+                            <li
+                              key={citation.key}
+                              className="rounded-lg border border-border/70 p-3"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium">{citation.label}</span>
+                                <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                                  {citation.entityType}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">{citation.fact}</p>
+                              {citation.entityType === 'Device' ? (
+                                <Link
+                                  to="/devices/$id"
+                                  params={{ id: citation.entityId }}
+                                  className="mt-2 inline-block text-xs text-primary hover:underline"
+                                  onClick={() => setCitedFactsOpen(false)}
+                                >
+                                  View device
+                                </Link>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </DialogContent>
+                    </Dialog>
+                  </>
                 ) : null}
               </div>
             ) : null}
