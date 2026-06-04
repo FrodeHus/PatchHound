@@ -81,4 +81,36 @@ public class AiOperationalContextServiceTests(PostgresFixture fixture)
         result.Pack.Scope.AffectedDeviceCount.Should().Be(2); // never the other tenant's device
         result.Pack.Citations.Should().OnlyContain(c => c.EntityType == "Device");
     }
+
+    [Fact]
+    public async Task RemediationCase_pack_includes_top_device_citations()
+    {
+        await fixture.ResetAsync();
+        await using var db = fixture.CreateDbContext();
+        var seed = await OperationalContextSeed.SeedRemediationCaseAsync(db);
+        var service = CreateService(db);
+
+        var result = await service.BuildForRemediationCaseAsync(
+            seed.TenantId, seed.RemediationCaseId, Options(), CancellationToken.None);
+
+        result.Pack.Citations.Should().NotBeEmpty();
+        result.Pack.Citations.Should().OnlyContain(c => c.EntityType == "Device");
+        result.Pack.Citations.Select(c => c.Key).Should().Contain("device-risk-top-1");
+    }
+
+    [Fact]
+    public async Task RemediationCase_citations_exclude_other_tenant_devices()
+    {
+        await fixture.ResetAsync();
+        await using var db = fixture.CreateDbContext();
+        var seed = await OperationalContextSeed.SeedRemediationCaseAsync(db);
+        await OperationalContextSeed.SeedOtherTenantExposureForSameSoftwareAsync(db, seed);
+        var service = CreateService(db);
+
+        var result = await service.BuildForRemediationCaseAsync(
+            seed.TenantId, seed.RemediationCaseId, Options(), CancellationToken.None);
+
+        // Only the subject tenant's devices (2) — never the other tenant's device.
+        result.Pack.Citations.Count.Should().BeLessThanOrEqualTo(2);
+    }
 }

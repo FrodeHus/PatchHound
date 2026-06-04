@@ -73,6 +73,8 @@ public sealed class AiOperationalContextService : IAiOperationalContextService
             .Where(s => s.TenantId == tenantId && deviceIds.Contains(s.DeviceId))
             .Select(s => (decimal?)s.OverallScore).OrderByDescending(s => s).FirstOrDefaultAsync(ct);
 
+        var citations = await BuildTopDeviceCitationsAsync(tenantId, deviceIds, options, ct);
+
         var pack = new OperationalContextPack
         {
             ContextKind = "RemediationCase",
@@ -93,6 +95,7 @@ public sealed class AiOperationalContextService : IAiOperationalContextService
                 CriticalityDistribution = criticality.ToDictionary(x => x.Key.ToString(), x => x.Count),
             },
             Risk = new() { SoftwareRiskScore = softwareRisk, MaxDeviceRiskScore = maxDeviceRisk },
+            Citations = citations,
             Workflow = new() { Status = rc.Status.ToString() },
             Limits = new() { TopDeviceLimit = options.TopDeviceLimit, ExposureLimit = options.ExposureLimit },
         };
@@ -128,23 +131,7 @@ public sealed class AiOperationalContextService : IAiOperationalContextService
             .ToListAsync(ct);
 
         // Top-N devices by risk score, for citations.
-        var topDevices = await db.DeviceRiskScores.IgnoreQueryFilters()
-            .Where(s => s.TenantId == tenantId && deviceIds.Contains(s.DeviceId))
-            .OrderByDescending(s => s.OverallScore)
-            .Take(options.TopDeviceLimit)
-            .Join(db.Devices.IgnoreQueryFilters(), s => s.DeviceId, d => d.Id,
-                (s, d) => new { d.Id, d.Name, d.Criticality, s.OverallScore })
-            .ToListAsync(ct);
-
-        var citations = topDevices.Select((d, i) => new OperationalContextCitation
-        {
-            Key = $"device-risk-top-{i + 1}",
-            EntityType = "Device",
-            EntityId = d.Id,
-            Label = d.Name,
-            Fact = $"Device {d.Name} risk score {d.OverallScore:0}, {d.Criticality} asset",
-            RiskWeight = (double)d.OverallScore,
-        }).ToList();
+        var citations = await BuildTopDeviceCitationsAsync(tenantId, deviceIds, options, ct);
 
         var pack = new OperationalContextPack
         {
@@ -162,6 +149,31 @@ public sealed class AiOperationalContextService : IAiOperationalContextService
         };
 
         return Finalize(pack, options);
+    }
+
+    private async Task<List<OperationalContextCitation>> BuildTopDeviceCitationsAsync(
+        Guid tenantId,
+        IReadOnlyList<Guid> deviceIds,
+        AiOperationalContextOptions options,
+        CancellationToken ct)
+    {
+        var topDevices = await db.DeviceRiskScores.IgnoreQueryFilters()
+            .Where(s => s.TenantId == tenantId && deviceIds.Contains(s.DeviceId))
+            .OrderByDescending(s => s.OverallScore)
+            .Take(options.TopDeviceLimit)
+            .Join(db.Devices.IgnoreQueryFilters(), s => s.DeviceId, d => d.Id,
+                (s, d) => new { d.Id, d.Name, d.Criticality, s.OverallScore })
+            .ToListAsync(ct);
+
+        return topDevices.Select((d, i) => new OperationalContextCitation
+        {
+            Key = $"device-risk-top-{i + 1}",
+            EntityType = "Device",
+            EntityId = d.Id,
+            Label = d.Name,
+            Fact = $"Device {d.Name} risk score {d.OverallScore:0}, {d.Criticality} asset",
+            RiskWeight = (double)d.OverallScore,
+        }).ToList();
     }
 
     private AiOperationalContextResult Finalize(OperationalContextPack pack, AiOperationalContextOptions options)
