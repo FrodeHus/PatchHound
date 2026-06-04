@@ -131,6 +131,11 @@ function createEmptyProfile(): SaveTenantAiProfile {
     includeCitations: true,
     maxResearchSources: 5,
     allowedDomains: '',
+    allowOperationalContext: false,
+    operationalContextMode: 'StructuredOnly',
+    maxOperationalContextTokens: 3000,
+    includeDeviceNamesInContext: false,
+    includeUserNamesInContext: false,
     apiKey: '',
     numCtx: null,
     responseFormat: 'None',
@@ -160,6 +165,11 @@ function toDraft(profile: TenantAiProfile): SaveTenantAiProfile {
     includeCitations: profile.includeCitations,
     maxResearchSources: profile.maxResearchSources,
     allowedDomains: profile.allowedDomains,
+    allowOperationalContext: profile.allowOperationalContext,
+    operationalContextMode: profile.operationalContextMode as SaveTenantAiProfile['operationalContextMode'],
+    maxOperationalContextTokens: profile.maxOperationalContextTokens,
+    includeDeviceNamesInContext: profile.includeDeviceNamesInContext,
+    includeUserNamesInContext: profile.includeUserNamesInContext,
     apiKey: '',
     numCtx: profile.numCtx,
     responseFormat: profile.responseFormat,
@@ -1084,6 +1094,106 @@ function AiProfileEditorPage({
                           }
                         />
                         <span className="text-sm text-foreground">Include citations in generated output</span>
+                      </label>
+                    </Field>
+                  </div>
+                ) : null}
+              </InsetPanel>
+            </div>
+          </FormSection>
+
+          <FormSection title="Operational context" icon={Server}>
+            <div className="space-y-4">
+              <InsetPanel className="space-y-4 p-4">
+                <label className="flex items-start gap-3">
+                  <Checkbox
+                    checked={draft.allowOperationalContext}
+                    onCheckedChange={(checked) => {
+                      const allowOperationalContext = checked === true
+                      onDraftChange((current) => ({
+                        ...current,
+                        allowOperationalContext,
+                        operationalContextMode: allowOperationalContext
+                          ? current.operationalContextMode === 'Disabled'
+                            ? 'StructuredOnly'
+                            : current.operationalContextMode
+                          : 'Disabled',
+                      }))
+                    }}
+                  />
+                  <div className="space-y-1">
+                    <span className="text-sm font-medium text-foreground">Allow operational context</span>
+                    <p className="text-sm text-muted-foreground">
+                      Include tenant-scoped exposure, risk, and workflow context when generating analysis for vulnerabilities and remediation cases.
+                    </p>
+                  </div>
+                </label>
+
+                {draft.allowOperationalContext ? (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Context mode" tooltip="Choose how much operational context to include in generated analysis.">
+                      <Select
+                        value={draft.operationalContextMode}
+                        onValueChange={(value) =>
+                          onDraftChange((current) => ({
+                            ...current,
+                            operationalContextMode: value as SaveTenantAiProfile['operationalContextMode'],
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-10 w-full rounded-xl border-border/80 bg-card px-3">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                          <SelectItem value="Disabled">Disabled</SelectItem>
+                          <SelectItem value="StructuredOnly">Structured only</SelectItem>
+                          <SelectItem value="StructuredAndSemantic">Structured and semantic</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                        StructuredAndSemantic behaves as StructuredOnly until embeddings exist.
+                      </p>
+                    </Field>
+
+                    <Field label="Max context tokens" tooltip="Upper bound for operational context added to the prompt.">
+                      <Input
+                        type="number"
+                        min="100"
+                        max="32000"
+                        value={String(draft.maxOperationalContextTokens)}
+                        onChange={(event) =>
+                          onDraftChange((current) => ({
+                            ...current,
+                            maxOperationalContextTokens: Number(event.target.value || 100),
+                          }))
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Device names" tooltip="Include device names in operational context.">
+                      <label className="flex h-10 items-center gap-3 rounded-xl border border-border/80 bg-card px-3">
+                        <Checkbox
+                          checked={draft.includeDeviceNamesInContext}
+                          onCheckedChange={(checked) =>
+                            onDraftChange((current) => ({ ...current, includeDeviceNamesInContext: checked === true }))
+                          }
+                        />
+                        <span className="text-sm text-foreground">Include device names in context</span>
+                      </label>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                        External providers redact device names unless enabled.
+                      </p>
+                    </Field>
+
+                    <Field label="User names" tooltip="Include user names in operational context.">
+                      <label className="flex h-10 items-center gap-3 rounded-xl border border-border/80 bg-card px-3">
+                        <Checkbox
+                          checked={draft.includeUserNamesInContext}
+                          onCheckedChange={(checked) =>
+                            onDraftChange((current) => ({ ...current, includeUserNamesInContext: checked === true }))
+                          }
+                        />
+                        <span className="text-sm text-foreground">Include user names in context</span>
                       </label>
                     </Field>
                   </div>

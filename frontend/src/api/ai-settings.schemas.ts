@@ -23,6 +23,11 @@ export const tenantAiProfileSchema = z.object({
   includeCitations: z.boolean(),
   maxResearchSources: z.number(),
   allowedDomains: z.string(),
+  allowOperationalContext: z.boolean(),
+  operationalContextMode: z.string(),
+  maxOperationalContextTokens: z.number(),
+  includeDeviceNamesInContext: z.boolean(),
+  includeUserNamesInContext: z.boolean(),
   hasSecret: z.boolean(),
   lastValidatedAt: nullableIsoDateTimeSchema,
   lastValidationStatus: z.string(),
@@ -53,9 +58,33 @@ export const saveTenantAiProfileSchema = z.object({
   includeCitations: z.boolean(),
   maxResearchSources: z.number().int().positive(),
   allowedDomains: z.string(),
+  allowOperationalContext: z.boolean(),
+  operationalContextMode: z.enum(['Disabled', 'StructuredOnly', 'StructuredAndSemantic']),
+  maxOperationalContextTokens: z.number().int().min(100).max(32000),
+  includeDeviceNamesInContext: z.boolean(),
+  includeUserNamesInContext: z.boolean(),
   apiKey: z.string(),
   numCtx: z.number().int().positive().nullable().optional(),
   responseFormat: z.enum(['None', 'Json']).optional(),
+})
+
+export const operationalContextCitationSchema = z.object({
+  key: z.string(),
+  entityType: z.string(),
+  entityId: z.string(),
+  label: z.string(),
+  fact: z.string(),
+  riskWeight: z.number(),
+})
+
+export const aiContextPreviewSchema = z.object({
+  contextKind: z.string(),
+  subjectId: z.string(),
+  tokenEstimate: z.number(),
+  truncated: z.boolean(),
+  generatedAt: nullableIsoDateTimeSchema,
+  context: z.record(z.string(), z.any()),
+  citations: z.array(operationalContextCitationSchema),
 })
 
 export const tenantAiProfileValidationSchema = z.object({
@@ -72,5 +101,6 @@ export const tenantAiProfileModelsSchema = z.object({
 
 export type TenantAiProfile = z.infer<typeof tenantAiProfileSchema>
 export type SaveTenantAiProfile = z.infer<typeof saveTenantAiProfileSchema>
+export type AiContextPreview = z.infer<typeof aiContextPreviewSchema>
 export type TenantAiProfileValidation = z.infer<typeof tenantAiProfileValidationSchema>
 export type TenantAiProfileModels = z.infer<typeof tenantAiProfileModelsSchema>

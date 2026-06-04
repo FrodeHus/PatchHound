@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost, apiPut } from '@/server/api'
 import {
+  aiContextPreviewSchema,
   tenantAiProfileModelsSchema,
   saveTenantAiProfileSchema,
   tenantAiProfileSchema,
@@ -41,6 +42,22 @@ export const setDefaultTenantAiProfile = createServerFn({ method: 'POST' })
   .handler(async ({ context, data: { id } }) => {
     const data = await apiPost(`/settings/ai/profiles/${id}/set-default`, context)
     return tenantAiProfileSchema.parse(data)
+  })
+
+export const previewVulnerabilityContext = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ vulnerabilityId: z.string().uuid() }))
+  .handler(async ({ context, data: { vulnerabilityId } }) => {
+    const data = await apiGet(`/ai/context/vulnerabilities/${vulnerabilityId}`, context)
+    return aiContextPreviewSchema.parse(data)
+  })
+
+export const previewRemediationCaseContext = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ caseId: z.string().uuid() }))
+  .handler(async ({ context, data: { caseId } }) => {
+    const data = await apiGet(`/ai/context/remediation-cases/${caseId}`, context)
+    return aiContextPreviewSchema.parse(data)
   })
 
 export const fetchTenantAiProfileModels = createServerFn({ method: 'POST' })

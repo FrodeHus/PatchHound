@@ -27,7 +27,12 @@ public record TenantAiProfileDto(
     string LastValidationStatus,
     string LastValidationError,
     int? NumCtx,
-    string ResponseFormat
+    string ResponseFormat,
+    bool AllowOperationalContext,
+    string OperationalContextMode,
+    int MaxOperationalContextTokens,
+    bool IncludeDeviceNamesInContext,
+    bool IncludeUserNamesInContext
 );
 
 public record SaveTenantAiProfileRequest(
@@ -53,7 +58,12 @@ public record SaveTenantAiProfileRequest(
     string ApiKey,
     int? NumCtx,
     string? ResponseFormat,
-    string ResearchSourceKey = ""
+    string ResearchSourceKey = "",
+    bool AllowOperationalContext = false,
+    string OperationalContextMode = "StructuredOnly",
+    int MaxOperationalContextTokens = 3000,
+    bool IncludeDeviceNamesInContext = true,
+    bool IncludeUserNamesInContext = false
 );
 
 public record TenantAiProfileValidationResultDto(
