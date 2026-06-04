@@ -148,6 +148,19 @@ export const aiRecommendationDraftSchema = z.object({
   recommendedOutcome: z.string(),
   priorityOverride: z.string(),
   rationale: z.string(),
+  operationalContextUsed: z.boolean().optional(),
+  uncited: z.boolean().optional(),
+  citations: z
+    .array(
+      z.object({
+        key: z.string(),
+        entityType: z.string(),
+        entityId: z.string(),
+        label: z.string(),
+        fact: z.string(),
+      })
+    )
+    .optional(),
 })
 
 export const patchAssessmentSchema = z.object({
