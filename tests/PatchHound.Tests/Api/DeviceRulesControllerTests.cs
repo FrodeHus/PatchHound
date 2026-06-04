@@ -6,6 +6,7 @@ using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.DeviceRules;
+using PatchHound.Api.Services;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -63,19 +64,33 @@ public class DeviceRulesControllerTests : IDisposable
             Substitute.For<MaterializedViewRefreshService>(_dbContext)
         );
         var filterBuilder = new DeviceRuleFilterBuilder(_dbContext);
+        var softwareFilterBuilder = new SoftwareRuleFilterBuilder();
+        var cloudApplicationFilterBuilder = new CloudApplicationRuleFilterBuilder();
         var evaluationService = new DeviceRuleEvaluationService(
             _dbContext,
             filterBuilder,
-            new SoftwareRuleFilterBuilder(),
+            softwareFilterBuilder,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<DeviceRuleEvaluationService>>()
         );
+        var definitionService = new DeviceRuleDefinitionService(_dbContext);
+        var previewService = new DeviceRulePreviewService(
+            _dbContext,
+            evaluationService,
+            softwareFilterBuilder,
+            cloudApplicationFilterBuilder);
+        var cleanupService = new DeviceRuleCleanupService(
+            _dbContext,
+            filterBuilder,
+            softwareFilterBuilder,
+            cloudApplicationFilterBuilder);
 
         _controller = new DeviceRulesController(
             _dbContext,
             _tenantContext,
             evaluationService,
-            filterBuilder,
-            new SoftwareRuleFilterBuilder(),
+            definitionService,
+            previewService,
+            cleanupService,
             riskRefreshService
         );
     }

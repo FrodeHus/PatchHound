@@ -23,6 +23,9 @@ public static class PatchHoundApiServiceExtensions
         services.AddScoped<DashboardQueryService>();
         services.AddScoped<VulnerabilityDetailQueryService>();
         services.AddScoped<DeviceDetailQueryService>();
+        services.AddScoped<DeviceRuleDefinitionService>();
+        services.AddScoped<DeviceRulePreviewService>();
+        services.AddScoped<DeviceRuleCleanupService>();
         services.AddScoped<RemediationDecisionQueryService>();
         services.AddScoped<ThreatIntelGenerationService>();
         services.AddScoped<AiRecommendationDraftService>();
