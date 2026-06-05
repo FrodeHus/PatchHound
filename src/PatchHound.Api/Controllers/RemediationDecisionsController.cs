@@ -142,6 +142,7 @@ public class RemediationDecisionsController(
             userId,
             request.VulnerabilityId,
             request.PriorityOverride,
+            request.ContextSnapshotId,
             ct
         );
 

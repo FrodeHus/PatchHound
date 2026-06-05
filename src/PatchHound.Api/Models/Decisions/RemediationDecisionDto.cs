@@ -203,7 +203,8 @@ public record CreateRecommendationRequest(
     string RecommendedOutcome,
     string Rationale,
     string? PriorityOverride,
-    Guid? VulnerabilityId
+    Guid? VulnerabilityId,
+    Guid? ContextSnapshotId = null
 );
 
 public record VerifyRemediationRequest(
