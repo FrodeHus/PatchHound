@@ -61,7 +61,8 @@ public record AiRecommendationDraftDto(
     string Rationale,
     bool OperationalContextUsed = false,
     bool Uncited = false,
-    IReadOnlyList<AiCitationDto>? Citations = null
+    IReadOnlyList<AiCitationDto>? Citations = null,
+    Guid? ContextSnapshotId = null
 );
 
 public record DecisionSummaryDto(

@@ -428,7 +428,7 @@ public class RemediationDecisionsController(
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var result = await aiRecommendationDraftService.GenerateAsync(tenantId, caseId, ct);
+        var result = await aiRecommendationDraftService.GenerateAsync(tenantId, caseId, tenantContext.CurrentUserId, ct);
         if (!result.IsSuccess)
         {
             if (result.Error == "Remediation case not found.")
