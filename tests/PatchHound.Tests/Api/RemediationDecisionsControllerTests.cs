@@ -90,6 +90,36 @@ public class RemediationDecisionsControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetRecommendationContext_ReturnsSnapshotForTenant()
+    {
+        var caseId = Guid.NewGuid();
+        var snapshot = RecommendationContextSnapshot.Create(
+            _tenantId, caseId, "{\"contextKind\":\"RemediationCase\"}", "hash", "[]", _userId);
+        _dbContext.RecommendationContextSnapshots.Add(snapshot);
+        await _dbContext.SaveChangesAsync();
+
+        var controller = CreateController();
+
+        var result = await controller.GetRecommendationContext(caseId, snapshot.Id, CancellationToken.None);
+
+        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var dto = ok.Value.Should().BeOfType<RecommendationContextSnapshotDto>().Subject;
+        dto.Id.Should().Be(snapshot.Id);
+        dto.Context.ContextKind.Should().Be("RemediationCase");
+    }
+
+    [Fact]
+    public async Task GetRecommendationContext_ReturnsNotFoundForUnknownId()
+    {
+        var controller = CreateController();
+
+        var result = await controller.GetRecommendationContext(
+            Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        result.Result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
     public async Task CreateDecision_RejectsNumericDeadlineMode()
     {
         var caseId = await SeedActiveDecisionWorkflowAsync();

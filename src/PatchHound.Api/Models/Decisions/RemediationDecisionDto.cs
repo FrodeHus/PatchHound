@@ -144,7 +144,16 @@ public record AnalystRecommendationDto(
     string? PriorityOverride,
     Guid AnalystId,
     string? AnalystDisplayName,
-    DateTimeOffset CreatedAt
+    DateTimeOffset CreatedAt,
+    Guid? ContextSnapshotId = null
+);
+
+public record RecommendationContextSnapshotDto(
+    Guid Id,
+    Guid RemediationCaseId,
+    DateTimeOffset GeneratedAt,
+    PatchHound.Core.Models.OperationalContext.OperationalContextPack Context,
+    IReadOnlyList<PatchHound.Core.Models.OperationalContext.OperationalContextCitation> Citations
 );
 
 public record DecisionVulnDto(

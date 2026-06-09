@@ -786,7 +786,8 @@ public class RemediationDecisionQueryService(
             r.PriorityOverride,
             r.AnalystId,
             recommendationAnalystNames.GetValueOrDefault(r.AnalystId),
-            r.CreatedAt
+            r.CreatedAt,
+            r.ContextSnapshotId
         )).ToList();
 
         if (activeWorkflow?.RecurrenceSourceWorkflowId is Guid recurrenceSourceWorkflowId)
