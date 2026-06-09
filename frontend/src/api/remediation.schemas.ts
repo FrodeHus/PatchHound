@@ -150,6 +150,7 @@ export const aiRecommendationDraftSchema = z.object({
   rationale: z.string(),
   operationalContextUsed: z.boolean().optional(),
   uncited: z.boolean().optional(),
+  contextSnapshotId: z.string().uuid().nullish(),
   citations: z
     .array(
       z.object({
