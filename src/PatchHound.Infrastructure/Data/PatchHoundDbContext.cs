@@ -122,6 +122,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<ApprovedVulnerabilityRemediation> ApprovedVulnerabilityRemediations =>
         Set<ApprovedVulnerabilityRemediation>();
     public DbSet<AnalystRecommendation> AnalystRecommendations => Set<AnalystRecommendation>();
+    public DbSet<RecommendationContextSnapshot> RecommendationContextSnapshots =>
+        Set<RecommendationContextSnapshot>();
     public DbSet<PatchingTask> PatchingTasks => Set<PatchingTask>();
     public DbSet<ApprovalTask> ApprovalTasks => Set<ApprovalTask>();
     public DbSet<ApprovalTaskVisibleRole> ApprovalTaskVisibleRoles => Set<ApprovalTaskVisibleRole>();
@@ -381,6 +383,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AnalystRecommendation>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<RecommendationContextSnapshot>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<PatchingTask>()

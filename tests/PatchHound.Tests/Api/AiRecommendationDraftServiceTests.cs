@@ -18,6 +18,7 @@ namespace PatchHound.Tests.Api;
 public class AiRecommendationDraftServiceTests : IDisposable
 {
     private readonly Guid _tenantId = Guid.NewGuid();
+    private readonly Guid _userId = Guid.NewGuid();
     private readonly ITenantContext _tenantContext;
     private readonly PatchHoundDbContext _dbContext;
 
@@ -97,7 +98,7 @@ public class AiRecommendationDraftServiceTests : IDisposable
             contextService
         );
 
-        var result = await service.GenerateAsync(_tenantId, remediationCase.Id, CancellationToken.None);
+        var result = await service.GenerateAsync(_tenantId, remediationCase.Id, _userId, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue(result.Error);
         capturedRequest.Should().NotBeNull();
@@ -138,7 +139,7 @@ public class AiRecommendationDraftServiceTests : IDisposable
             aiResolver,
             contextService);
 
-        var result = await service.GenerateAsync(_tenantId, caseId, CancellationToken.None);
+        var result = await service.GenerateAsync(_tenantId, caseId, _userId, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue(result.Error);
         await contextService.Received(1).BuildForRemediationCaseAsync(
@@ -176,7 +177,7 @@ public class AiRecommendationDraftServiceTests : IDisposable
             aiResolver,
             contextService);
 
-        var result = await service.GenerateAsync(_tenantId, caseId, CancellationToken.None);
+        var result = await service.GenerateAsync(_tenantId, caseId, _userId, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue(result.Error);
         await contextService.DidNotReceiveWithAnyArgs().BuildForRemediationCaseAsync(
@@ -214,7 +215,7 @@ public class AiRecommendationDraftServiceTests : IDisposable
             aiResolver,
             contextService);
 
-        var result = await service.GenerateAsync(_tenantId, caseId, CancellationToken.None);
+        var result = await service.GenerateAsync(_tenantId, caseId, _userId, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue(result.Error);
         result.Value.OperationalContextUsed.Should().BeTrue();
@@ -223,6 +224,84 @@ public class AiRecommendationDraftServiceTests : IDisposable
         result.Value.RecommendedOutcome.Should().Be("ApprovedForPatching");
         result.Value.PriorityOverride.Should().Be("Critical");
         result.Value.Rationale.Should().Be("Patch now.");
+    }
+
+    [Fact]
+    public async Task GenerateAsync_persists_context_snapshot_when_grounded()
+    {
+        var caseId = await SeedSingleAssessmentCaseAsync();
+        const string packJson = "{\"contextKind\":\"RemediationCase\"}";
+
+        var provider = StubProvider(
+            _ => { },
+            """
+            {
+              "recommendedOutcome": "ApprovedForPatching",
+              "priorityOverride": "Critical",
+              "rationale": "Patch now.",
+              "citations": ["device-risk-top-1"]
+            }
+            """);
+
+        var profile = TenantAiProfileFactory.Create(_tenantId, allowOperationalContext: true);
+        var aiResolver = ResolverFor(profile);
+
+        var contextService = Substitute.For<IAiOperationalContextService>();
+        contextService
+            .BuildForRemediationCaseAsync(_tenantId, caseId, Arg.Any<AiOperationalContextOptions>(), Arg.Any<CancellationToken>())
+            .Returns(PackWithJson(packJson, "device-risk-top-1"));
+
+        var service = new AiRecommendationDraftService(
+            _dbContext,
+            new TenantAiTextGenerationService([provider], aiResolver),
+            aiResolver,
+            contextService);
+
+        var result = await service.GenerateAsync(_tenantId, caseId, _userId, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.Error);
+        result.Value.ContextSnapshotId.Should().NotBeNull();
+
+        var snapshot = await _dbContext.RecommendationContextSnapshots
+            .FirstOrDefaultAsync(s => s.Id == result.Value.ContextSnapshotId);
+        snapshot.Should().NotBeNull();
+        snapshot!.TenantId.Should().Be(_tenantId);
+        snapshot.RemediationCaseId.Should().Be(caseId);
+        snapshot.GeneratedBy.Should().Be(_userId);
+        snapshot.ContextJson.Should().Be(packJson);
+        snapshot.ContextHash.Should().HaveLength(64);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_does_not_persist_snapshot_when_context_disallowed()
+    {
+        var caseId = await SeedSingleAssessmentCaseAsync();
+
+        var provider = StubProvider(
+            _ => { },
+            """
+            {
+              "recommendedOutcome": "ApprovedForPatching",
+              "priorityOverride": "Critical",
+              "rationale": "Patch now."
+            }
+            """);
+
+        var profile = TenantAiProfileFactory.Create(_tenantId, allowOperationalContext: false);
+        var aiResolver = ResolverFor(profile);
+        var contextService = Substitute.For<IAiOperationalContextService>();
+
+        var service = new AiRecommendationDraftService(
+            _dbContext,
+            new TenantAiTextGenerationService([provider], aiResolver),
+            aiResolver,
+            contextService);
+
+        var result = await service.GenerateAsync(_tenantId, caseId, _userId, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.Error);
+        result.Value.ContextSnapshotId.Should().BeNull();
+        (await _dbContext.RecommendationContextSnapshots.AnyAsync()).Should().BeFalse();
     }
 
     private static IAiReportProvider StubProvider(Action<AiTextGenerationRequest> capture, string response)
@@ -247,10 +326,13 @@ public class AiRecommendationDraftServiceTests : IDisposable
     }
 
     private static AiOperationalContextResult PackWith(params string[] keys) =>
+        PackWithJson("{}", keys);
+
+    private static AiOperationalContextResult PackWithJson(string packJson, params string[] keys) =>
         new()
         {
             Pack = new OperationalContextPack(),
-            PackJson = "{}",
+            PackJson = packJson,
             Citations = keys
                 .Select((key, index) => new OperationalContextCitation
                 {

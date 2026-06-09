@@ -19,6 +19,7 @@ public class AnalystRecommendationService(
         Guid analystId,
         Guid? vulnerabilityId = null,
         string? priorityOverride = null,
+        Guid? contextSnapshotId = null,
         CancellationToken ct = default
     )
     {
@@ -27,6 +28,21 @@ public class AnalystRecommendationService(
             remediationCaseId,
             ct
         );
+
+        // Only link a snapshot that belongs to this same tenant + case. A forged or foreign id
+        // is ignored (the recommendation still saves, just without an audit link).
+        Guid? verifiedSnapshotId = null;
+        if (contextSnapshotId is Guid snapshotId)
+        {
+            var snapshotMatches = await dbContext.RecommendationContextSnapshots
+                .AnyAsync(snapshot =>
+                    snapshot.Id == snapshotId
+                    && snapshot.TenantId == tenantId
+                    && snapshot.RemediationCaseId == remediationCaseId,
+                    ct);
+            if (snapshotMatches)
+                verifiedSnapshotId = snapshotId;
+        }
 
         var recommendation = await dbContext.AnalystRecommendations
             .FirstOrDefaultAsync(item =>
@@ -44,7 +60,8 @@ public class AnalystRecommendationService(
                 rationale,
                 analystId,
                 vulnerabilityId,
-                priorityOverride
+                priorityOverride,
+                verifiedSnapshotId
             );
 
             await dbContext.AnalystRecommendations.AddAsync(recommendation, ct);
@@ -56,7 +73,8 @@ public class AnalystRecommendationService(
                 rationale,
                 analystId,
                 vulnerabilityId,
-                priorityOverride
+                priorityOverride,
+                verifiedSnapshotId
             );
         }
 

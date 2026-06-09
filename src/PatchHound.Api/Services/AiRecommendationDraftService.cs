@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Models.Decisions;
 using PatchHound.Core.Common;
 using PatchHound.Core.Constants;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
@@ -51,6 +52,7 @@ public class AiRecommendationDraftService(
     public async Task<Result<AiRecommendationDraftDto>> GenerateAsync(
         Guid tenantId,
         Guid caseId,
+        Guid userId,
         CancellationToken ct)
     {
         var case_ = await dbContext.RemediationCases.AsNoTracking()
@@ -185,6 +187,22 @@ public class AiRecommendationDraftService(
             ? new CitationValidationResult([], false)
             : OperationalContextCitationValidator.Validate(parsed.Citations ?? [], context.Citations);
 
+        Guid? contextSnapshotId = null;
+        if (context is not null)
+        {
+            var hash = Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(
+                    Encoding.UTF8.GetBytes(context.PackJson))).ToLowerInvariant();
+            var citationsJson = JsonSerializer.Serialize(
+                validation.Citations,
+                OperationalContextPack.SerializerOptions);
+            var snapshot = RecommendationContextSnapshot.Create(
+                tenantId, caseId, context.PackJson, hash, citationsJson, userId);
+            await dbContext.RecommendationContextSnapshots.AddAsync(snapshot, ct);
+            await dbContext.SaveChangesAsync(ct);
+            contextSnapshotId = snapshot.Id;
+        }
+
         return Result<AiRecommendationDraftDto>.Success(new AiRecommendationDraftDto(
             NormalizeMatch(parsed.RecommendedOutcome, SupportedOutcomes),
             NormalizeMatch(parsed.PriorityOverride, SupportedPriorities),
@@ -193,7 +211,8 @@ public class AiRecommendationDraftService(
             Uncited: context is not null && validation.Uncited,
             Citations: validation.Citations
                 .Select(c => new AiCitationDto(c.Key, c.EntityType, c.EntityId, c.Label, c.Fact))
-                .ToList()
+                .ToList(),
+            ContextSnapshotId: contextSnapshotId
         ));
     }
 

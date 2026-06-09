@@ -13,6 +13,7 @@ public class AnalystRecommendation
     public string Rationale { get; private set; } = null!;
     public string? PriorityOverride { get; private set; }
     public Guid AnalystId { get; private set; }
+    public Guid? ContextSnapshotId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
     public RemediationCase RemediationCase { get; private set; } = null!;
@@ -27,7 +28,8 @@ public class AnalystRecommendation
         string rationale,
         Guid analystId,
         Guid? vulnerabilityId = null,
-        string? priorityOverride = null)
+        string? priorityOverride = null,
+        Guid? contextSnapshotId = null)
     {
         if (string.IsNullOrWhiteSpace(rationale))
             throw new ArgumentException("Rationale is required.");
@@ -42,6 +44,7 @@ public class AnalystRecommendation
             Rationale = rationale,
             PriorityOverride = priorityOverride,
             AnalystId = analystId,
+            ContextSnapshotId = contextSnapshotId,
             CreatedAt = DateTimeOffset.UtcNow,
         };
     }
@@ -56,7 +59,8 @@ public class AnalystRecommendation
         string rationale,
         Guid analystId,
         Guid? vulnerabilityId = null,
-        string? priorityOverride = null)
+        string? priorityOverride = null,
+        Guid? contextSnapshotId = null)
     {
         if (string.IsNullOrWhiteSpace(rationale))
             throw new ArgumentException("Rationale is required.");
@@ -66,6 +70,7 @@ public class AnalystRecommendation
         AnalystId = analystId;
         VulnerabilityId = vulnerabilityId;
         PriorityOverride = priorityOverride;
+        ContextSnapshotId = contextSnapshotId;
         CreatedAt = DateTimeOffset.UtcNow;
     }
 }

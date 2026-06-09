@@ -67,6 +67,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
     operationalContextUsed: boolean
     uncited: boolean
     citations: { key: string; label: string; fact: string; entityType: string; entityId: string }[]
+    contextSnapshotId: string | null
   } | null>(null)
   const [citedFactsOpen, setCitedFactsOpen] = useState(false)
   const [requestingAssessment, setRequestingAssessment] = useState(false)
@@ -128,6 +129,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
           recommendedOutcome,
           rationale: rationale.trim(),
           priorityOverride: priorityOverride || undefined,
+          contextSnapshotId: aiDraftMeta?.contextSnapshotId ?? undefined,
         },
       })
       await Promise.all([
@@ -180,6 +182,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
         operationalContextUsed: draft.operationalContextUsed ?? false,
         uncited: draft.uncited ?? false,
         citations: draft.citations ?? [],
+        contextSnapshotId: draft.contextSnapshotId ?? null,
       })
     } catch (err) {
       setError(getApiErrorMessage(err, 'Unable to apply the AI recommendation draft.'))

@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PatchHound.Api.Auth;
+using PatchHound.Core.Models.OperationalContext;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.ApprovalTasks;
 using PatchHound.Api.Models.Decisions;
@@ -115,6 +117,35 @@ public class RemediationDecisionsController(
         return Ok(context.Recommendations);
     }
 
+    [HttpGet("recommendations/context/{snapshotId:guid}")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
+    public async Task<ActionResult<RecommendationContextSnapshotDto>> GetRecommendationContext(
+        Guid caseId,
+        Guid snapshotId,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var snapshot = await dbContext.RecommendationContextSnapshots.AsNoTracking()
+            .FirstOrDefaultAsync(item =>
+                item.Id == snapshotId
+                && item.TenantId == tenantId
+                && item.RemediationCaseId == caseId,
+                ct);
+        if (snapshot is null)
+            return NotFound(new ProblemDetails { Title = "Context snapshot not found." });
+
+        var pack = JsonSerializer.Deserialize<OperationalContextPack>(
+            snapshot.ContextJson, OperationalContextPack.SerializerOptions)!;
+        var citations = JsonSerializer.Deserialize<List<OperationalContextCitation>>(
+            snapshot.CitationsJson, OperationalContextPack.SerializerOptions) ?? [];
+
+        return Ok(new RecommendationContextSnapshotDto(
+            snapshot.Id, snapshot.RemediationCaseId, snapshot.GeneratedAt, pack, citations));
+    }
+
     [HttpPost("analysis")]
     [Authorize(Policy = Policies.AddComments)]
     public async Task<ActionResult<AnalystRecommendationDto>> AddRecommendation(
@@ -142,6 +173,7 @@ public class RemediationDecisionsController(
             userId,
             request.VulnerabilityId,
             request.PriorityOverride,
+            request.ContextSnapshotId,
             ct
         );
 
@@ -156,7 +188,8 @@ public class RemediationDecisionsController(
         var r = result.Value;
         return Created("", new AnalystRecommendationDto(
             r.Id, r.VulnerabilityId, r.RecommendedOutcome.ToString(),
-            r.Rationale, r.PriorityOverride, r.AnalystId, analystDisplayName, r.CreatedAt
+            r.Rationale, r.PriorityOverride, r.AnalystId, analystDisplayName, r.CreatedAt,
+            r.ContextSnapshotId
         ));
     }
 
@@ -428,7 +461,7 @@ public class RemediationDecisionsController(
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var result = await aiRecommendationDraftService.GenerateAsync(tenantId, caseId, ct);
+        var result = await aiRecommendationDraftService.GenerateAsync(tenantId, caseId, tenantContext.CurrentUserId, ct);
         if (!result.IsSuccess)
         {
             if (result.Error == "Remediation case not found.")

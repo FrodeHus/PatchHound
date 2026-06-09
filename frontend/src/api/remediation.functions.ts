@@ -100,6 +100,7 @@ export const addRecommendation = createServerFn({ method: 'POST' })
       rationale: z.string(),
       priorityOverride: z.string().optional(),
       vulnerabilityId: z.string().uuid().optional(),
+      contextSnapshotId: z.string().uuid().optional(),
     })
   )
   .handler(async ({ context, data: { caseId, ...body } }) => {
